@@ -1,0 +1,21 @@
+{
+  "name": "cc1010-scc",
+  "version": "0.1.0",
+  "private": true,
+  "description": "КЦ1010 — контроль качества звонков: ядро расчёта, схема Postgres и перенос данных из Google Таблиц",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=18"
+  },
+  "main": "lib/core.js",
+  "scripts": {
+    "db:schema": "psql \"$DATABASE_URL\" -f db/schema.sql",
+    "migrate": "node scripts/migrate.js",
+    "test": "node test/parity.js && node test/migration.js",
+    "test:parity": "node test/parity.js",
+    "test:migration": "node test/migration.js"
+  },
+  "dependencies": {
+    "pg": "^8.23.0"
+  }
+}

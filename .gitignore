@@ -1,30 +1,26 @@
-# зависимости
 node_modules/
+.next/
+out/
 
-# переменные окружения — DATABASE_URL от Neon сюда не попадает
+# переменные окружения — строка Neon сюда не попадает
 .env
 .env.*
 !.env.example
 
-# выгрузки из Google Таблиц: персональные данные, в репозиторий не кладём
+# выгрузки листов: персональные данные, в репозиторий не кладём
 dump.json
 *.dump.json
 from_xlsx.json
 generated.json
-/data/
-/tmp/
 
-# логи и мусор
 *.log
 npm-debug.log*
 .DS_Store
 Thumbs.db
 desktop.ini
 
-# редакторы
 .vscode/*
 !.vscode/extensions.json
 .idea/
 
-# Vercel
 .vercel

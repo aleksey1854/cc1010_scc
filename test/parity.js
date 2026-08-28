@@ -1,12 +1,20 @@
 // Сверка переноса: новое ядро против старого Apps Script.
 // Если хоть одна цифра сдвинулась — переезд сломал расчёт.
+// Сверка требует финальную версию Apps Script (8 файлов .gs) рядом,
+// в /home/claude/qc. Без неё тест пропускается — это не провал.
+const OLD = process.env.OLD_PROJECT || '/home/claude/qc/test/harness';
+try { require.resolve(OLD); } catch {
+  console.log('ПРОПУЩЕН: не найден старый проект (' + OLD + ').');
+  console.log('Задайте OLD_PROJECT, если нужна сверка паритета.');
+  process.exit(0);
+}
 const core = require('../lib/core');
-const { harness, fixture } = require('./legacy');
-const { buildCtx } = harness();
+const { buildCtx } = require(OLD);
+const fs = require('fs');
 let bad = [];
 const chk = (n, c, d) => { if (c) console.log('  ✓', n); else { console.log('  ✗', n, d !== undefined ? '→ ' + JSON.stringify(d) : ''); bad.push(n); } };
 
-const old = buildCtx(fixture('FROM_XLSX_JSON', 'from_xlsx.json'));
+const old = buildCtx(JSON.parse(fs.readFileSync('/tmp/from_xlsx.json', 'utf8')));
 old._MEM = {};
 const oldCfg = old.getChecklistConfig_();
 

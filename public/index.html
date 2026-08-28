@@ -1,0 +1,1830 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+  :root{
+    --paper:#EEF1F6; --surface:#FFFFFF; --surface-2:#F7F9FC;
+    --border:#E4E8F0; --border-strong:#D3DAE6;
+    --ink:#121722; --ink-2:#414b5c; --muted:#8b94a5;
+    --accent:#2B59F0; --accent-ink:#1B3AC2; --accent-soft:#E9EFFF;
+    --good:#0FA45A; --good-bg:#E4F6EC;
+    --mid:#DE9109;  --mid-bg:#FAF0DA;
+    --bad:#E23A3A;  --bad-bg:#FBE7E7;
+    --new:#2B59F0;  --new-bg:#E9EFFF;
+    --radius:14px; --radius-sm:10px;
+    --shadow:0 1px 2px rgba(18,23,34,.05), 0 2px 8px rgba(18,23,34,.04);
+    --shadow-lg:0 12px 40px rgba(18,23,34,.18);
+    --font:'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --display:'Space Grotesk', var(--font);
+    --login-bg:#0B1019; --login-card:#131b2b; --login-line:rgba(255,255,255,.08);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:var(--font); background:var(--paper); color:var(--ink); min-height:100vh; -webkit-font-smoothing:antialiased; }
+  .hidden { display:none !important; }
+  ::selection { background:var(--accent); color:#fff; }
+
+  /* ===== ВХОД (консоль) ===== */
+  .login-wrapper{
+    display:flex; justify-content:center; align-items:center; min-height:100vh; padding:20px;
+    background:
+      radial-gradient(900px 500px at 50% -10%, rgba(43,89,240,.22), transparent 60%),
+      radial-gradient(circle at 1px 1px, rgba(255,255,255,.05) 1px, transparent 0) 0 0/22px 22px,
+      var(--login-bg);
+  }
+  .login-container{
+    background:var(--login-card); padding:44px 38px; border-radius:20px;
+    border:1px solid var(--login-line); box-shadow:var(--shadow-lg);
+    width:400px; max-width:100%; text-align:center; animation:rise .5s cubic-bezier(.2,.7,.3,1) both;
+  }
+  .logo{
+    width:60px; height:60px; margin:0 auto 18px; border-radius:16px;
+    display:inline-flex; align-items:center; justify-content:center;
+    background:linear-gradient(180deg,#2B59F0,#1B3AC2); color:#fff; font-size:26px;
+    box-shadow:0 8px 24px rgba(43,89,240,.45);
+  }
+  .login-container h1{ color:#fff; font-family:var(--display); font-size:23px; font-weight:600; letter-spacing:-.2px; margin-bottom:8px; }
+  .subtitle{ color:#93a0b8; font-size:14px; margin-bottom:28px; }
+  .pin-input-container{ position:relative; margin-bottom:14px; }
+  .pin-input-container i{ position:absolute; left:16px; top:50%; transform:translateY(-50%); color:#5c6a86; font-size:16px; }
+  .pin-input-container input{
+    width:100%; padding:15px 44px 15px 46px; border:1.5px solid rgba(255,255,255,.12); border-radius:12px;
+    font-size:16px; outline:none; background:#0d1523; color:#fff; transition:border-color .2s, box-shadow .2s; margin-bottom:18px;
+  }
+  .pin-input-container input::placeholder{ color:#3a465e; }
+  .pin-input-container input:focus{ border-color:var(--accent); box-shadow:0 0 0 4px rgba(43,89,240,.22); }
+  .pw-eye{ position:absolute; right:12px; top:50%; transform:translateY(-50%); background:transparent; border:none; color:#5c6a86; cursor:pointer; font-size:15px; padding:6px; }
+  .pw-eye:hover{ color:var(--accent); }
+  .login-btn{
+    width:100%; padding:15px; background:var(--accent); color:#fff; border:none; border-radius:12px;
+    font-family:var(--display); font-size:16px; font-weight:600; cursor:pointer; transition:transform .15s, background .2s, box-shadow .2s;
+  }
+  .login-btn:hover{ background:var(--accent-ink); transform:translateY(-1px); box-shadow:0 10px 26px rgba(43,89,240,.4); }
+  .login-btn:active{ transform:translateY(0); }
+  .error-message{ color:#ff8a8a; font-size:14px; margin-top:15px; min-height:20px; }
+
+  /* ===== ШАПКА ===== */
+  .header{
+    background:var(--surface); color:var(--ink); padding:14px 26px; border-bottom:1px solid var(--border);
+    display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px;
+    position:sticky; top:0; z-index:50;
+  }
+  .header h1{ font-family:var(--display); font-size:18px; font-weight:600; letter-spacing:-.2px; display:flex; align-items:center; gap:12px; }
+  .header h1 i{
+    width:36px; height:36px; border-radius:10px; background:var(--accent-soft); color:var(--accent);
+    display:inline-flex; align-items:center; justify-content:center; font-size:16px; margin:0;
+  }
+  .user-info{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .user-badge{ background:var(--surface-2); border:1px solid var(--border); color:var(--ink-2); padding:7px 13px; border-radius:9px; font-size:13px; font-weight:500; }
+  .user-badge i{ margin-right:6px; color:var(--muted); }
+  .logout-btn{ background:transparent; border:1px solid var(--border-strong); color:var(--ink-2); padding:7px 15px; border-radius:9px; cursor:pointer; font-size:13px; font-weight:500; transition:.2s; }
+  .logout-btn:hover{ background:var(--bad-bg); border-color:var(--bad); color:var(--bad); }
+
+  .container{ max-width:1200px; margin:0 auto; padding:24px 20px 40px; }
+
+  /* ===== СТАТ-КАРТЫ ===== */
+  .stats-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:14px; margin-bottom:22px; }
+  .stat-card{
+    background:var(--surface); padding:18px 20px; border-radius:var(--radius); border:1px solid var(--border);
+    box-shadow:var(--shadow); position:relative; overflow:hidden;
+  }
+  .stat-card::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--muted); }
+  .stat-card .number{ font-family:var(--display); font-size:30px; font-weight:700; line-height:1; color:var(--ink); font-variant-numeric:tabular-nums; letter-spacing:-.5px; }
+  .stat-card .label{ font-size:11px; color:var(--muted); margin-top:8px; text-transform:uppercase; letter-spacing:.6px; font-weight:600; }
+  .stat-card .number.new{ color:var(--new); }
+  .stat-card .number.inprogress{ color:var(--mid); }
+  .stat-card .number.checked{ color:var(--good); }
+  .stat-card .number.rejected{ color:var(--bad); }
+  .stat-card .number.rating{ color:var(--accent); }
+  .stat-card:has(.number.new)::before{ background:var(--new); }
+  .stat-card:has(.number.inprogress)::before{ background:var(--mid); }
+  .stat-card:has(.number.checked)::before{ background:var(--good); }
+  .stat-card:has(.number.rejected)::before{ background:var(--bad); }
+  .stat-card:has(.number.rating)::before{ background:var(--accent); }
+
+  /* ===== КАРТОЧКИ ===== */
+  .card{ background:var(--surface); border-radius:var(--radius); border:1px solid var(--border); box-shadow:var(--shadow); padding:22px 24px; margin-bottom:22px; }
+  .card-title{ font-family:var(--display); font-size:16px; font-weight:600; color:var(--ink); margin-bottom:18px; padding-bottom:14px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:11px; letter-spacing:-.1px; }
+  .card-title i{ width:30px; height:30px; border-radius:9px; background:var(--accent-soft); color:var(--accent); display:inline-flex; align-items:center; justify-content:center; font-size:14px; margin:0; }
+
+  /* ===== ФОРМЫ ===== */
+  .form-grid{ display:grid; grid-template-columns:1fr 1fr; gap:15px; }
+  .form-group{ display:flex; flex-direction:column; }
+  .form-group.full-width{ grid-column:1/-1; }
+  .form-group label{ font-size:13px; font-weight:600; color:var(--ink-2); margin-bottom:6px; }
+  .form-group input, .form-group select, .form-group textarea{
+    padding:11px 14px; border:1.5px solid var(--border-strong); border-radius:var(--radius-sm); font-size:15px; outline:none; font-family:inherit; color:var(--ink); background:var(--surface); transition:border-color .2s, box-shadow .2s;
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus{ border-color:var(--accent); box-shadow:0 0 0 3px rgba(43,89,240,.14); }
+
+  .btn-submit{ padding:13px 30px; background:var(--accent); color:#fff; border:none; border-radius:var(--radius-sm); font-family:var(--display); font-size:15px; font-weight:600; cursor:pointer; transition:transform .15s, background .2s, box-shadow .2s; width:100%; }
+  .btn-submit:hover{ background:var(--accent-ink); transform:translateY(-1px); box-shadow:0 8px 20px rgba(43,89,240,.28); }
+  .btn-submit:disabled{ opacity:.55; cursor:not-allowed; transform:none; box-shadow:none; }
+  .hint{ display:block; color:var(--muted); font-size:12px; margin-top:5px; }
+  .seg{ display:inline-flex; background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:4px; margin-bottom:16px; gap:4px; }
+  .seg-btn{ border:none; background:transparent; color:var(--ink-2); font-family:var(--display); font-weight:600; font-size:14px; padding:9px 18px; border-radius:9px; cursor:pointer; transition:.15s; }
+  .seg-btn.active{ background:var(--accent); color:#fff; box-shadow:0 2px 8px rgba(43,89,240,.28); }
+  .status-badge.Без_звонка{ background:#eceff5; color:#6b7585; }
+  .btn-small{ padding:6px 12px; background:var(--accent-soft); color:var(--accent); border:none; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; transition:.15s; margin:0 2px; }
+  .btn-small:hover{ background:var(--accent); color:#fff; }
+  .btn-small.btn-danger{ background:var(--bad-bg); color:var(--bad); }
+  .btn-small.btn-danger:hover{ background:var(--bad); color:#fff; }
+
+  .message{ padding:11px 16px; border-radius:var(--radius-sm); margin-top:15px; display:none; font-size:14px; font-weight:500; }
+  .message.success{ display:block; background:var(--good-bg); color:#0a6e3d; border:1px solid #b7e6c9; }
+  .message.error{ display:block; background:var(--bad-bg); color:#a52020; border:1px solid #f2c2c2; }
+
+  /* ===== ТАБЛИЦЫ ===== */
+  .table-wrapper{ overflow-x:auto; margin:0 -4px; }
+  table{ width:100%; border-collapse:collapse; font-size:14px; }
+  table th{ background:transparent; padding:10px 14px; text-align:left; font-weight:600; color:var(--muted); border-bottom:1.5px solid var(--border); white-space:nowrap; font-size:11px; text-transform:uppercase; letter-spacing:.5px; }
+  table td{ padding:12px 14px; border-bottom:1px solid var(--border); color:var(--ink-2); font-variant-numeric:tabular-nums; }
+  table td strong{ color:var(--ink); font-weight:600; }
+  table tr:hover td{ background:var(--surface-2); }
+  .status-badge{ padding:4px 11px; border-radius:20px; font-size:12px; font-weight:600; display:inline-block; letter-spacing:.1px; }
+  .status-badge.Новая{ background:var(--new-bg); color:var(--new); }
+  .status-badge.В_работе{ background:var(--mid-bg); color:#9a6206; }
+  .status-badge.Проверена{ background:var(--good-bg); color:#0a6e3d; }
+  .status-badge.Отклонена{ background:var(--bad-bg); color:#a52020; }
+  .empty-state{ text-align:center; padding:40px; color:var(--muted); }
+  .empty-state i{ font-size:40px; margin-bottom:14px; display:block; color:var(--border-strong); }
+
+  .filter-bar{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  .filter-bar select, .filter-bar input{ padding:10px 13px; border:1.5px solid var(--border-strong); border-radius:var(--radius-sm); font-size:14px; outline:none; color:var(--ink); background:var(--surface); transition:border-color .2s, box-shadow .2s; }
+  .filter-bar select:focus, .filter-bar input:focus{ border-color:var(--accent); box-shadow:0 0 0 3px rgba(43,89,240,.14); }
+  .filter-bar .btn-filter{ padding:10px 18px; background:var(--accent); color:#fff; border:none; border-radius:var(--radius-sm); cursor:pointer; font-weight:600; font-size:14px; transition:background .2s; }
+  .filter-bar .btn-filter:hover{ background:var(--accent-ink); }
+
+  /* ===== МОДАЛКИ ===== */
+  .review-modal{ display:none; position:fixed; inset:0; background:rgba(11,16,25,.55); backdrop-filter:blur(3px); z-index:1000; justify-content:center; align-items:center; padding:16px; }
+  .review-modal.active{ display:flex; animation:fade .2s ease both; }
+  .review-modal .modal-content{ background:var(--surface); padding:28px; border-radius:18px; max-width:560px; width:100%; max-height:90vh; overflow-y:auto; box-shadow:var(--shadow-lg); animation:rise .28s cubic-bezier(.2,.7,.3,1) both; }
+  .review-modal .modal-title{ font-family:var(--display); font-size:19px; font-weight:600; margin-bottom:20px; display:flex; align-items:center; gap:10px; }
+  .review-modal .modal-title i{ color:var(--accent); }
+  .review-modal .form-group{ margin-bottom:15px; }
+  .review-modal .form-group label{ display:block; font-weight:600; margin-bottom:6px; color:var(--ink-2); font-size:13px; }
+  .review-modal .form-group select, .review-modal .form-group input, .review-modal .form-group textarea{ width:100%; padding:11px 13px; border:1.5px solid var(--border-strong); border-radius:var(--radius-sm); font-size:14px; outline:none; font-family:inherit; color:var(--ink); transition:border-color .2s, box-shadow .2s; }
+  .review-modal .form-group select:focus, .review-modal .form-group input:focus, .review-modal .form-group textarea:focus{ border-color:var(--accent); box-shadow:0 0 0 3px rgba(43,89,240,.14); }
+  .review-modal .btn-row{ display:flex; gap:10px; margin-top:20px; }
+  .review-modal .btn-row button{ flex:1; padding:12px; border:none; border-radius:var(--radius-sm); font-family:var(--display); font-weight:600; cursor:pointer; transition:.15s; }
+  .review-modal .btn-save{ background:var(--accent); color:#fff; }
+  .review-modal .btn-save:hover{ background:var(--accent-ink); }
+  .review-modal .btn-cancel{ background:var(--surface-2); color:var(--ink-2); border:1px solid var(--border); }
+  .review-modal .btn-cancel:hover{ background:#eceff5; }
+  .request-detail{ background:var(--surface-2); padding:15px 16px; border-radius:var(--radius-sm); border:1px solid var(--border); margin-bottom:16px; }
+  .request-detail .row{ display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border); gap:12px; }
+  .request-detail .row:last-child{ border-bottom:none; }
+  .request-detail .label{ color:var(--muted); font-size:13px; }
+  .request-detail .value{ font-weight:600; color:var(--ink); text-align:right; }
+
+  /* ===== ЧЕК-ЛИСТ (проверка) ===== */
+  .checklist-block{ margin-bottom:16px; }
+  .checklist-item{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius-sm); margin-bottom:8px; background:var(--surface); }
+  .checklist-item .ci-text{ font-size:14px; color:var(--ink); }
+  .ci-toggle{ border:none; border-radius:20px; padding:6px 14px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; min-width:120px; transition:.15s; }
+  .ci-toggle.pass{ background:var(--good-bg); color:#0a6e3d; }
+  .ci-toggle.pass:hover{ box-shadow:inset 0 0 0 1.5px var(--good); }
+  .ci-toggle.fail{ background:var(--bad-bg); color:#a52020; }
+  .ci-toggle.fail:hover{ box-shadow:inset 0 0 0 1.5px var(--bad); }
+  .score-box{ display:flex; align-items:baseline; gap:10px; background:var(--accent-soft); border:1px solid #cfdbff; border-radius:var(--radius-sm); padding:14px 18px; margin-bottom:16px; }
+  .score-box .score-num{ font-family:var(--display); font-size:34px; font-weight:700; color:var(--accent); font-variant-numeric:tabular-nums; line-height:1; }
+  .score-box .score-lbl{ font-size:13px; color:var(--ink-2); }
+
+  /* ===== ОШИБКИ ОПЕРАТОРА ===== */
+  .fail-call{ border:1px solid var(--border); border-radius:var(--radius); padding:16px; margin-bottom:12px; background:var(--surface); }
+  .fail-call .fc-head{ display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:11px; }
+  .fail-call .fc-head strong{ color:var(--ink); font-family:var(--display); }
+  .fail-call .fc-score{ font-family:var(--display); font-weight:700; font-size:19px; font-variant-numeric:tabular-nums; padding:2px 10px; border-radius:8px; }
+  .fail-call .fc-score.ok{ color:var(--good); background:var(--good-bg); }
+  .fail-call .fc-score.mid{ color:#9a6206; background:var(--mid-bg); }
+  .fail-call .fc-score.bad{ color:var(--bad); background:var(--bad-bg); }
+  .fail-tag{ display:inline-block; background:var(--bad-bg); color:#a52020; border-radius:8px; padding:4px 10px; font-size:12px; font-weight:500; margin:3px 4px 3px 0; }
+  .fail-tag.minor{ background:var(--mid-bg); color:#9a6206; }
+  .all-pass{ color:var(--good); font-weight:600; font-size:13px; }
+
+  /* ===== ЧЕК-ЛИСТ v2 (единый белый блок) ===== */
+  .ev-block{ margin-bottom:26px; }
+  .ev-block:last-child{ margin-bottom:0; }
+  .ev-bhead{ display:flex; justify-content:space-between; align-items:baseline; gap:12px; padding-bottom:9px; margin-bottom:12px; border-bottom:2px solid var(--border); }
+  .ev-bname{ font-family:var(--display); font-weight:600; font-size:15px; color:var(--ink); }
+  .ev-bmax{ font-size:12px; color:var(--muted); font-weight:600; white-space:nowrap; }
+  .ev-row{ display:flex; align-items:center; justify-content:space-between; gap:16px; padding:11px 0; border-bottom:1px solid var(--border); }
+  .ev-row:last-child{ border-bottom:none; }
+  .ev-text{ font-size:14px; color:var(--ink); flex:1; min-width:0; }
+  .ev-minus{ display:block; font-size:11px; color:var(--bad); margin-top:3px; font-weight:600; min-height:14px; }
+  .ev-opts{ display:flex; gap:5px; flex-wrap:wrap; justify-content:flex-end; }
+  .ev-opt{ border:1.5px solid var(--border-strong); background:var(--surface); color:var(--ink-2); border-radius:8px; padding:6px 11px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; transition:.12s; }
+  .ev-opt:hover{ border-color:var(--muted); }
+  .ev-opt.on-pos{ background:var(--good-bg); border-color:var(--good); color:#0a6e3d; }
+  .ev-opt.on-dbt{ background:var(--mid-bg); border-color:var(--mid); color:#9a6206; }
+  .ev-opt.on-neg{ background:var(--bad-bg); border-color:var(--bad); color:#a52020; }
+  .ev-opt.on-na{ background:#eceff5; border-color:var(--border-strong); color:#6b7585; }
+  .ev-opt.on-yes{ background:var(--bad-bg); border-color:var(--bad); color:#a52020; }
+  .ev-opt.on-no{ background:#eceff5; border-color:var(--border-strong); color:#6b7585; }
+  .ev-cmt{ width:100%; margin-top:8px; padding:8px 11px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; font-family:inherit; outline:none; }
+  .ev-cmt:focus{ border-color:var(--accent); }
+
+  .ev-sticky{ position:sticky; bottom:12px; z-index:40; display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+    background:var(--surface); border:1px solid var(--border-strong); border-radius:var(--radius); box-shadow:0 6px 26px rgba(18,23,34,.14); padding:14px 20px; margin-bottom:16px; }
+  .ev-score{ display:flex; align-items:baseline; gap:9px; }
+  .ev-num{ font-family:var(--display); font-size:32px; font-weight:700; color:var(--accent); font-variant-numeric:tabular-nums; letter-spacing:-.5px; }
+  .ev-num.bad{ color:var(--bad); } .ev-num.mid{ color:var(--mid); } .ev-num.ok{ color:var(--good); }
+  .ev-lbl{ font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; font-weight:600; }
+  .ev-counts{ display:flex; gap:7px; flex-wrap:wrap; flex:1; }
+  .ev-chip{ border-radius:8px; padding:5px 11px; font-size:12px; font-weight:600; }
+  .ev-chip.bad{ background:var(--bad-bg); color:#a52020; }
+  .ev-chip.mid{ background:var(--mid-bg); color:#9a6206; }
+  .ev-chip.ko{ background:var(--bad); color:#fff; }
+
+  .chart-box{ position:relative; height:260px; }
+  .charts-2{ display:grid; grid-template-columns:1fr 1fr; gap:22px; }
+
+  @keyframes rise{ from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:none; } }
+  @keyframes fade{ from{ opacity:0; } to{ opacity:1; } }
+
+  @media (max-width:768px){
+    .form-grid{ grid-template-columns:1fr; }
+    .stats-grid{ grid-template-columns:repeat(3,1fr); }
+    .header{ flex-direction:column; text-align:center; align-items:center; }
+    .user-info{ justify-content:center; }
+    .charts-2{ grid-template-columns:1fr; }
+  }
+  @media (max-width:480px){
+    .stats-grid{ grid-template-columns:1fr 1fr; }
+    .login-container{ padding:32px 22px; }
+    .container{ padding:16px 14px 32px; }
+  }
+  @media (prefers-reduced-motion:reduce){
+    *, .login-container, .review-modal.active .modal-content{ animation:none !important; transition:none !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ВХОД -->
+<div id="loginPage" class="login-wrapper">
+  <div class="login-container">
+    <div class="logo"><i class="fas fa-headset"></i></div>
+    <h1>Контроль качества</h1>
+    <p class="subtitle">Введите пароль для входа</p>
+    <div class="pin-input-container">
+      <i class="fas fa-lock"></i>
+      <input type="password" id="pinInput" placeholder="Пароль" autocomplete="current-password" autofocus>
+      <button type="button" class="pw-eye" onclick="togglePw()" title="Показать/скрыть"><i class="fas fa-eye" id="pwEye"></i></button>
+    </div>
+    <button class="login-btn" onclick="login()"><i class="fas fa-sign-in-alt"></i> Войти</button>
+    <div class="error-message" id="errorMessage"></div>
+  </div>
+</div>
+
+<!-- ИМПОРТ СТАТИСТИКИ -->
+<div class="review-modal" id="importModal">
+  <div class="modal-content" style="max-width:520px;">
+    <div class="modal-title"><i class="fas fa-upload"></i> Статистика принятых звонков</div>
+    <div class="form-group"><label>Дата</label><input type="date" id="impDate"></div>
+    <div class="form-group">
+      <label>Вставьте из веб-статистики: ФИО и количество принятых звонков</label>
+      <textarea id="impText" rows="10" placeholder="Иванов Иван Иванович; 58&#10;Петрова Мария Сергеевна; 101&#10;..." style="width:100%;padding:11px;border:1.5px solid var(--border-strong);border-radius:10px;font-family:monospace;font-size:13px;outline:none;"></textarea>
+      <small class="hint">Одна строка = один оператор. Разделитель: точка с запятой, запятая или таб (можно копировать прямо из Excel). Префикс группы «ИНВ-1_» и «(У)» распознаются автоматически.</small>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="btn-cancel" onclick="document.getElementById('importModal').classList.remove('active')">Отмена</button>
+      <button type="button" class="btn-save" onclick="submitImport()"><i class="fas fa-check"></i> Загрузить</button>
+    </div>
+    <div class="message" id="impMessage"></div>
+  </div>
+</div>
+
+<!-- СМЕНА ПАРОЛЯ -->
+<div class="review-modal" id="pwModal">
+  <div class="modal-content" style="max-width:420px;">
+    <div class="modal-title"><i class="fas fa-key"></i> Смена пароля</div>
+    <div class="form-group"><label>Текущий пароль</label><input type="password" id="pwOld" autocomplete="current-password"></div>
+    <div class="form-group"><label>Новый пароль</label><input type="password" id="pwNew" autocomplete="new-password"><small class="hint">Минимум 6 символов</small></div>
+    <div class="form-group"><label>Повторите новый</label><input type="password" id="pwNew2" autocomplete="new-password"></div>
+    <div class="btn-row">
+      <button type="button" class="btn-cancel" onclick="closePwModal()">Отмена</button>
+      <button type="button" class="btn-save" onclick="submitPw()"><i class="fas fa-save"></i> Сохранить</button>
+    </div>
+    <div class="message" id="pwMessage"></div>
+  </div>
+</div>
+
+<!-- ОПЕРАТОР -->
+<div id="operatorPage" class="hidden">
+  <div class="header">
+    <h1><i class="fas fa-headset"></i> Оператор КК</h1>
+    <div class="user-info">
+      <span class="user-badge"><i class="fas fa-user"></i> <span id="opUserName"></span></span>
+      <span class="user-badge"><i class="fas fa-users"></i> <span id="opUserGroup"></span></span>
+      <button class="logout-btn" onclick="openPwModal(false)" title="Сменить пароль"><i class="fas fa-key"></i></button>
+      <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Выйти</button>
+    </div>
+  </div>
+  <div class="container">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="number new" id="opStatNew">0</div><div class="label">Новые</div></div>
+      <div class="stat-card"><div class="number inprogress" id="opStatInProgress">0</div><div class="label">В работе</div></div>
+      <div class="stat-card"><div class="number checked" id="opEvCount">0</div><div class="label">Оценок КК</div></div>
+      <div class="stat-card"><div class="number rating" id="opEvAvg">—</div><div class="label">Среднее качество</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="fas fa-chart-line"></i> Моё качество</div>
+      <div class="charts-2">
+        <div class="chart-box"><canvas id="opTrendChart"></canvas></div>
+        <div class="chart-box"><canvas id="opFailsChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="fas fa-clipboard-check"></i> Мои оценки и ошибки</div>
+      <div id="opEvalList"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="fas fa-plus-circle"></i> Сдать звонок на проверку</div>
+      <form id="requestForm" onsubmit="submitRequest(event)">
+        <div class="seg">
+          <button type="button" class="seg-btn active" id="segYes" onclick="setHasCall('yes')">Звонок был</button>
+          <button type="button" class="seg-btn" id="segNo" onclick="setHasCall('no')">Звонка не было</button>
+        </div>
+
+        <div id="callFields" class="form-grid">
+          <div class="form-group full-width">
+            <label>📋 Тип звонка *</label>
+            <select id="callType">
+              <option value="">Выберите тип</option>
+              <option value="СР">СР</option>
+              <option value="КР">КР</option>
+            </select>
+            <small class="hint">Согласно графику выгрузки</small>
+          </div>
+          <div class="form-group"><label>📅 Дата звонка *</label><input type="date" id="callDate"></div>
+          <div class="form-group"><label>⏰ Время звонка (МСК) *</label><input type="time" id="callTime"></div>
+          <div class="form-group full-width">
+            <label>📞 Номер телефона *</label>
+            <input type="tel" id="phone" placeholder="79001234567" oninput="maskPhone(this)" inputmode="numeric" maxlength="11">
+            <small class="hint">Только цифры, без + - ( ). 10 или 11 знаков — приведём к виду 7XXXXXXXXXX</small>
+          </div>
+          <div class="form-group full-width"><label>💬 Комментарий (необязательно)</label><input type="text" id="opComment" placeholder="Напр.: тип звонка, контекст"></div>
+        </div>
+
+        <div id="noCallFields" class="hidden">
+          <div class="form-group full-width">
+            <label>📝 Причина отсутствия звонка *</label>
+            <input type="text" id="opReason" placeholder="Напр.: отпуск, больничный, не было подходящих звонков">
+          </div>
+        </div>
+
+        <div class="form-group full-width" style="margin-top:15px;">
+          <button type="submit" class="btn-submit"><i class="fas fa-paper-plane"></i> Отправить</button>
+        </div>
+        <div class="message" id="opFormMessage"></div>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="fas fa-list"></i> Мои заявки</div>
+      <div id="opRequestsList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- QC -->
+<div id="qcPage" class="hidden">
+  <div class="header">
+    <h1><i class="fas fa-clipboard-check"></i> Контроль качества</h1>
+    <div class="user-info">
+      <span class="user-badge"><i class="fas fa-user"></i> <span id="qcUserName"></span></span>
+      <span class="user-badge"><i class="fas fa-users"></i> <span id="qcUserGroup"></span></span>
+      <button class="logout-btn" onclick="openPwModal(false)" title="Сменить пароль"><i class="fas fa-key"></i></button>
+      <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Выйти</button>
+    </div>
+  </div>
+  <div class="container">
+    <div class="seg" style="margin-bottom:20px;">
+      <button type="button" class="seg-btn active" id="tabEvalBtn" onclick="qcTab('eval')">Оценка звонка</button>
+      <button type="button" class="seg-btn" id="tabPlanBtn" onclick="qcTab('plan')">План прослушки</button>
+      <button type="button" class="seg-btn" id="tabReqBtn" onclick="qcTab('req')">Заявки операторов</button>
+      <button type="button" class="seg-btn hidden" id="tabAnaBtn" onclick="qcTab('ana')">Аналитика</button>
+      <button type="button" class="seg-btn hidden" id="tabRepBtn" onclick="openReports('qc')">Отчёты</button>
+    </div>
+
+    <!-- ОЦЕНКА ЗВОНКА (чек-лист v2) -->
+    <div id="qcEvalTab">
+      <div class="card">
+        <div class="card-title"><i class="fas fa-headphones"></i> Данные звонка</div>
+        <div class="form-grid">
+          <div class="form-group full-width">
+            <label>👤 Оператор *</label>
+            <select id="evOperator" onchange="evOperatorChanged()"><option value="">Загрузка...</option></select>
+            <small class="hint" id="evGroupHint">Группа подставится автоматически</small>
+          </div>
+          <div class="form-group full-width">
+            <label>🔗 Источник звонка</label>
+            <select id="evReq" onchange="evReqChanged()"><option value="">СКК выбрал сам</option></select>
+            <small class="hint">Если оператор выгрузил звонок заявкой — выберите её, чтобы засчитать в план</small>
+          </div>
+          <div class="form-group"><label>📅 Дата звонка *</label><input type="date" id="evDate"></div>
+          <div class="form-group"><label>⏰ Время звонка</label><input type="time" id="evTime"></div>
+          <div class="form-group"><label>📞 Телефон</label><input type="tel" id="evPhone" oninput="this.value=this.value.replace(/\D/g,'').slice(0,11)" placeholder="79001234567"></div>
+          <div class="form-group"><label>⏱ Критерий звонка</label><select id="evCriterion"></select></div>
+          <div class="form-group"><label>🏷 Тематика</label><select id="evTopic" onchange="evTopicChanged()"></select></div>
+          <div class="form-group"><label>🏷 Подтематика</label><select id="evSub"></select></div>
+          <div class="form-group"><label>🏙 Город</label><select id="evCity"></select></div>
+          <div class="form-group"><label>🗺 Агломерация</label><input type="text" id="evAgg" readonly></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><i class="fas fa-list-check"></i> Чек-лист</div>
+        <div id="evChecklist"><div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Загрузка чек-листа...</p></div></div>
+      </div>
+
+      <div class="ev-sticky" id="evSticky">
+        <div class="ev-score">
+          <span class="ev-num" id="evPct">100,00%</span>
+          <span class="ev-lbl">качество контакта</span>
+        </div>
+        <div class="ev-counts">
+          <span class="ev-chip bad" id="evCrit">критичных: 0</span>
+          <span class="ev-chip mid" id="evMinor">некритичных: 0</span>
+          <span class="ev-chip ko hidden" id="evKo">недопустимое событие</span>
+        </div>
+        <button class="btn-submit" style="width:auto;padding:12px 26px;" onclick="submitEvaluation()"><i class="fas fa-save"></i> Сохранить оценку</button>
+      </div>
+      <div class="message" id="evMessage"></div>
+    </div>
+
+    <!-- ПЛАН ПРОСЛУШКИ -->
+    <div id="qcPlanTab" class="hidden">
+      <div class="stats-grid">
+        <div class="stat-card"><div class="number new" id="planOps">0</div><div class="label">Операторов</div></div>
+        <div class="stat-card"><div class="number inprogress" id="planNeed">0</div><div class="label">Нужно прослушать</div></div>
+        <div class="stat-card"><div class="number checked" id="planDone">0</div><div class="label">Прослушано</div></div>
+        <div class="stat-card"><div class="number rejected" id="planLeft">0</div><div class="label">Осталось</div></div>
+      </div>
+      <div class="card">
+        <div class="filter-bar" style="margin-bottom:0;">
+          <label style="font-size:14px;color:var(--ink-2);">Дата статистики:</label>
+          <input type="date" id="planDate" onchange="loadPlan()">
+          <span id="planPct" style="color:var(--muted);font-size:13px;"></span>
+          <button class="btn-filter" style="margin-left:auto;" onclick="openImport()"><i class="fas fa-upload"></i> Загрузить статистику дня</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="fas fa-headphones"></i> Кого и сколько слушать</div>
+        <div id="planTable"></div>
+      </div>
+    </div>
+
+    <!-- ЗАЯВКИ -->
+    <div id="qcReqTab" class="hidden">
+    <div class="card">
+      <div class="card-title"><i class="fas fa-filter"></i> Фильтры</div>
+      <div class="filter-bar">
+        <select id="filterStatus">
+          <option value="">Все статусы</option>
+          <option value="Новая">Новая</option>
+          <option value="В работе">В работе</option>
+          <option value="Проверена">Проверена</option>
+          <option value="Отклонена">Отклонена</option>
+        </select>
+        <input type="text" id="filterOperator" placeholder="Поиск по ФИО оператора">
+        <input type="text" id="filterPhone" placeholder="Поиск по телефону">
+        <input type="date" id="filterDate">
+        <button class="btn-filter" onclick="applyFilters()"><i class="fas fa-search"></i> Применить</button>
+        <button class="btn-filter" onclick="resetFilters()" style="background:#95a5a6;"><i class="fas fa-undo"></i> Сбросить</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title"><i class="fas fa-list"></i> Все заявки</div>
+      <div id="qcRequestsList"></div>
+    </div>
+    </div>
+  </div>
+</div>
+
+<!-- РГО -->
+<div id="rgoPage" class="hidden">
+  <div class="header">
+    <h1><i class="fas fa-users-gear"></i> Кабинет РГО</h1>
+    <div class="user-info">
+      <button class="logout-btn" onclick="openReports('rgo')"><i class="fas fa-table"></i> Отчёты</button>
+      <select id="rgoPeriod" onchange="loadRgoDashboard()" style="padding:7px 12px;border:1px solid var(--border-strong);border-radius:9px;font-size:13px;font-family:inherit;">
+        <option value="all">За всё время</option>
+        <option value="week">Эта неделя</option>
+        <option value="month">Этот месяц</option>
+        <option value="year">Этот год</option>
+      </select>
+      <span class="user-badge"><i class="fas fa-user"></i> <span id="rgoUserName"></span></span>
+      <span class="user-badge"><i class="fas fa-users"></i> <span id="rgoUserGroup"></span></span>
+      <button class="logout-btn" onclick="openPwModal(false)" title="Сменить пароль"><i class="fas fa-key"></i></button>
+      <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Выйти</button>
+    </div>
+  </div>
+  <div class="container">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="number" id="rgoOpsTotal">0</div><div class="label">Операторов</div></div>
+      <div class="stat-card"><div class="number checked" id="rgoOpsChecked">0</div><div class="label">С проверками</div></div>
+      <div class="stat-card"><div class="number new" id="rgoCalls">0</div><div class="label">Проверено звонков</div></div>
+      <div class="stat-card"><div class="number rating" id="rgoAvg">0</div><div class="label">Средний балл</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="fas fa-chart-line"></i> Качество группы</div>
+      <div class="charts-2">
+        <div class="chart-box"><canvas id="rgoTrendChart"></canvas></div>
+        <div class="chart-box"><canvas id="rgoFailsChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="fas fa-user-group"></i> Мои операторы</div>
+      <div id="rgoOperatorsList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ДИВИЗИОН: СРГО / МЕНЕДЖЕР -->
+<div id="orgPage" class="hidden">
+  <div class="header">
+    <h1><i class="fas fa-chart-pie"></i> <span id="orgTitle">Дивизион</span></h1>
+    <div class="user-info">
+      <button class="logout-btn hidden" id="backToQc" onclick="backToQc()"><i class="fas fa-arrow-left"></i> К оценке</button>
+      <button class="logout-btn" onclick="openReports('org')"><i class="fas fa-table"></i> Отчёты</button>
+      <select id="orgPeriod" onchange="loadOrgDashboard(JSON.parse(sessionStorage.getItem('user')||'{}').role)" style="padding:7px 12px;border:1px solid var(--border-strong);border-radius:9px;font-size:13px;font-family:inherit;">
+        <option value="all">За всё время</option>
+        <option value="week">Эта неделя</option>
+        <option value="month">Этот месяц</option>
+        <option value="year">Этот год</option>
+      </select>
+      <span class="user-badge"><i class="fas fa-user"></i> <span id="orgUserName"></span></span>
+      <span class="user-badge"><i class="fas fa-diagram-project"></i> <span id="orgUserGroup"></span></span>
+      <button class="logout-btn" onclick="openPwModal(false)" title="Сменить пароль"><i class="fas fa-key"></i></button>
+      <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Выйти</button>
+    </div>
+  </div>
+  <div class="container">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="number" id="orgOps">0</div><div class="label">Операторов</div></div>
+      <div class="stat-card"><div class="number checked" id="orgOpsChecked">0</div><div class="label">С проверками</div></div>
+      <div class="stat-card"><div class="number new" id="orgCalls">0</div><div class="label">Проверено звонков</div></div>
+      <div class="stat-card"><div class="number rating" id="orgAvg">0</div><div class="label">Средний балл</div></div>
+    </div>
+
+    <div id="managerOnly" class="hidden">
+      <div class="stats-grid">
+        <div class="stat-card"><div class="number checked" id="mgrCalls">0</div><div class="label">Сдано звонков</div></div>
+        <div class="stat-card"><div class="number rejected" id="mgrNoCall">0</div><div class="label">Без звонка</div></div>
+        <div class="stat-card"><div class="number rating" id="mgrQc">0</div><div class="label">Контролёров активно</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="fas fa-layer-group"></i> Качество по группам</div>
+      <div class="chart-box"><canvas id="orgGroupChart"></canvas></div>
+      <div id="orgGroupTable" style="margin-top:18px;"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="fas fa-chart-line"></i> Динамика и частые провалы</div>
+      <div class="charts-2">
+        <div class="chart-box"><canvas id="orgTrendChart"></canvas></div>
+        <div class="chart-box"><canvas id="orgFailsChart"></canvas></div>
+      </div>
+    </div>
+
+    <div id="managerQcCard" class="card hidden">
+      <div class="card-title"><i class="fas fa-clipboard-check"></i> Работа контроля качества</div>
+      <div id="orgQcTable"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="fas fa-user-group"></i> Операторы</div>
+      <div class="filter-bar">
+        <select id="orgGroupFilter" onchange="renderOrgOperators()">
+          <option value="">Все группы (по порядку)</option>
+        </select>
+        <select id="orgSortMode" onchange="renderOrgOperators()">
+          <option value="group">Группы по порядку, внутри — слабые сверху</option>
+          <option value="score">Слабые сверху (все группы вместе)</option>
+        </select>
+      </div>
+      <div id="orgOperatorsTable"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ОТЧЁТЫ -->
+<div id="repPage" class="hidden">
+  <div class="header">
+    <h1><i class="fas fa-table"></i> Отчёты</h1>
+    <div class="user-info">
+      <button class="logout-btn" onclick="backFromReports()"><i class="fas fa-arrow-left"></i> Назад</button>
+      <span class="user-badge"><i class="fas fa-user"></i> <span id="repUserName"></span></span>
+      <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Выйти</button>
+    </div>
+  </div>
+  <div class="container">
+    <div class="seg" style="margin-bottom:20px;">
+      <button type="button" class="seg-btn active" id="repT1" onclick="repTab('weekly')">Оценки по неделям</button>
+      <button type="button" class="seg-btn" id="repT2" onclick="repTab('journal')">Журнал оценок</button>
+      <button type="button" class="seg-btn" id="repT3" onclick="repTab('kk')">Отчёт КК</button>
+      <button type="button" class="seg-btn" id="repT4" onclick="repTab('criteria')">Критерии по неделям</button>
+      <button type="button" class="seg-btn" id="repT5" onclick="repTab('topics')">Тематики</button>
+      <button type="button" class="seg-btn" id="repT6" onclick="repTab('complaints')">Жалобы</button>
+    </div>
+
+    <!-- Оценки по неделям -->
+    <div id="repWeekly">
+      <div class="card">
+        <div class="filter-bar" style="margin-bottom:0;">
+          <button class="btn-filter" onclick="weekShift(-1)"><i class="fas fa-chevron-left"></i></button>
+          <strong id="weekLabel" style="min-width:210px;text-align:center;font-family:var(--display);">—</strong>
+          <button class="btn-filter" onclick="weekShift(1)"><i class="fas fa-chevron-right"></i></button>
+          <select id="weekGroup" onchange="loadWeekly()"><option value="">Все группы</option></select>
+          <button class="btn-filter" style="margin-left:auto;background:var(--good);" onclick="downloadReport('weekly')"><i class="fas fa-download"></i> Скачать неделю</button>
+        </div>
+      </div>
+      <div class="card"><div id="weeklyGrid"></div></div>
+    </div>
+
+    <!-- Журнал -->
+    <div id="repJournal" class="hidden">
+      <div class="card">
+        <div class="filter-bar" style="margin-bottom:0;">
+          <select id="jPeriod" onchange="loadJournal()">
+            <option value="month">Этот месяц</option>
+            <option value="week">Эта неделя</option>
+            <option value="year">Этот год</option>
+            <option value="all">За всё время</option>
+          </select>
+          <select id="jGroup" onchange="loadJournal()"><option value="">Все группы</option></select>
+          <input type="text" id="jOperator" placeholder="Оператор" oninput="loadJournal()">
+          <input type="text" id="jQc" placeholder="СКК" oninput="loadJournal()">
+          <label style="display:flex;align-items:center;gap:6px;font-size:14px;color:var(--ink-2);"><input type="checkbox" id="jErrors" onchange="loadJournal()" style="width:16px;height:16px;"> только с ошибками</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:14px;color:var(--ink-2);"><input type="checkbox" id="jKo" onchange="loadJournal()" style="width:16px;height:16px;"> только ПЖ/НС</label>
+          <button class="btn-filter" style="margin-left:auto;background:var(--good);" onclick="downloadReport('journal')"><i class="fas fa-download"></i> Скачать</button>
+        </div>
+      </div>
+      <div class="card"><div id="journalList"></div></div>
+    </div>
+
+    <!-- Отчёт КК -->
+    <div id="repKk" class="hidden">
+      <div class="card">
+        <div class="filter-bar" style="margin-bottom:0;">
+          <span style="color:var(--muted);font-size:13px;">Неделя и месяц считаются от текущей даты</span>
+          <button class="btn-filter" style="margin-left:auto;background:var(--good);" onclick="downloadReport('kk')"><i class="fas fa-download"></i> Скачать</button>
+        </div>
+      </div>
+      <div class="card"><div id="kkTable"></div></div>
+    </div>
+
+    <!-- Критерии по неделям -->
+    <div id="repCriteria" class="hidden">
+      <div class="card">
+        <div class="filter-bar" style="margin-bottom:0;">
+          <select id="cPeriod" onchange="loadCriteria()">
+            <option value="all">За всё время</option>
+            <option value="month">Этот месяц</option>
+            <option value="year">Этот год</option>
+          </select>
+          <span style="color:var(--muted);font-size:13px;">% выполнения каждого критерия по неделям</span>
+          <button class="btn-filter" style="margin-left:auto;background:var(--good);" onclick="downloadReport('criteria')"><i class="fas fa-download"></i> Скачать</button>
+        </div>
+      </div>
+      <div class="card"><div id="criteriaTable"></div></div>
+    </div>
+
+    <!-- Тематики -->
+    <div id="repTopics" class="hidden">
+      <div class="card">
+        <div class="filter-bar" style="margin-bottom:0;">
+          <select id="tPeriod" onchange="loadTopics()">
+            <option value="all">За всё время</option>
+            <option value="month">Этот месяц</option>
+            <option value="week">Эта неделя</option>
+            <option value="year">Этот год</option>
+          </select>
+          <button class="btn-filter" style="margin-left:auto;background:var(--good);" onclick="downloadReport('topics')"><i class="fas fa-download"></i> Скачать</button>
+        </div>
+      </div>
+      <div class="card"><div id="topicsTable"></div></div>
+    </div>
+
+    <!-- Жалобы -->
+    <div id="repComplaints" class="hidden">
+      <div class="stats-grid">
+        <div class="stat-card"><div class="number new" id="cmpTotal">0</div><div class="label">Всего жалоб</div></div>
+        <div class="stat-card"><div class="number rejected" id="cmpConf">0</div><div class="label">Обоснованные</div></div>
+        <div class="stat-card"><div class="number checked" id="cmpUnconf">0</div><div class="label">Необоснованные</div></div>
+      </div>
+      <div class="card">
+        <div class="filter-bar" style="margin-bottom:0;">
+          <select id="cmpPeriod" onchange="loadComplaints()">
+            <option value="all">За всё время</option>
+            <option value="month">Этот месяц</option>
+            <option value="year">Этот год</option>
+          </select>
+          <button class="btn-filter" style="margin-left:auto;background:var(--good);" onclick="downloadReport('complaints')"><i class="fas fa-download"></i> Скачать</button>
+        </div>
+      </div>
+      <div class="card"><div id="complaintsTable"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ПРОВЕРКА (QC) -->
+<div class="review-modal" id="reviewModal">
+  <div class="modal-content">
+    <div class="modal-title"><i class="fas fa-check-circle"></i> Проверка заявки</div>
+    <div id="requestDetail"></div>
+
+    <form id="reviewForm" onsubmit="submitReview(event)">
+      <div class="form-group">
+        <label>Статус *</label>
+        <select id="reviewStatus" required>
+          <option value="В работе">В работе</option>
+          <option value="Проверена">Проверена</option>
+          <option value="Отклонена">Отклонена</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Оценка, % (можно скорректировать вручную)</label>
+        <input type="number" id="reviewRating" min="0" max="100" step="0.01">
+      </div>
+      <div class="form-group">
+        <label>Комментарий</label>
+        <textarea id="reviewComment" rows="3" placeholder="Введите комментарий..."></textarea>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn-cancel" onclick="closeModal()">Отмена</button>
+        <button type="submit" class="btn-save"><i class="fas fa-save"></i> Сохранить</button>
+      </div>
+    </form>
+    <div class="message" id="reviewMessage"></div>
+  </div>
+</div>
+
+<!-- РЕДАКТИРОВАНИЕ -->
+<div class="review-modal" id="editModal">
+  <div class="modal-content">
+    <div class="modal-title"><i class="fas fa-edit"></i> Редактирование заявки</div>
+    <div id="editRequestDetail"></div>
+    <form id="editForm" onsubmit="submitEdit(event)">
+      <div class="form-group"><label>📅 Дата звонка *</label><input type="date" id="editCallDate" required></div>
+      <div class="form-group"><label>⏰ Время звонка *</label><input type="time" id="editCallTime" required></div>
+      <div class="form-group"><label>📞 Номер телефона *</label><input type="tel" id="editPhone" required></div>
+      <div class="btn-row">
+        <button type="button" class="btn-cancel" onclick="closeEditModal()">Отмена</button>
+        <button type="submit" class="btn-save"><i class="fas fa-save"></i> Сохранить</button>
+      </div>
+    </form>
+    <div class="message" id="editMessage"></div>
+  </div>
+</div>
+
+<!-- транспорт: подменяет google.script.run на fetch, подключается первым -->
+  <script src="/gs-shim.js"></script>
+  <script>
+  let currentRequestId = null;
+  let allRequests = [];
+  let editRequestId = null;
+  let orgOperators = [];       // операторы дивизиона (для фильтра/сортировки)
+  const charts = {};           // хранилище Chart.js
+
+  // ---------- ФОРМАТ ----------
+  function formatDate(dateStr) {
+    if (!dateStr) return '-';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const p = function (n) { return String(n).padStart(2, '0'); };
+    return p(d.getDate()) + '.' + p(d.getMonth() + 1) + '.' + d.getFullYear();
+  }
+  function formatTime(timeStr) {
+    if (!timeStr) return '-';
+    const m = String(timeStr).match(/(\d{1,2}):(\d{2})/);
+    if (m) return m[1].padStart(2, '0') + ':' + m[2];
+    const d = new Date(timeStr);
+    if (!isNaN(d.getTime())) return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    return timeStr;
+  }
+  function scoreClass(s) { return s >= 90 ? 'ok' : (s >= 70 ? 'mid' : 'bad'); }
+
+  // ---------- ВХОД ----------
+  function togglePw() {
+    const i = document.getElementById('pinInput');
+    const e = document.getElementById('pwEye');
+    const show = i.type === 'password';
+    i.type = show ? 'text' : 'password';
+    e.className = show ? 'fas fa-eye-slash' : 'fas fa-eye';
+  }
+
+  function login() {
+    const errorEl = document.getElementById('errorMessage');
+    const inp = document.getElementById('pinInput');
+    const pass = inp.value.trim();
+    if (!pass) { errorEl.textContent = 'Введите пароль'; errorEl.style.color = '#ff8a8a'; return; }
+    errorEl.textContent = '⏳ Проверка...'; errorEl.style.color = '#8fb3ff';
+    google.script.run
+      .withSuccessHandler(function (result) {
+        if (result.success) {
+          sessionStorage.setItem('user', JSON.stringify(result));
+          sessionStorage.setItem('pin', pass);
+          showApp(result);
+          if (result.weak) setTimeout(function () { openPwModal(true); }, 600);
+        } else {
+          errorEl.textContent = result.error || 'Неверный пароль';
+          errorEl.style.color = '#ff8a8a';
+          inp.value = ''; inp.focus();
+        }
+      })
+      .withFailureHandler(function (error) { errorEl.textContent = 'Ошибка: ' + error; errorEl.style.color = '#ff8a8a'; })
+      .loginWithPin(pass);
+  }
+
+  // ---------- СМЕНА ПАРОЛЯ ----------
+  function openPwModal(suggest) {
+    document.getElementById('pwOld').value = suggest ? sessionStorage.getItem('pin') : '';
+    document.getElementById('pwNew').value = '';
+    document.getElementById('pwNew2').value = '';
+    const m = document.getElementById('pwMessage');
+    if (suggest) { m.textContent = 'У вас короткий пароль. Задайте новый — минимум 6 символов.'; m.className = 'message error'; m.style.display = 'block'; }
+    else { m.style.display = 'none'; m.className = 'message'; }
+    document.getElementById('pwModal').classList.add('active');
+  }
+  function closePwModal() { document.getElementById('pwModal').classList.remove('active'); }
+  function submitPw() {
+    const oldP = document.getElementById('pwOld').value.trim();
+    const n1 = document.getElementById('pwNew').value.trim();
+    const n2 = document.getElementById('pwNew2').value.trim();
+    const m = document.getElementById('pwMessage');
+    if (n1.length < 6) { m.textContent = '❌ Минимум 6 символов'; m.className = 'message error'; m.style.display = 'block'; return; }
+    if (n1 !== n2) { m.textContent = '❌ Пароли не совпадают'; m.className = 'message error'; m.style.display = 'block'; return; }
+    google.script.run
+      .withSuccessHandler(function (r) {
+        if (r.success) {
+          sessionStorage.setItem('pin', r.pin);
+          m.textContent = '✅ Пароль изменён'; m.className = 'message success'; m.style.display = 'block';
+          setTimeout(closePwModal, 1200);
+        } else { m.textContent = '❌ ' + r.error; m.className = 'message error'; m.style.display = 'block'; }
+      })
+      .withFailureHandler(function (e) { m.textContent = '❌ ' + e; m.className = 'message error'; m.style.display = 'block'; })
+      .changePassword(oldP, n1);
+  }
+  function logout() {
+    sessionStorage.removeItem('user'); sessionStorage.removeItem('pin');
+    ['operatorPage', 'qcPage', 'rgoPage', 'orgPage'].forEach(function (id) { document.getElementById(id).classList.add('hidden'); });
+    document.getElementById('loginPage').classList.remove('hidden');
+    document.getElementById('pinInput').value = '';
+    document.getElementById('errorMessage').textContent = '';
+  }
+
+  // ---------- РОУТИНГ ----------
+  function showApp(user) {
+    document.getElementById('loginPage').classList.add('hidden');
+    if (user.role === 'manager' || user.role === 'srgo') {
+      document.getElementById('orgPage').classList.remove('hidden');
+      document.getElementById('orgUserName').textContent = user.fullName;
+      document.getElementById('orgUserGroup').textContent = user.group;
+      document.getElementById('orgTitle').textContent = user.role === 'manager' ? 'Кабинет менеджера проекта' : 'Дивизион · старший РГО';
+      loadOrgDashboard(user.role);
+    } else if (user.role === 'rgo') {
+      document.getElementById('rgoPage').classList.remove('hidden');
+      document.getElementById('rgoUserName').textContent = user.fullName;
+      document.getElementById('rgoUserGroup').textContent = user.group;
+      loadRgoDashboard();
+    } else if (user.role === 'qc' || user.role === 'sqc' || user.role === 'admin') {
+      document.getElementById('qcPage').classList.remove('hidden');
+      document.getElementById('qcUserName').textContent = user.fullName;
+      document.getElementById('qcUserGroup').textContent = user.group;
+      const isSqc = user.role === 'sqc' || user.role === 'admin';
+      document.getElementById('tabAnaBtn').classList.toggle('hidden', !isSqc);
+      document.getElementById('tabRepBtn').classList.toggle('hidden', !isSqc);
+      qcTab('eval');
+      loadEvalPage();
+    } else {
+      document.getElementById('operatorPage').classList.remove('hidden');
+      document.getElementById('opUserName').textContent = user.fullName;
+      document.getElementById('opUserGroup').textContent = user.group;
+      document.getElementById('callDate').value = new Date().toISOString().split('T')[0];
+      loadOperatorStats();
+      loadOperatorRequests();
+      loadMyEvaluations();
+    }
+  }
+
+  // ---------- ОПЕРАТОР: заявки/стата ----------
+  function loadOperatorStats() {
+    google.script.run.withSuccessHandler(function (result) {
+      if (result.success) {
+        const s = result.stats;
+        document.getElementById('opStatNew').textContent = s.new;
+        document.getElementById('opStatInProgress').textContent = s.inProgress;
+      }
+    }).getOperatorStats(sessionStorage.getItem('pin'));
+  }
+
+  function loadOperatorRequests() {
+    google.script.run.withSuccessHandler(function (result) {
+      const container = document.getElementById('opRequestsList');
+      if (result.success && result.requests && result.requests.length > 0) {
+        let html = '<div class="table-wrapper"><table><thead><tr><th>ID</th><th>Дата</th><th>Время</th><th>Телефон</th><th>Статус</th><th>Оценка</th><th>Комментарий</th><th>Действия</th></tr></thead><tbody>';
+        result.requests.forEach(function (r) {
+          const canEdit = r.status === 'Новая';
+          html += '<tr>' +
+            '<td><strong>' + r.id + '</strong></td>' +
+            '<td>' + formatDate(r.callDate) + '</td>' +
+            '<td>' + formatTime(r.callTime) + '</td>' +
+            '<td>' + r.phone + '</td>' +
+            '<td><span class="status-badge ' + r.status.replace(/ /g, '_') + '">' + r.status + '</span></td>' +
+            '<td>' + (r.rating ? r.rating + '%' : '-') + '</td>' +
+            '<td>' + (r.comment || '-') + '</td>' +
+            '<td>' + (canEdit ? '<button class="btn-small" onclick="openEditModal(\'' + r.id + '\')"><i class="fas fa-edit"></i></button>' : '-') + '</td>' +
+          '</tr>';
+        });
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+      } else {
+        container.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>У вас пока нет заявок</p></div>';
+      }
+    }).getOperatorRequests(sessionStorage.getItem('pin'));
+  }
+
+  let hasCallState = 'yes';
+  function setHasCall(v) {
+    hasCallState = v;
+    document.getElementById('segYes').classList.toggle('active', v === 'yes');
+    document.getElementById('segNo').classList.toggle('active', v === 'no');
+    document.getElementById('callFields').classList.toggle('hidden', v !== 'yes');
+    document.getElementById('noCallFields').classList.toggle('hidden', v !== 'no');
+  }
+
+  // Даниил: без +, -, () — только цифры (нормализуем к 11 цифрам при отправке)
+  function maskPhone(el) {
+    el.value = el.value.replace(/\D/g, '').slice(0, 11);
+  }
+
+  function submitRequest(event) {
+    event.preventDefault();
+    const pin = sessionStorage.getItem('pin');
+    let data;
+    if (hasCallState === 'yes') {
+      const callType = document.getElementById('callType').value;
+      const callDate = document.getElementById('callDate').value;
+      const callTime = document.getElementById('callTime').value;
+      let d = document.getElementById('phone').value.replace(/\D/g, '');
+      if (d.length === 11 && d[0] === '8') d = '7' + d.slice(1);
+      if (d.length === 10) d = '7' + d;
+      if (!callType) { showOpMessage('Выберите тип звонка', 'error'); return; }
+      if (!callDate || !callTime) { showOpMessage('Укажите дату и время звонка', 'error'); return; }
+      if (d.length !== 11 || d[0] !== '7') { showOpMessage('Номер: только цифры, 10 или 11 знаков (напр. 79001234567)', 'error'); return; }
+      data = { pin: pin, hasCall: 'yes', callType: callType, callDate: callDate, callTime: callTime, phone: d, comment: document.getElementById('opComment').value.trim() };
+    } else {
+      const reason = document.getElementById('opReason').value.trim();
+      if (!reason) { showOpMessage('Укажите причину отсутствия звонка', 'error'); return; }
+      data = { pin: pin, hasCall: 'no', callDate: '', callTime: '', phone: '', comment: reason };
+    }
+    const btn = event.target.querySelector('.btn-submit'); btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Отправка...';
+    google.script.run
+      .withSuccessHandler(function (result) {
+        btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Отправить';
+        if (result.success) {
+          showOpMessage('✅ Отправлено' + (result.requestId ? ' (#' + result.requestId + ')' : ''), 'success');
+          document.getElementById('phone').value = ''; document.getElementById('opComment').value = ''; document.getElementById('opReason').value = ''; document.getElementById('callType').value = '';
+          setHasCall('yes');
+          loadOperatorStats(); loadOperatorRequests();
+        } else { showOpMessage('❌ ' + result.error, 'error'); }
+      })
+      .withFailureHandler(function (error) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Отправить'; showOpMessage('❌ Ошибка: ' + error, 'error'); })
+      .createRequest(data);
+  }
+  function showOpMessage(text, type) { const el = document.getElementById('opFormMessage'); el.textContent = text; el.className = 'message ' + type; el.style.display = 'block'; setTimeout(function () { el.style.display = 'none'; }, 5000); }
+
+  // ---------- ОПЕРАТОР: оценки КК (чек-лист v2) ----------
+  function loadMyEvaluations() {
+    google.script.run.withSuccessHandler(function (res) {
+      const box = document.getElementById('opEvalList');
+      if (!res.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + res.error + '</p></div>'; return; }
+
+      document.getElementById('opEvCount').textContent = res.stats.count;
+      document.getElementById('opEvAvg').textContent = res.stats.count ? pct2(res.stats.avg) : '—';
+
+      drawLineChart('opTrendChart', 'Качество контакта, %', res.trend.map(function (t) { return t.label; }), res.trend.map(function (t) { return t.score; }));
+      drawBarChart('opFailsChart', 'Мои частые ошибки', res.fails.map(function (f) { return f.text; }), res.fails.map(function (f) { return f.count; }));
+
+      if (!res.evaluations.length) {
+        box.innerHTML = '<div class="empty-state"><i class="fas fa-clipboard-list"></i><p>Оценок пока нет</p></div>';
+        return;
+      }
+      let html = '';
+      res.evaluations.forEach(function (e) {
+        const cls = e.score >= 90 ? 'ok' : (e.score >= 70 ? 'mid' : 'bad');
+        html += '<div class="fail-call">' +
+          '<div class="fc-head">' +
+            '<div><strong>' + e.callDate + '</strong>' + (e.phone ? ' · ' + e.phone : '') + ' · СКК: ' + (e.qc || '—') + '</div>' +
+            '<div class="fc-score ' + cls + '">' + pct2(e.score) + '</div>' +
+          '</div>';
+        if (e.gratitude) html += '<div class="all-pass"><i class="fas fa-star"></i> Благодарность от клиента</div>';
+        if (e.complaint) html += '<div style="color:var(--bad);font-weight:600;font-size:13px;"><i class="fas fa-triangle-exclamation"></i> Подтверждённая жалоба</div>';
+        if (e.violation) html += '<div style="color:var(--bad);font-weight:600;font-size:13px;"><i class="fas fa-ban"></i> Недопустимое событие</div>';
+        if (e.failed.length) {
+          html += '<div style="margin-top:8px;">';
+          e.failed.forEach(function (f) {
+            const chip = f.critical ? 'fail-tag' : 'fail-tag minor';
+            html += '<div style="margin:6px 0;">' +
+              '<span class="' + chip + '">' + (f.critical ? '✕' : '!') + ' ' + f.text + ' — ' + f.result.toLowerCase() + '</span>' +
+              (f.comment ? '<div style="margin:4px 0 0 4px;color:var(--ink-2);font-size:13px;"><i class="fas fa-comment"></i> ' + f.comment + '</div>' : '') +
+            '</div>';
+          });
+          html += '</div>';
+        } else if (!e.violation && !e.complaint) {
+          html += '<div class="all-pass"><i class="fas fa-check"></i> Ошибок нет</div>';
+        }
+        html += '</div>';
+      });
+      box.innerHTML = html;
+    }).getMyEvaluations(sessionStorage.getItem('pin'));
+  }
+
+  // ---------- РЕДАКТИРОВАНИЕ ----------
+  function openEditModal(requestId) {
+    editRequestId = requestId;
+    google.script.run.withSuccessHandler(function (result) {
+      if (result.success && result.requests) {
+        const req = result.requests.find(function (r) { return r.id === requestId; });
+        if (req) {
+          document.getElementById('editCallDate').value = req.callDate;
+          document.getElementById('editCallTime').value = req.callTime;
+          document.getElementById('editPhone').value = req.phone;
+          document.getElementById('editRequestDetail').innerHTML = '<div class="request-detail"><div class="row"><span class="label">Заявка</span><span class="value">' + req.id + '</span></div><div class="row"><span class="label">Статус</span><span class="value">' + req.status + '</span></div></div>';
+          document.getElementById('editMessage').className = 'message'; document.getElementById('editMessage').style.display = 'none';
+          document.getElementById('editModal').classList.add('active');
+        }
+      }
+    }).getOperatorRequests(sessionStorage.getItem('pin'));
+  }
+  function closeEditModal() { document.getElementById('editModal').classList.remove('active'); editRequestId = null; }
+  function submitEdit(event) {
+    event.preventDefault();
+    const data = { pin: sessionStorage.getItem('pin'), requestId: editRequestId, callDate: document.getElementById('editCallDate').value, callTime: document.getElementById('editCallTime').value, phone: document.getElementById('editPhone').value.trim() };
+    if (!data.callDate || !data.callTime || !data.phone) { showEditMessage('Заполните все поля!', 'error'); return; }
+    const btn = event.target.querySelector('.btn-save'); btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Сохранение...';
+    google.script.run
+      .withSuccessHandler(function (result) {
+        btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Сохранить';
+        if (result.success) { showEditMessage('✅ Обновлено!', 'success'); setTimeout(function () { closeEditModal(); loadOperatorRequests(); loadOperatorStats(); }, 1200); }
+        else { showEditMessage('❌ ' + result.error, 'error'); }
+      })
+      .withFailureHandler(function (error) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Сохранить'; showEditMessage('❌ Ошибка: ' + error, 'error'); })
+      .updateRequest(data);
+  }
+  function showEditMessage(text, type) { const el = document.getElementById('editMessage'); el.textContent = text; el.className = 'message ' + type; el.style.display = 'block'; }
+
+  // ---------- QC: список ----------
+  function loadAllRequests() {
+    google.script.run.withSuccessHandler(function (result) {
+      if (result.success) { allRequests = result.requests; renderRequests(allRequests); }
+    }).getAllRequests(sessionStorage.getItem('pin'));
+  }
+  function renderRequests(requests) {
+    const container = document.getElementById('qcRequestsList');
+    if (!requests || requests.length === 0) { container.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Нет заявок</p></div>'; return; }
+    const user = JSON.parse(sessionStorage.getItem('user') || '{}');
+    const isAdmin = user.role === 'admin';
+    let html = '<div class="table-wrapper"><table><thead><tr><th>ID</th><th>Оператор</th><th>Группа</th><th>Дата</th><th>Время</th><th>Телефон</th><th>Статус</th><th>Оценка</th><th>Действия</th></tr></thead><tbody>';
+    requests.forEach(function (r) {
+      const noCall = r.status === 'Без звонка';
+      const canReview = r.status === 'Новая' || r.status === 'В работе';
+      const del = isAdmin ? '<button class="btn-small btn-danger" onclick="deleteRequest(\'' + r.id + '\')"><i class="fas fa-trash"></i></button>' : '';
+      const rev = noCall ? '<span style="color:var(--muted);font-size:12px;">' + (r.opComment || '—') + '</span>' :
+        (canReview ? '<button class="btn-small" onclick="openReview(\'' + r.id + '\')"><i class="fas fa-check"></i> Проверить</button>' : '<button class="btn-small" style="background:#95a5a6" onclick="openReview(\'' + r.id + '\')"><i class="fas fa-eye"></i></button>');
+      html += '<tr>' +
+        '<td><strong>' + r.id + '</strong></td><td>' + r.fullName + '</td><td>' + r.group + '</td>' +
+        '<td>' + (noCall ? '—' : formatDate(r.callDate)) + '</td><td>' + (noCall ? '—' : formatTime(r.callTime)) + '</td><td>' + (noCall ? '—' : r.phone) + '</td>' +
+        '<td><span class="status-badge ' + r.status.replace(/ /g, '_') + '">' + r.status + '</span></td>' +
+        '<td>' + (r.rating ? r.rating + '%' : '-') + '</td>' +
+        '<td>' + rev + ' ' + del + '</td>' +
+      '</tr>';
+    });
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
+  }
+  function applyFilters() {
+    const status = document.getElementById('filterStatus').value;
+    const operator = document.getElementById('filterOperator').value.toLowerCase().trim();
+    const phone = document.getElementById('filterPhone').value.toLowerCase().trim();
+    const date = document.getElementById('filterDate').value;
+    let f = allRequests;
+    if (status) f = f.filter(function (r) { return r.status === status; });
+    if (operator) f = f.filter(function (r) { return r.fullName && r.fullName.toLowerCase().indexOf(operator) >= 0; });
+    if (phone) f = f.filter(function (r) { return r.phone && r.phone.indexOf(phone) >= 0; });
+    if (date) { const p = date.split('-'); const s = p[2] + '.' + p[1] + '.' + p[0]; f = f.filter(function (r) { return formatDate(r.callDate) === s; }); }
+    renderRequests(f);
+  }
+  function resetFilters() {
+    document.getElementById('filterStatus').value = ''; document.getElementById('filterOperator').value = '';
+    document.getElementById('filterPhone').value = ''; document.getElementById('filterDate').value = '';
+    renderRequests(allRequests);
+  }
+
+  // ---------- QC: проверка с чек-листом ----------
+  function openReview(requestId) {
+    currentRequestId = requestId;
+    const req = allRequests.find(function (r) { return r.id === requestId; });
+    if (!req) return;
+    document.getElementById('requestDetail').innerHTML =
+      '<div class="request-detail">' +
+        '<div class="row"><span class="label">Заявка</span><span class="value">' + req.id + '</span></div>' +
+        '<div class="row"><span class="label">Оператор</span><span class="value">' + req.fullName + '</span></div>' +
+        '<div class="row"><span class="label">Группа</span><span class="value">' + req.group + '</span></div>' +
+        '<div class="row"><span class="label">Дата</span><span class="value">' + formatDate(req.callDate) + '</span></div>' +
+        '<div class="row"><span class="label">Телефон</span><span class="value">' + req.phone + '</span></div>' +
+        (req.callType ? '<div class="row"><span class="label">Тип</span><span class="value">' + req.callType + '</span></div>' : '') +
+        (req.opComment ? '<div class="row"><span class="label">Коммент оператора</span><span class="value">' + req.opComment + '</span></div>' : '') +
+      '</div>';
+    document.getElementById('reviewStatus').value = (req.status === 'Новая' ? 'В работе' : req.status);
+    document.getElementById('reviewComment').value = req.comment || '';
+    document.getElementById('reviewMessage').className = 'message'; document.getElementById('reviewMessage').style.display = 'none';
+    document.getElementById('reviewModal').classList.add('active');
+  }
+  function closeModal() { document.getElementById('reviewModal').classList.remove('active'); }
+
+  function submitReview(event) {
+    event.preventDefault();
+    const p = sessionStorage.getItem('pin');
+    const status = document.getElementById('reviewStatus').value;
+    const rating = document.getElementById('reviewRating').value || '';
+    const comment = document.getElementById('reviewComment').value.trim() || '';
+    const btn = event.target.querySelector('.btn-save'); btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Сохранение...';
+
+    google.script.run.withSuccessHandler(function (result) {
+      btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Сохранить';
+      const msg = document.getElementById('reviewMessage');
+      if (result.success) { msg.textContent = '✅ Сохранено'; msg.className = 'message success'; msg.style.display = 'block'; setTimeout(function () { closeModal(); loadAllRequests(); }, 1200); }
+      else { msg.textContent = '❌ ' + result.error; msg.className = 'message error'; msg.style.display = 'block'; }
+    }).withFailureHandler(function (error) {
+      btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Сохранить';
+      const msg = document.getElementById('reviewMessage'); msg.textContent = '❌ Ошибка: ' + error; msg.className = 'message error'; msg.style.display = 'block';
+    }).reviewRequest(p, currentRequestId, status, rating, comment);
+  }
+
+  function deleteRequest(requestId) {
+    if (!confirm('Удалить заявку #' + requestId + '?')) return;
+    google.script.run
+      .withSuccessHandler(function (result) { if (result.success) { alert('✅ Удалено'); loadAllRequests(); } else { alert('❌ ' + result.error); } })
+      .withFailureHandler(function (error) { alert('❌ Ошибка: ' + error); })
+      .deleteRequest(sessionStorage.getItem('pin'), requestId);
+  }
+
+  // ---------- РГО ----------
+  function loadRgoDashboard() {
+    google.script.run.withSuccessHandler(function (res) {
+      if (!res.success) { document.getElementById('rgoOperatorsList').innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + (res.error || 'Ошибка') + '</p></div>'; return; }
+      document.getElementById('rgoOpsTotal').textContent = res.summary.operatorsTotal;
+      document.getElementById('rgoOpsChecked').textContent = res.summary.operatorsChecked;
+      document.getElementById('rgoCalls').textContent = res.summary.callsChecked;
+      document.getElementById('rgoAvg').textContent = res.summary.callsChecked ? pct2(res.summary.avgScore) : '—';
+
+      drawLineChart('rgoTrendChart', 'Средний балл группы, %', res.groupTrend.map(function (t) { return t.label; }), res.groupTrend.map(function (t) { return t.score; }));
+      drawBarChart('rgoFailsChart', 'Частые провалы', res.topFails.map(function (f) { return f.text; }), res.topFails.map(function (f) { return f.count; }));
+
+      const box = document.getElementById('rgoOperatorsList');
+      if (!res.operators.length) { box.innerHTML = '<div class="empty-state"><i class="fas fa-user-slash"></i><p>В группе нет операторов</p></div>'; return; }
+      let html = '<div class="table-wrapper"><table><thead><tr><th>Оператор</th><th>Группа</th><th>Проверок</th><th>Средний балл</th><th>Провалов</th></tr></thead><tbody>';
+      res.operators.forEach(function (o) {
+        const scoreCell = o.avgScore === null ? '<span style="color:#bbb">нет проверок</span>' : '<strong style="color:' + scoreColorHex(o.avgScore) + '">' + pct2(o.avgScore) + '</strong>';
+        html += '<tr><td>' + o.fullName + '</td><td>' + o.group + '</td><td>' + o.checkedCount + '</td><td>' + scoreCell + '</td><td>' + o.failsCount + '</td></tr>';
+      });
+      html += '</tbody></table></div>';
+      box.innerHTML = html;
+    }).getRgoDashboard(sessionStorage.getItem('pin'), document.getElementById('rgoPeriod').value);
+  }
+
+  // ---------- ЧЕК-ЛИСТ v2: ОЦЕНКА ЗВОНКА ----------
+  let evCfg = null;          // {blocks, maxTotal, topics, cities, callCriteria}
+  let evAnswers = {};        // id -> значение
+  let evComments = {};       // id -> комментарий
+
+  const V = { POS: 'Положительно', DBT: 'Сомнительно', NEG: 'Отрицательно', NA: 'Не требуется', YES: 'Обнаружено', NO: 'Не обнаружено' };
+
+  function pct2(n) { return n.toFixed(2).replace('.', ',') + '%'; }   // 91,11% — требование заказчика
+
+  function qcTab(t) {
+    if (t === 'ana') {
+      document.getElementById('qcPage').classList.add('hidden');
+      document.getElementById('orgPage').classList.remove('hidden');
+      document.getElementById('backToQc').classList.remove('hidden');
+      const u = JSON.parse(sessionStorage.getItem('user') || '{}');
+      document.getElementById('orgUserName').textContent = u.fullName || '';
+      document.getElementById('orgUserGroup').textContent = u.group || '';
+      document.getElementById('orgTitle').textContent = 'Аналитика качества';
+      loadOrgDashboard(u.role);
+      return;
+    }
+    document.getElementById('tabEvalBtn').classList.toggle('active', t === 'eval');
+    document.getElementById('tabPlanBtn').classList.toggle('active', t === 'plan');
+    document.getElementById('tabReqBtn').classList.toggle('active', t === 'req');
+    document.getElementById('qcEvalTab').classList.toggle('hidden', t !== 'eval');
+    document.getElementById('qcPlanTab').classList.toggle('hidden', t !== 'plan');
+    document.getElementById('qcReqTab').classList.toggle('hidden', t !== 'req');
+    if (t === 'req' && !allRequests.length) loadAllRequests();
+    if (t === 'plan') { if (!document.getElementById('planDate').value) document.getElementById('planDate').value = yesterdayStr(); loadPlan(); }
+  }
+
+  function yesterdayStr() {
+    const d = new Date(); d.setDate(d.getDate() - 1);
+    return d.toISOString().split('T')[0];
+  }
+
+  function loadPlan() {
+    const box = document.getElementById('planTable');
+    box.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Загрузка...</p></div>';
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
+      document.getElementById('planOps').textContent = r.summary.operators;
+      document.getElementById('planNeed').textContent = r.summary.plan;
+      document.getElementById('planDone').textContent = r.summary.done;
+      document.getElementById('planLeft').textContent = r.summary.left;
+      document.getElementById('planPct').textContent = 'выборка ' + r.percent + '% от принятых';
+      if (r.noData) { box.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Нет статистики за ' + r.date + '. Нажмите «Загрузить статистику дня».</p></div>'; return; }
+      let html = '<div class="table-wrapper"><table><thead><tr><th>Оператор</th><th>Группа</th><th>Принято</th><th>План (' + r.percent + '%)</th><th>Прослушано</th><th>Осталось</th><th>Выгрузил оператор</th><th>СКК сам</th></tr></thead><tbody>';
+      r.rows.forEach(function (x) {
+        const leftCell = x.left === 0 ? '<span style="color:var(--good);font-weight:700;">готово</span>' : '<strong style="color:var(--bad);">' + x.left + '</strong>';
+        html += '<tr><td>' + x.operator + '</td><td>' + x.group + '</td><td>' + x.accepted + '</td><td><strong>' + x.plan + '</strong></td><td>' + x.done + '</td><td>' + leftCell + '</td>' +
+          '<td>' + x.fromOperator + (x.submitted > x.fromOperator ? ' <span style="color:var(--mid);font-size:12px;">(+' + (x.submitted - x.fromOperator) + ' ждут)</span>' : '') + '</td><td>' + x.bySkk + '</td></tr>';
+      });
+      html += '</tbody></table></div>';
+      box.innerHTML = html;
+    }).getListeningPlan(sessionStorage.getItem('pin'), document.getElementById('planDate').value);
+  }
+
+  function openImport() {
+    document.getElementById('impDate').value = document.getElementById('planDate').value || yesterdayStr();
+    document.getElementById('impText').value = '';
+    document.getElementById('impMessage').style.display = 'none';
+    document.getElementById('importModal').classList.add('active');
+  }
+  function submitImport() {
+    const date = document.getElementById('impDate').value;
+    const text = document.getElementById('impText').value;
+    const m = document.getElementById('impMessage');
+    if (!date) { m.textContent = '❌ Укажите дату'; m.className = 'message error'; m.style.display = 'block'; return; }
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) { m.textContent = '❌ ' + r.error; m.className = 'message error'; m.style.display = 'block'; return; }
+      let txt = '✅ Загружено строк: ' + r.imported;
+      if (r.unknown.length) txt += '. Не распознаны (' + r.unknown.length + '): ' + r.unknown.slice(0, 5).join(', ') + (r.unknown.length > 5 ? '…' : '');
+      m.textContent = txt; m.className = r.unknown.length ? 'message error' : 'message success'; m.style.display = 'block';
+      document.getElementById('planDate').value = r.date.split('.').reverse().join('-');
+      setTimeout(function () { document.getElementById('importModal').classList.remove('active'); loadPlan(); }, r.unknown.length ? 3500 : 1200);
+    }).withFailureHandler(function (e) { m.textContent = '❌ ' + e; m.className = 'message error'; m.style.display = 'block'; })
+      .importAcceptedCalls(sessionStorage.getItem('pin'), date, text);
+  }
+
+  function backToQc() {
+    document.getElementById('orgPage').classList.add('hidden');
+    document.getElementById('qcPage').classList.remove('hidden');
+    qcTab('eval');
+  }
+
+  function loadEvalPage() {
+    document.getElementById('evDate').value = new Date().toISOString().split('T')[0];
+    google.script.run.withSuccessHandler(function (res) {
+      if (!res.success) { document.getElementById('evChecklist').innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + res.error + '</p></div>'; return; }
+      evCfg = res;
+      // справочники
+      const crit = document.getElementById('evCriterion');
+      crit.innerHTML = '<option value="">—</option>' + res.callCriteria.map(function (c) { return '<option>' + c + '</option>'; }).join('');
+      const topics = [];
+      res.topics.forEach(function (t) { if (topics.indexOf(t.topic) < 0) topics.push(t.topic); });
+      document.getElementById('evTopic').innerHTML = '<option value="">—</option>' + topics.map(function (t) { return '<option>' + t + '</option>'; }).join('');
+      document.getElementById('evSub').innerHTML = '<option value="">—</option>';
+      const cities = [];
+      res.cities.forEach(function (c) { if (cities.indexOf(c.city) < 0) cities.push(c.city); });
+      document.getElementById('evCity').innerHTML = '<option value="">—</option>' + cities.map(function (c) { return '<option>' + c + '</option>'; }).join('');
+      renderChecklist();
+      recalcEval();
+    }).getChecklistConfig();
+
+    google.script.run.withSuccessHandler(function (res) {
+      const sel = document.getElementById('evOperator');
+      if (!res.success) { sel.innerHTML = '<option value="">Ошибка загрузки</option>'; return; }
+      let html = '<option value="">Выберите оператора</option>';
+      let g = null;
+      res.operators.forEach(function (o) {
+        if (o.group !== g) { if (g !== null) html += '</optgroup>'; html += '<optgroup label="' + o.group + '">'; g = o.group; }
+        html += '<option value="' + o.fullName + '" data-group="' + o.group + '">' + o.fullName + '</option>';
+      });
+      if (g !== null) html += '</optgroup>';
+      sel.innerHTML = html;
+    }).getOperatorsList(sessionStorage.getItem('pin'));
+  }
+
+  function evOperatorChanged() {
+    const sel = document.getElementById('evOperator');
+    const opt = sel.options[sel.selectedIndex];
+    const g = opt ? opt.getAttribute('data-group') : '';
+    document.getElementById('evGroupHint').textContent = g ? ('Группа: ' + g) : 'Группа подставится автоматически';
+    // заявки этого оператора → в источник
+    const req = document.getElementById('evReq');
+    req.innerHTML = '<option value="">СКК выбрал сам</option>';
+    if (!sel.value) return;
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) return;
+      (r.requests || []).filter(function (x) { return x.status !== 'Без звонка'; }).forEach(function (x) {
+        req.innerHTML += '<option value="' + x.id + '" data-date="' + x.callDate + '" data-time="' + x.callTime + '" data-phone="' + x.phone + '">' +
+          x.id + ' · ' + formatDate(x.callDate) + ' ' + formatTime(x.callTime) + ' · ' + x.phone + '</option>';
+      });
+    }).getRequestsByOperator(sel.value);
+  }
+
+  // автоподстановка даты/времени/телефона из выбранной заявки
+  function evReqChanged() {
+    const req = document.getElementById('evReq');
+    const o = req.options[req.selectedIndex];
+    if (!o || !o.value) return;
+    if (o.getAttribute('data-date')) document.getElementById('evDate').value = o.getAttribute('data-date');
+    if (o.getAttribute('data-time')) document.getElementById('evTime').value = o.getAttribute('data-time');
+    if (o.getAttribute('data-phone')) document.getElementById('evPhone').value = o.getAttribute('data-phone');
+  }
+  function evTopicChanged() {
+    const t = document.getElementById('evTopic').value;
+    const subs = (evCfg ? evCfg.topics : []).filter(function (x) { return x.topic === t && x.sub; }).map(function (x) { return x.sub; });
+    document.getElementById('evSub').innerHTML = '<option value="">—</option>' + subs.map(function (s) { return '<option>' + s + '</option>'; }).join('');
+  }
+
+  function optClass(v) {
+    if (v === V.POS) return 'on-pos'; if (v === V.DBT) return 'on-dbt'; if (v === V.NEG) return 'on-neg';
+    if (v === V.NA) return 'on-na'; if (v === V.YES) return 'on-yes'; return 'on-no';
+  }
+
+  function renderChecklist() {
+    if (!evCfg) return;
+    let html = '';
+    evCfg.blocks.forEach(function (b) {
+      html += '<div class="ev-block"><div class="ev-bhead"><span class="ev-bname">' + b.name + '</span>' +
+              (b.max > 0 ? '<span class="ev-bmax">макс. ' + b.max + ' б.</span>' : '') + '</div>';
+      b.items.forEach(function (it) {
+        const cur = evAnswers[it.id] || '';
+        html += '<div class="ev-row"><div class="ev-text">' + it.text +
+                '<span class="ev-minus" id="m_' + it.id + '"></span></div><div class="ev-opts">';
+        it.options.forEach(function (o) {
+          const on = cur === o.value ? ' ' + optClass(o.value) : '';
+          html += '<button type="button" class="ev-opt' + on + '" onclick="pickOpt(\'' + it.id + '\',\'' + o.value + '\')">' + o.value + '</button>';
+        });
+        html += '</div></div>';
+        if (cur === V.NEG || cur === V.DBT) {
+          html += '<input type="text" class="ev-cmt" id="c_' + it.id + '" placeholder="Комментарий к ошибке (увидит оператор)" value="' +
+                  (evComments[it.id] || '').replace(/"/g, '&quot;') + '" oninput="evComments[\'' + it.id + '\']=this.value">';
+        }
+      });
+      html += '</div>';
+    });
+    document.getElementById('evChecklist').innerHTML = html;
+  }
+
+  function pickOpt(id, val) {
+    if (evAnswers[id] === val) delete evAnswers[id]; else evAnswers[id] = val;
+    renderChecklist();
+    recalcEval();
+  }
+
+  // Живой расчёт — та же логика, что на сервере (сервер пересчитает при сохранении)
+  function recalcEval() {
+    if (!evCfg) return;
+    let got = 0, max = 0, crit = 0, minor = 0, f100 = false, f0 = false;
+    evCfg.blocks.forEach(function (b) {
+      b.items.forEach(function (it) {
+        const a = evAnswers[it.id];
+        if (it.type === 'flag') {
+          if (a === V.YES) { if (it.rule === 'force100') f100 = true; if (it.rule === 'force0') f0 = true; }
+          return;
+        }
+        let best = 0;
+        it.options.forEach(function (o) { if (o.points > best) best = o.points; });
+        max += best;
+        if (!a) return;
+        let p = null;
+        it.options.forEach(function (o) { if (o.value === a) p = o.points; });
+        if (p === null) return;
+        got += p;
+        if (a === V.NEG) crit++; else if (a === V.DBT) minor++;
+      });
+    });
+    let pct = max > 0 ? (got / max) * 100 : 100;
+    if (f100) pct = 100;
+    if (f0) pct = 0;
+
+    // «сколько % снимается» у каждого пункта
+    evCfg.blocks.forEach(function (b) {
+      b.items.forEach(function (it) {
+        const el = document.getElementById('m_' + it.id);
+        if (!el) return;
+        const a = evAnswers[it.id];
+        if (it.type === 'flag') { el.textContent = (a === V.YES && it.rule === 'force0') ? 'итог → 0,00%' : (a === V.YES && it.rule === 'force100' ? 'итог → 100,00%' : ''); return; }
+        if (!a || a === V.POS || a === V.NA) { el.textContent = ''; return; }
+        let best = 0, p = 0;
+        it.options.forEach(function (o) { if (o.points > best) best = o.points; if (o.value === a) p = o.points; });
+        const lost = max > 0 ? ((best - p) / max) * 100 : 0;
+        el.textContent = lost > 0 ? ('−' + lost.toFixed(2).replace('.', ',') + '%') : '';
+      });
+    });
+
+    const num = document.getElementById('evPct');
+    num.textContent = pct2(pct);
+    num.className = 'ev-num ' + (pct >= 90 ? 'ok' : (pct >= 70 ? 'mid' : 'bad'));
+    document.getElementById('evCrit').textContent = 'критичных: ' + crit;
+    document.getElementById('evMinor').textContent = 'некритичных: ' + minor;
+    document.getElementById('evKo').classList.toggle('hidden', !f0);
+  }
+
+  function submitEvaluation() {
+    const sel = document.getElementById('evOperator');
+    const opt = sel.options[sel.selectedIndex];
+    const cityName = document.getElementById('evCity').value;
+    const cityRow = (evCfg ? evCfg.cities : []).filter(function (c) { return c.city === cityName; })[0];
+    const payload = {
+      pin: sessionStorage.getItem('pin'),
+      meta: {
+        operator: sel.value,
+        group: opt ? opt.getAttribute('data-group') : '',
+        callDate: document.getElementById('evDate').value,
+        callTime: document.getElementById('evTime').value,
+        phone: document.getElementById('evPhone').value,
+        criterion: document.getElementById('evCriterion').value,
+        topic: document.getElementById('evTopic').value,
+        sub: document.getElementById('evSub').value,
+        city: cityName,
+        agg: cityRow ? cityRow.agg : '',
+        reqId: document.getElementById('evReq').value
+      },
+      answers: evAnswers,
+      comments: evComments
+    };
+    if (!payload.meta.operator) { evMsg('Выберите оператора', 'error'); return; }
+    if (!payload.meta.callDate) { evMsg('Укажите дату звонка', 'error'); return; }
+
+    const btn = document.querySelector('#evSticky .btn-submit');
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Сохранение...';
+    google.script.run
+      .withSuccessHandler(function (res) {
+        btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Сохранить оценку';
+        if (!res.success) { evMsg('❌ ' + res.error, 'error'); return; }
+        evMsg('✅ Оценка ' + res.id + ' сохранена: ' + pct2(res.result.score) + ' (' + res.week + ')', 'success');
+        evAnswers = {}; evComments = {};
+        document.getElementById('evPhone').value = '';
+        document.getElementById('evTime').value = '';
+        document.getElementById('evReq').innerHTML = '<option value="">СКК выбрал сам</option>';
+        renderChecklist(); recalcEval();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      })
+      .withFailureHandler(function (e) {
+        btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Сохранить оценку';
+        evMsg('❌ Ошибка: ' + e, 'error');
+      })
+      .saveEvaluation(payload);
+  }
+
+  function evMsg(text, type) {
+    const el = document.getElementById('evMessage');
+    el.textContent = text; el.className = 'message ' + type; el.style.display = 'block';
+    if (type === 'success') setTimeout(function () { el.style.display = 'none'; }, 6000);
+  }
+
+  // ---------- ОТЧЁТЫ ----------
+  let weekOffset = 0;
+  let repFrom = 'org';   // куда возвращаться
+
+  function openReports(from) {
+    repFrom = from || 'org';
+    ['operatorPage', 'qcPage', 'rgoPage', 'orgPage'].forEach(function (id) { document.getElementById(id).classList.add('hidden'); });
+    document.getElementById('repPage').classList.remove('hidden');
+    const u = JSON.parse(sessionStorage.getItem('user') || '{}');
+    document.getElementById('repUserName').textContent = u.fullName || '';
+    weekOffset = 0;
+    repTab('weekly');
+  }
+  function backFromReports() {
+    document.getElementById('repPage').classList.add('hidden');
+    document.getElementById(repFrom === 'qc' ? 'qcPage' : (repFrom === 'rgo' ? 'rgoPage' : 'orgPage')).classList.remove('hidden');
+  }
+  function repTab(t) {
+    const tabs = { weekly: ['repT1', 'repWeekly'], journal: ['repT2', 'repJournal'], kk: ['repT3', 'repKk'],
+                   criteria: ['repT4', 'repCriteria'], topics: ['repT5', 'repTopics'], complaints: ['repT6', 'repComplaints'] };
+    Object.keys(tabs).forEach(function (k) {
+      document.getElementById(tabs[k][0]).classList.toggle('active', k === t);
+      document.getElementById(tabs[k][1]).classList.toggle('hidden', k !== t);
+    });
+    if (t === 'weekly') loadWeekly();
+    if (t === 'journal') loadJournal();
+    if (t === 'kk') loadKk();
+    if (t === 'criteria') loadCriteria();
+    if (t === 'topics') loadTopics();
+    if (t === 'complaints') loadComplaints();
+  }
+
+  function loadCriteria() {
+    const box = document.getElementById('criteriaTable');
+    box.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Загрузка...</p></div>';
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
+      if (!r.weeks.length) { box.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Нет данных за период</p></div>'; return; }
+      let html = '<div class="table-wrapper"><table><thead><tr><th>Критерий</th>' + r.weeks.map(function (w) { return '<th>' + w + '</th>'; }).join('') + '</tr></thead><tbody>';
+      let prevB = null;
+      r.items.forEach(function (it) {
+        if (it.block !== prevB) { html += '<tr><td colspan="' + (r.weeks.length + 1) + '" style="background:var(--surface-2);font-weight:700;">' + it.block + '</td></tr>'; prevB = it.block; }
+        html += '<tr><td style="max-width:340px;">' + it.text + '</td>' +
+          it.cells.map(function (c) { return '<td>' + (c === null ? '<span style="color:#ccc">—</span>' : '<strong style="color:' + scoreColorHex(c) + '">' + pct2(c) + '</strong>') + '</td>'; }).join('') + '</tr>';
+      });
+      html += '</tbody></table></div>';
+      box.innerHTML = html;
+    }).getCriteriaReport(sessionStorage.getItem('pin'), document.getElementById('cPeriod').value);
+  }
+
+  function loadTopics() {
+    const box = document.getElementById('topicsTable');
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
+      if (!r.rows.length) { box.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Нет данных</p></div>'; return; }
+      let html = '<div class="table-wrapper"><table><thead><tr><th>Тематика</th><th>Подтематика</th><th>Чек-листов</th><th>С ошибкой</th><th>Доля с ошибкой</th><th>Средний балл</th></tr></thead><tbody>';
+      r.rows.forEach(function (x) {
+        html += '<tr><td><strong>' + x.topic + '</strong></td><td>' + (x.sub || '—') + '</td><td>' + x.count + '</td><td>' + x.withErrors + '</td>' +
+          '<td>' + pct2(x.errShare) + '</td>' +
+          '<td>' + (x.avgScore === null ? '—' : '<strong style="color:' + scoreColorHex(x.avgScore) + '">' + pct2(x.avgScore) + '</strong>') + '</td></tr>';
+      });
+      html += '</tbody></table></div>';
+      box.innerHTML = html;
+    }).getTopicsReport(sessionStorage.getItem('pin'), document.getElementById('tPeriod').value);
+  }
+
+  function loadComplaints() {
+    const box = document.getElementById('complaintsTable');
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
+      document.getElementById('cmpTotal').textContent = r.summary.total;
+      document.getElementById('cmpConf').textContent = r.summary.confirmed;
+      document.getElementById('cmpUnconf').textContent = r.summary.unconfirmed;
+      if (!r.rows.length) { box.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Жалоб нет</p></div>'; return; }
+      let html = '<div class="table-wrapper"><table><thead><tr><th>Тематика</th><th>Неделя</th><th>Всего</th><th>Обоснованные</th><th>Необоснованные</th><th>Доля обоснованных</th></tr></thead><tbody>';
+      r.rows.forEach(function (x) {
+        html += '<tr><td><strong>' + x.topic + '</strong></td><td>' + x.week + '</td><td>' + x.total + '</td>' +
+          '<td>' + (x.confirmed ? '<span class="fail-tag">' + x.confirmed + '</span>' : '0') + '</td>' +
+          '<td>' + x.unconfirmed + '</td><td>' + pct2(x.share) + '</td></tr>';
+      });
+      html += '</tbody></table></div>';
+      box.innerHTML = html;
+    }).getComplaintsReport(sessionStorage.getItem('pin'), document.getElementById('cmpPeriod').value);
+  }
+
+  function weekShift(d) { weekOffset += d; loadWeekly(); }
+
+  function loadWeekly() {
+    const box = document.getElementById('weeklyGrid');
+    box.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Загрузка...</p></div>';
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
+      document.getElementById('weekLabel').textContent = r.week.label;
+      const gs = document.getElementById('weekGroup');
+      if (gs.options.length <= 1) gs.innerHTML = '<option value="">Все группы</option>' + r.groups.map(function (g) { return '<option>' + g + '</option>'; }).join('');
+
+      let html = '<div class="table-wrapper"><table><thead><tr><th>Оператор</th><th>Группа</th>';
+      for (let i = 1; i <= r.maxCells; i++) html += '<th>Оценка ' + i + '</th>';
+      html += '<th>Среднее</th><th>ПЖ</th></tr></thead><tbody>';
+      let prevG = null;
+      r.rows.forEach(function (x) {
+        if (x.group !== prevG) { html += '<tr><td colspan="' + (r.maxCells + 4) + '" style="background:var(--surface-2);font-weight:700;">' + x.group + '</td></tr>'; prevG = x.group; }
+        html += '<tr><td>' + x.operator + '</td><td>' + x.group + '</td>';
+        for (let i = 0; i < r.maxCells; i++) {
+          const c = x.cells[i];
+          if (!c) { html += '<td style="color:#ccc">—</td>'; continue; }
+          const mark = c.complaint ? ' ⚠' : (c.gratitude ? ' ★' : '');
+          html += '<td><button class="btn-small" style="background:transparent;color:' + scoreColorHex(c.score) + ';font-weight:700;" onclick="downloadEval(\'' + c.id + '\')" title="Скачать чек-лист">' + pct2(c.score) + mark + '</button></td>';
+        }
+        html += '<td>' + (x.avg === null ? '<span style="color:#bbb">—</span>' : '<strong style="color:' + scoreColorHex(x.avg) + '">' + pct2(x.avg) + '</strong>') + '</td>';
+        html += '<td>' + (x.complaints || '') + '</td></tr>';
+      });
+      html += '</tbody></table></div>';
+      box.innerHTML = html;
+    }).getWeeklyGrid(sessionStorage.getItem('pin'), weekOffset, document.getElementById('weekGroup').value);
+  }
+
+  function jFilters() {
+    return {
+      period: document.getElementById('jPeriod').value,
+      group: document.getElementById('jGroup').value,
+      operator: document.getElementById('jOperator').value.trim(),
+      qc: document.getElementById('jQc').value.trim(),
+      onlyErrors: document.getElementById('jErrors').checked,
+      onlyKo: document.getElementById('jKo').checked
+    };
+  }
+
+  function loadJournal() {
+    const box = document.getElementById('journalList');
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
+      const gs = document.getElementById('jGroup');
+      if (gs.options.length <= 1) {
+        const groups = [];
+        r.rows.forEach(function (e) { if (e.group && groups.indexOf(e.group) < 0) groups.push(e.group); });
+        groups.sort();
+        gs.innerHTML = '<option value="">Все группы</option>' + groups.map(function (g) { return '<option>' + g + '</option>'; }).join('');
+      }
+      if (!r.rows.length) { box.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Оценок нет</p></div>'; return; }
+      let html = '<div class="table-wrapper"><table><thead><tr><th>Дата</th><th>Оператор</th><th>Группа</th><th>СКК</th><th>Тематика</th><th>Качество</th><th>Ошибки</th><th></th></tr></thead><tbody>';
+      r.rows.forEach(function (e) {
+        const errs = e.failed.length
+          ? e.failed.map(function (f) { return '<div style="margin:2px 0;"><span class="fail-tag' + (f.critical ? '' : ' minor') + '">' + f.text + '</span>' + (f.comment ? '<span style="color:var(--muted);font-size:12px;"> — ' + f.comment + '</span>' : '') + '</div>'; }).join('')
+          : '<span style="color:var(--good);font-weight:600;">без ошибок</span>';
+        const flags = (e.violation ? ' <span class="fail-tag">НС</span>' : '') + (e.complaint ? ' <span class="fail-tag">ПЖ</span>' : '') + (e.gratitude ? ' <span class="fail-tag minor">★</span>' : '');
+        html += '<tr><td>' + e.callDate + '</td><td>' + e.operator + '</td><td>' + e.group + '</td><td>' + e.qc + '</td><td>' + (e.topic || '—') + '</td>' +
+          '<td><strong style="color:' + scoreColorHex(e.score) + '">' + pct2(e.score) + '</strong>' + flags + '</td>' +
+          '<td style="max-width:420px;">' + errs + '</td>' +
+          '<td><button class="btn-small" onclick="downloadEval(\'' + e.id + '\')"><i class="fas fa-file-excel"></i></button></td></tr>';
+      });
+      html += '</tbody></table></div>';
+      box.innerHTML = html;
+    }).getJournal(sessionStorage.getItem('pin'), jFilters());
+  }
+
+  function loadKk() {
+    const box = document.getElementById('kkTable');
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
+      let html = '<div class="table-wrapper"><table><thead><tr><th>Оператор</th><th>Группа</th><th>Стаж, мес</th><th>Оценок (нед)</th><th>% без КО (нед)</th><th>Оценок (мес)</th><th>% без КО (мес)</th><th>Недоп. событий</th><th>Подтв. жалоб</th></tr></thead><tbody>';
+      r.rows.forEach(function (x) {
+        html += '<tr><td>' + x.operator + '</td><td>' + x.group + '</td><td>' + (x.months === '' ? '—' : x.months) + '</td>' +
+          '<td>' + x.weekCount + '</td><td>' + (x.weekAvg === null ? '—' : '<strong style="color:' + scoreColorHex(x.weekAvg) + '">' + pct2(x.weekAvg) + '</strong>') + '</td>' +
+          '<td>' + x.monthCount + '</td><td>' + (x.monthAvg === null ? '—' : '<strong style="color:' + scoreColorHex(x.monthAvg) + '">' + pct2(x.monthAvg) + '</strong>') + '</td>' +
+          '<td>' + (x.ko ? '<span class="fail-tag">' + x.ko + '</span>' : '0') + '</td>' +
+          '<td>' + (x.complaints ? '<span class="fail-tag">' + x.complaints + '</span>' : '0') + '</td></tr>';
+      });
+      html += '</tbody></table></div>';
+      box.innerHTML = html;
+    }).getKkReport(sessionStorage.getItem('pin'), 'month');
+  }
+
+  // ---------- СКАЧИВАНИЕ ----------
+  function saveCsv(filename, content) {
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  }
+  function downloadReport(kind) {
+    let params;
+    if (kind === 'weekly') params = { weekOffset: weekOffset, group: document.getElementById('weekGroup').value };
+    else if (kind === 'journal') params = jFilters();
+    else if (kind === 'criteria') params = { period: document.getElementById('cPeriod').value };
+    else if (kind === 'topics') params = { period: document.getElementById('tPeriod').value };
+    else if (kind === 'complaints') params = { period: document.getElementById('cmpPeriod').value };
+    else params = { period: 'month' };
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) { alert('❌ ' + r.error); return; }
+      saveCsv(r.filename, r.content);
+    }).exportReport(sessionStorage.getItem('pin'), kind, params);
+  }
+  function downloadEval(id) {
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) { alert('❌ ' + r.error); return; }
+      saveCsv(r.filename, r.content);
+    }).exportReport(sessionStorage.getItem('pin'), 'evaluation', { id: id });
+  }
+
+  // ---------- ДИВИЗИОН (СРГО / МЕНЕДЖЕР) ----------
+  function scoreColorHex(s) { return s >= 90 ? '#0FA45A' : (s >= 70 ? '#DE9109' : '#E23A3A'); }
+
+  function loadOrgDashboard(role) {
+    const isMgr = (role === 'manager' || role === 'admin');
+    document.getElementById('managerOnly').classList.toggle('hidden', !isMgr);
+    document.getElementById('managerQcCard').classList.toggle('hidden', !isMgr);
+    google.script.run.withSuccessHandler(function (res) {
+      if (!res.success) { document.getElementById('orgOperatorsTable').innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + (res.error || 'Ошибка') + '</p></div>'; return; }
+
+      document.getElementById('orgOps').textContent = res.summary.operatorsTotal;
+      document.getElementById('orgOpsChecked').textContent = res.summary.operatorsChecked;
+      document.getElementById('orgCalls').textContent = res.summary.callsChecked;
+      document.getElementById('orgAvg').textContent = res.summary.callsChecked ? pct2(res.summary.avgScore) : '—';
+      if (isMgr) {
+        document.getElementById('mgrCalls').textContent = res.submissions.calls;
+        document.getElementById('mgrNoCall').textContent = res.submissions.noCall;
+        document.getElementById('mgrQc').textContent = res.byQc.length;
+      }
+
+      // качество по группам
+      drawBarChartV('orgGroupChart', 'Средний балл по группам, %', res.byGroup.map(function (g) { return g.group; }), res.byGroup.map(function (g) { return g.avgScore == null ? 0 : g.avgScore; }));
+      let gh = '<div class="table-wrapper"><table><thead><tr><th>Группа</th><th>Операторов</th><th>С проверками</th><th>Звонков</th><th>Средний балл</th><th>Провалов</th></tr></thead><tbody>';
+      res.byGroup.forEach(function (g) {
+        const sc = g.avgScore == null ? '<span style="color:#bbb">—</span>' : '<strong style="color:' + scoreColorHex(g.avgScore) + '">' + pct2(g.avgScore) + '</strong>';
+        gh += '<tr><td><strong>' + g.group + '</strong></td><td>' + g.operators + '</td><td>' + g.checked + '</td><td>' + g.callsChecked + '</td><td>' + sc + '</td><td>' + g.fails + '</td></tr>';
+      });
+      gh += '</tbody></table></div>';
+      document.getElementById('orgGroupTable').innerHTML = gh;
+
+      drawLineChart('orgTrendChart', 'Средний балл, %', res.groupTrend.map(function (t) { return t.label; }), res.groupTrend.map(function (t) { return t.score; }));
+      drawBarChart('orgFailsChart', 'Частые провалы', res.topFails.map(function (f) { return f.text; }), res.topFails.map(function (f) { return f.count; }));
+
+      if (isMgr) {
+        let qh = '<div class="table-wrapper"><table><thead><tr><th>Контролёр</th><th>Проверено звонков</th><th>Средний балл, который ставит</th></tr></thead><tbody>';
+        if (!res.byQc.length) qh += '<tr><td colspan="3"><span style="color:#bbb">Пока нет проверок</span></td></tr>';
+        res.byQc.forEach(function (q) { qh += '<tr><td>' + q.qc + '</td><td>' + q.checkedCount + '</td><td><strong style="color:' + scoreColorHex(q.avgGiven) + '">' + pct2(q.avgGiven) + '</strong></td></tr>'; });
+        qh += '</tbody></table></div>';
+        document.getElementById('orgQcTable').innerHTML = qh;
+      }
+
+      // операторы: сохраняем и рендерим по фильтру
+      orgOperators = res.operators || [];
+      const gf = document.getElementById('orgGroupFilter');
+      const groups = [];
+      orgOperators.forEach(function (o) { if (groups.indexOf(o.group) < 0) groups.push(o.group); });
+      groups.sort();
+      gf.innerHTML = '<option value="">Все группы (по порядку)</option>' + groups.map(function (g) { return '<option value="' + g + '">' + g + '</option>'; }).join('');
+      renderOrgOperators();
+    }).getOrgDashboard(sessionStorage.getItem('pin'), document.getElementById('orgPeriod').value);
+  }
+
+  function renderOrgOperators() {
+    const box = document.getElementById('orgOperatorsTable');
+    const gsel = document.getElementById('orgGroupFilter').value;
+    const mode = document.getElementById('orgSortMode').value;
+    let list = orgOperators.slice();
+    if (gsel) list = list.filter(function (o) { return o.group === gsel; });
+    if (!list.length) { box.innerHTML = '<div class="empty-state"><i class="fas fa-user-slash"></i><p>Нет операторов</p></div>'; return; }
+    if (mode === 'group') {
+      list.sort(function (a, b) {
+        if (a.group !== b.group) return a.group.localeCompare(b.group);
+        if (a.avgScore === null && b.avgScore === null) return a.fullName.localeCompare(b.fullName);
+        if (a.avgScore === null) return 1; if (b.avgScore === null) return -1;
+        return a.avgScore - b.avgScore;
+      });
+    } // 'score' — уже отсортированы бэком: слабые сверху
+    let oh = '<div class="table-wrapper"><table><thead><tr><th>Оператор</th><th>Группа</th><th>Проверок</th><th>Средний балл</th><th>Провалов</th></tr></thead><tbody>';
+    let prevG = null;
+    list.forEach(function (o) {
+      if (mode === 'group' && !gsel && o.group !== prevG) {
+        oh += '<tr><td colspan="5" style="background:var(--surface-2);font-weight:700;color:var(--ink);">' + o.group + '</td></tr>';
+        prevG = o.group;
+      }
+      const sc = o.avgScore == null ? '<span style="color:#bbb">нет проверок</span>' : '<strong style="color:' + scoreColorHex(o.avgScore) + '">' + pct2(o.avgScore) + '</strong>';
+      oh += '<tr><td>' + o.fullName + '</td><td>' + o.group + '</td><td>' + o.checkedCount + '</td><td>' + sc + '</td><td>' + o.failsCount + '</td></tr>';
+    });
+    oh += '</tbody></table></div>';
+    box.innerHTML = oh;
+  }
+
+  // ---------- ГРАФИКИ ----------
+  function drawLineChart(canvasId, label, labels, data) {
+    const ctx = document.getElementById(canvasId); if (!ctx) return;
+    if (charts[canvasId]) charts[canvasId].destroy();
+    if (!labels.length) { emptyChart(ctx); return; }
+    charts[canvasId] = new Chart(ctx, {
+      type: 'line',
+      data: { labels: labels, datasets: [{ label: label, data: data, borderColor: '#2B59F0', backgroundColor: 'rgba(43,89,240,0.10)', fill: true, tension: 0.3, pointRadius: 4, pointBackgroundColor: '#1B3AC2' }] },
+      options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 100 } }, plugins: { legend: { display: true, position: 'top' } } }
+    });
+  }
+  function drawBarChart(canvasId, label, labels, data) {
+    const ctx = document.getElementById(canvasId); if (!ctx) return;
+    if (charts[canvasId]) charts[canvasId].destroy();
+    if (!labels.length) { emptyChart(ctx); return; }
+    charts[canvasId] = new Chart(ctx, {
+      type: 'bar',
+      data: { labels: labels, datasets: [{ label: label, data: data, backgroundColor: '#E23A3A', borderRadius: 6 }] },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { beginAtZero: true, ticks: { precision: 0 } } }, plugins: { legend: { display: true, position: 'top' } } }
+    });
+  }
+  function drawBarChartV(canvasId, label, labels, data) {
+    const ctx = document.getElementById(canvasId); if (!ctx) return;
+    if (charts[canvasId]) charts[canvasId].destroy();
+    if (!labels.length) { emptyChart(ctx); return; }
+    charts[canvasId] = new Chart(ctx, {
+      type: 'bar',
+      data: { labels: labels, datasets: [{ label: label, data: data, backgroundColor: '#2B59F0', borderRadius: 6 }] },
+      options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 100 } }, plugins: { legend: { display: true, position: 'top' } } }
+    });
+  }
+  function emptyChart(ctx) {
+    const c = ctx.getContext('2d'); c.clearRect(0, 0, ctx.width, ctx.height);
+    c.fillStyle = '#8b94a5'; c.font = '14px Inter'; c.textAlign = 'center';
+    c.fillText('Пока нет данных', ctx.width / 2, ctx.height / 2);
+  }
+
+  // Enter на форме входа
+  document.getElementById('pinInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); login(); }
+  });
+</script>
+
+</body>
+</html>

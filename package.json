@@ -1,21 +1,27 @@
 {
-  "name": "cc1010-scc",
-  "version": "0.1.0",
+  "name": "kc1010",
+  "version": "1.0.0",
   "private": true,
-  "description": "КЦ1010 — контроль качества звонков: ядро расчёта, схема Postgres и перенос данных из Google Таблиц",
-  "license": "UNLICENSED",
-  "engines": {
-    "node": ">=18"
-  },
-  "main": "lib/core.js",
+  "description": "Система контроля качества звонков КЦ1010",
   "scripts": {
-    "db:schema": "psql \"$DATABASE_URL\" -f db/schema.sql",
-    "migrate": "node scripts/migrate.js",
-    "test": "node test/parity.js && node test/migration.js",
-    "test:parity": "node test/parity.js",
-    "test:migration": "node test/migration.js"
+    "dev": "node scripts/dev-server.js 3000",
+    "dev:next": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "db:init": "psql -d $PGDATABASE -c 'CREATE EXTENSION IF NOT EXISTS citext;' -f db/schema.sql",
+    "db:migrate": "node scripts/migrate.js",
+    "test": "bash test/run.sh"
   },
   "dependencies": {
-    "pg": "^8.23.0"
+    "next": "^15.0.0",
+    "pg": "^8.23.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "jsdom": "^25.0.1"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

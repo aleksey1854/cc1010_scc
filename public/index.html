@@ -4,6 +4,9 @@
   <base target="_top">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Контроль качества · КЦ1010</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#2B59F0">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -53,14 +56,18 @@
   .login-container h1{ color:#fff; font-family:var(--display); font-size:23px; font-weight:600; letter-spacing:-.2px; margin-bottom:8px; }
   .subtitle{ color:#93a0b8; font-size:14px; margin-bottom:28px; }
   .pin-input-container{ position:relative; margin-bottom:14px; }
-  .pin-input-container i{ position:absolute; left:16px; top:50%; transform:translateY(-50%); color:#5c6a86; font-size:16px; }
+  .pin-input-container > i{ position:absolute; left:16px; top:50%; transform:translateY(-50%); color:#5c6a86; font-size:16px; }
   .pin-input-container input{
     width:100%; padding:15px 44px 15px 46px; border:1.5px solid rgba(255,255,255,.12); border-radius:12px;
     font-size:16px; outline:none; background:#0d1523; color:#fff; transition:border-color .2s, box-shadow .2s;
   }
   .pin-input-container input::placeholder{ color:#3a465e; }
   .pin-input-container input:focus{ border-color:var(--accent); box-shadow:0 0 0 4px rgba(43,89,240,.22); }
-  .pw-eye{ position:absolute; right:12px; top:50%; transform:translateY(-50%); background:transparent; border:none; color:#5c6a86; cursor:pointer; font-size:15px; padding:6px; }
+  .pw-eye{
+    position:absolute; right:6px; top:50%; transform:translateY(-50%);
+    width:36px; height:36px; padding:0; display:inline-flex; align-items:center; justify-content:center;
+    background:transparent; border:none; border-radius:9px; color:#5c6a86; cursor:pointer; font-size:15px;
+  }
   .pw-eye:hover{ color:var(--accent); }
   .login-btn{
     width:100%; padding:15px; background:var(--accent); color:#fff; border:none; border-radius:12px;

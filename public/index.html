@@ -30,6 +30,9 @@
     --login-bg:#0B1019; --login-card:#131b2b; --login-line:rgba(255,255,255,.08);
   }
   * { margin:0; padding:0; box-sizing:border-box; }
+  /* место под полосу прокрутки держим всегда: иначе при загрузке данных
+     она появляется и вся страница дёргается вбок */
+  html { scrollbar-gutter:stable; }
   body { font-family:var(--font); background:var(--paper); color:var(--ink); min-height:100vh; -webkit-font-smoothing:antialiased; }
   .hidden { display:none !important; }
   ::selection { background:var(--accent); color:#fff; }
@@ -80,6 +83,45 @@
   #loginForm .pin-input-container{ margin-bottom:14px; }
   #loginForm .login-btn{ margin-top:4px; }
   .error-message{ color:#ff8a8a; font-size:14px; margin-top:15px; min-height:20px; }
+
+  /* ===== СПИСОК ВЫБОРА С ПОИСКОМ (ui-select.js) ===== */
+  .uisel{ position:relative; display:block; }
+  .uisel-native{ position:absolute; left:0; top:0; width:100%; height:100%; opacity:0; pointer-events:none; }
+  .uisel-btn{
+    position:relative; width:100%; text-align:left; cursor:pointer; font-family:inherit;
+    background:var(--surface); display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    transition:border-color .2s, box-shadow .2s;
+  }
+  .uisel-btn:hover{ border-color:var(--muted) !important; }
+  .uisel-btn:focus-visible, .uisel[data-open] .uisel-btn{
+    border-color:var(--accent) !important; box-shadow:0 0 0 3px rgba(43,89,240,.14); outline:none;
+  }
+  .uisel-btn[disabled]{ opacity:.6; cursor:default; }
+  .uisel-btn.uisel-placeholder .uisel-val{ color:var(--muted); }
+  .uisel-caret{ position:absolute; right:11px; top:50%; transform:translateY(-50%); font-size:11px; color:var(--muted); pointer-events:none; }
+  .uisel[data-open] .uisel-caret{ transform:translateY(-50%) rotate(180deg); }
+
+  .uisel-panel{
+    position:fixed; z-index:1200; background:var(--surface); border:1px solid var(--border-strong);
+    border-radius:var(--radius-sm); box-shadow:var(--shadow-lg); display:flex; flex-direction:column;
+    overflow:hidden; min-width:210px;
+  }
+  .uisel-search{ position:relative; padding:8px; border-bottom:1px solid var(--border); flex:0 0 auto; }
+  .uisel-search i{ position:absolute; left:19px; top:50%; transform:translateY(-50%); color:var(--muted); font-size:13px; }
+  .uisel-search input{
+    width:100%; padding:9px 11px 9px 34px; border:1.5px solid var(--border-strong); border-radius:9px;
+    font-size:14px; font-family:inherit; color:var(--ink); background:var(--surface-2); outline:none;
+  }
+  .uisel-search input:focus{ border-color:var(--accent); background:var(--surface); }
+  .uisel-list{ overflow-y:auto; padding:6px; flex:1 1 auto; }
+  .uisel-group{ font-size:11px; font-weight:700; letter-spacing:.4px; text-transform:uppercase;
+    color:var(--muted); padding:9px 10px 5px; }
+  .uisel-item{ padding:9px 11px; border-radius:8px; font-size:14px; color:var(--ink); cursor:pointer; }
+  .uisel-item-in-group{ padding-left:20px; }
+  .uisel-item:hover, .uisel-item.uisel-active{ background:var(--accent-soft); color:var(--accent-ink); }
+  .uisel-item.uisel-disabled{ color:var(--muted); cursor:default; background:none; }
+  .uisel-empty{ padding:18px; text-align:center; color:var(--muted); font-size:14px; }
+  @media (max-width:640px){ .uisel-panel{ min-width:0; } }
 
   /* ===== ШАПКА ===== */
   .header{
@@ -164,7 +206,8 @@
   .status-badge.В_работе{ background:var(--mid-bg); color:#9a6206; }
   .status-badge.Проверена{ background:var(--good-bg); color:#0a6e3d; }
   .status-badge.Отклонена{ background:var(--bad-bg); color:#a52020; }
-  .empty-state{ text-align:center; padding:40px; color:var(--muted); }
+  .empty-state{ text-align:center; padding:40px; color:var(--muted); min-height:190px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; }
   .empty-state i{ font-size:40px; margin-bottom:14px; display:block; color:var(--border-strong); }
 
   .filter-bar{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
@@ -457,8 +500,8 @@
           <div class="form-group"><label>⏱ Критерий звонка</label><select id="evCriterion"></select></div>
           <div class="form-group"><label>🏷 Тематика</label><select id="evTopic" onchange="evTopicChanged()"></select></div>
           <div class="form-group"><label>🏷 Подтематика</label><select id="evSub"></select></div>
-          <div class="form-group"><label>🏙 Город</label><select id="evCity"></select></div>
-          <div class="form-group"><label>🗺 Агломерация</label><input type="text" id="evAgg" readonly></div>
+          <div class="form-group"><label>🏙 Город</label><select id="evCity" onchange="evCityChanged()"></select></div>
+          <div class="form-group"><label>🗺 Агломерация</label><input type="text" id="evAgg" readonly placeholder="Подставится по городу"></div>
         </div>
       </div>
 
@@ -515,6 +558,7 @@
           <option value="В работе">В работе</option>
           <option value="Проверена">Проверена</option>
           <option value="Отклонена">Отклонена</option>
+          <option value="Без звонка">Без звонка</option>
         </select>
         <input type="text" id="filterOperator" placeholder="Поиск по ФИО оператора">
         <input type="text" id="filterPhone" placeholder="Поиск по телефону">
@@ -814,6 +858,8 @@
 
 <!-- транспорт: подменяет google.script.run на fetch, подключается первым -->
   <script src="/gs-shim.js"></script>
+  <!-- поиск и клавиатура в списках выбора; родной <select> остаётся источником правды -->
+  <script src="/ui-select.js"></script>
   <script>
   let currentRequestId = null;
   let allRequests = [];
@@ -1182,7 +1228,16 @@
   }
   function renderRequests(requests) {
     const container = document.getElementById('qcRequestsList');
-    if (!requests || requests.length === 0) { container.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Нет заявок</p></div>'; return; }
+    if (!requests || requests.length === 0) {
+      // «ничего не нашлось» и «заявок нет вовсе» — разные сообщения,
+      // иначе пустой фильтр выглядит как сломанная страница
+      const filtered = allRequests.length > 0;
+      container.innerHTML = '<div class="empty-state"><i class="fas fa-' + (filtered ? 'filter-circle-xmark' : 'inbox') + '"></i><p>' +
+        (filtered ? 'Ничего не найдено по фильтрам' : 'Нет заявок') + '</p>' +
+        (filtered ? '<button class="btn-small" style="margin-top:12px" onclick="resetFilters()">Сбросить фильтры</button>' : '') +
+        '</div>';
+      return;
+    }
     const user = JSON.parse(sessionStorage.getItem('user') || '{}');
     const isAdmin = user.role === 'admin';
     let html = '<div class="table-wrapper"><table><thead><tr><th>ID</th><th>Оператор</th><th>Группа</th><th>Дата</th><th>Время</th><th>Телефон</th><th>Статус</th><th>Оценка</th><th>Действия</th></tr></thead><tbody>';
@@ -1203,6 +1258,23 @@
     html += '</tbody></table></div>';
     container.innerHTML = html;
   }
+  // Фильтры применяются на лету. Кнопка «Применить» осталась для привычки,
+  // но ждать её больше не нужно: раньше можно было набрать ФИО, нажать Enter
+  // и решить, что фильтры не работают.
+  function wireFilters() {
+    ['filterOperator', 'filterPhone'].forEach(function (id) {
+      const el = document.getElementById(id);
+      let t = null;
+      el.addEventListener('input', function () { clearTimeout(t); t = setTimeout(applyFilters, 180); });
+      el.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); applyFilters(); } });
+    });
+    ['filterStatus', 'filterDate'].forEach(function (id) {
+      document.getElementById(id).addEventListener('change', applyFilters);
+    });
+  }
+
+  window.addEventListener('DOMContentLoaded', wireFilters);
+
   function applyFilters() {
     const status = document.getElementById('filterStatus').value;
     const operator = document.getElementById('filterOperator').value.toLowerCase().trim();
@@ -1234,7 +1306,7 @@
         '<div class="row"><span class="label">Дата</span><span class="value">' + formatDate(req.callDate) + '</span></div>' +
         '<div class="row"><span class="label">Телефон</span><span class="value">' + req.phone + '</span></div>' +
         (req.callType ? '<div class="row"><span class="label">Тип</span><span class="value">' + req.callType + '</span></div>' : '') +
-        (req.opComment ? '<div class="row"><span class="label">Коммент оператора</span><span class="value">' + req.opComment + '</span></div>' : '') +
+        (req.opComment ? '<div class="row"><span class="label">Комментарий оператора</span><span class="value">' + req.opComment + '</span></div>' : '') +
       '</div>';
     document.getElementById('reviewStatus').value = (req.status === 'Новая' ? 'В работе' : req.status);
     document.getElementById('reviewComment').value = req.comment || '';
@@ -1391,7 +1463,8 @@
       const topics = [];
       res.topics.forEach(function (t) { if (topics.indexOf(t.topic) < 0) topics.push(t.topic); });
       document.getElementById('evTopic').innerHTML = '<option value="">—</option>' + topics.map(function (t) { return '<option>' + t + '</option>'; }).join('');
-      document.getElementById('evSub').innerHTML = '<option value="">—</option>';
+      document.getElementById('evSub').disabled = true;
+      document.getElementById('evSub').innerHTML = '<option value="">Сначала выберите тематику</option>';
       const cities = [];
       res.cities.forEach(function (c) { if (cities.indexOf(c.city) < 0) cities.push(c.city); });
       document.getElementById('evCity').innerHTML = '<option value="">—</option>' + cities.map(function (c) { return '<option>' + c + '</option>'; }).join('');
@@ -1442,8 +1515,26 @@
   }
   function evTopicChanged() {
     const t = document.getElementById('evTopic').value;
+    const sub = document.getElementById('evSub');
     const subs = (evCfg ? evCfg.topics : []).filter(function (x) { return x.topic === t && x.sub; }).map(function (x) { return x.sub; });
-    document.getElementById('evSub').innerHTML = '<option value="">—</option>' + subs.map(function (s) { return '<option>' + s + '</option>'; }).join('');
+    // Пустой список выглядел поломкой. Теперь поле говорит, почему оно пустое:
+    // тематика не выбрана или у неё в справочнике нет подтематик.
+    if (!subs.length) {
+      sub.disabled = true;
+      sub.innerHTML = '<option value="">' + (t ? 'У этой тематики нет подтематик' : 'Сначала выберите тематику') + '</option>';
+      return;
+    }
+    sub.disabled = false;
+    sub.innerHTML = '<option value="">—</option>' + subs.map(function (s) { return '<option>' + s + '</option>'; }).join('');
+  }
+
+  // Агломерация — производное от города, руками её не заполняют.
+  // Раньше она подставлялась только в момент сохранения, и поле всё время
+  // выглядело пустым и сломанным.
+  function evCityChanged() {
+    const city = document.getElementById('evCity').value;
+    const row = (evCfg ? evCfg.cities : []).filter(function (c) { return c.city === city; })[0];
+    document.getElementById('evAgg').value = row ? (row.agg || '') : '';
   }
 
   function optClass(v) {

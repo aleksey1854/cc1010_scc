@@ -106,6 +106,8 @@
     border-radius:var(--radius-sm); box-shadow:var(--shadow-lg); display:flex; flex-direction:column;
     overflow:hidden; min-width:210px;
   }
+  /* display:flex выше перебивал атрибут hidden, и все панели висели внизу страницы */
+  .uisel-panel[hidden]{ display:none; }
   .uisel-search{ position:relative; padding:8px; border-bottom:1px solid var(--border); flex:0 0 auto; }
   .uisel-search i{ position:absolute; left:19px; top:50%; transform:translateY(-50%); color:var(--muted); font-size:13px; }
   .uisel-search input{
@@ -206,6 +208,7 @@
   .status-badge.В_работе{ background:var(--mid-bg); color:#9a6206; }
   .status-badge.Проверена{ background:var(--good-bg); color:#0a6e3d; }
   .status-badge.Отклонена{ background:var(--bad-bg); color:#a52020; }
+  .ev-row.ev-missing{ background:var(--bad-bg); border-radius:8px; box-shadow:inset 3px 0 0 var(--bad); }
   .empty-state{ text-align:center; padding:40px; color:var(--muted); min-height:190px;
     display:flex; flex-direction:column; align-items:center; justify-content:center; }
   .empty-state i{ font-size:40px; margin-bottom:14px; display:block; color:var(--border-strong); }
@@ -1010,7 +1013,7 @@
   function logout() {
     const t = sessionStorage.getItem('token');
     if (t) google.script.run.logoutSession(t);    // иначе токен живёт на сервере до истечения срока
-    sessionStorage.removeItem('user'); sessionStorage.removeItem('token');
+    sessionStorage.removeItem('user'); sessionStorage.removeItem('token'); sessionStorage.removeItem('nav');
     ['operatorPage', 'qcPage', 'rgoPage', 'orgPage'].forEach(function (id) { document.getElementById(id).classList.add('hidden'); });
     document.getElementById('loginPage').classList.remove('hidden');
     document.getElementById('pinInput').value = '';
@@ -1021,6 +1024,7 @@
 
   // ---------- РОУТИНГ ----------
   function showApp(user) {
+    const want = navSnapshot();
     document.getElementById('loginPage').classList.add('hidden');
     if (user.role === 'manager' || user.role === 'srgo') {
       document.getElementById('orgPage').classList.remove('hidden');
@@ -1051,6 +1055,7 @@
       loadOperatorRequests();
       loadMyEvaluations();
     }
+    restoreView(user, want);
   }
 
   // ---------- ОПЕРАТОР: заявки/стата ----------
@@ -1375,7 +1380,35 @@
 
   function pct2(n) { return n.toFixed(2).replace('.', ',') + '%'; }   // 91,11% — требование заказчика
 
+  // ---------- ГДЕ МЫ БЫЛИ ----------
+  // После F5 возвращаемся на ту вкладку, где работали, а не на первую.
+  // Живёт в sessionStorage рядом с токеном и умирает вместе с вкладкой браузера.
+  function navSet(k, v) {
+    let s = {};
+    try { s = JSON.parse(sessionStorage.getItem('nav') || '{}'); } catch (e) {}
+    s[k] = v;
+    sessionStorage.setItem('nav', JSON.stringify(s));
+  }
+  function navGet(k) {
+    try { return JSON.parse(sessionStorage.getItem('nav') || '{}')[k]; } catch (e) { return undefined; }
+  }
+  // Куда возвращаться — снимаем ДО отрисовки: showApp по дороге сам зовёт
+  // qcTab('eval') и затирает запомненное место.
+  function navSnapshot() {
+    return { page: navGet('page'), qcTab: navGet('qcTab'), repTab: navGet('repTab'), repFrom: navGet('repFrom') };
+  }
+  function restoreView(user, want) {
+    if (!want) return;
+    if (want.page === 'rep') {
+      openReports(want.repFrom || 'org');
+      if (want.repTab && want.repTab !== 'weekly') repTab(want.repTab);
+      return;
+    }
+    if (want.qcTab && want.qcTab !== 'eval' && ['qc', 'sqc', 'admin'].indexOf(user.role) >= 0) qcTab(want.qcTab);
+  }
+
   function qcTab(t) {
+    navSet('page', 'cab'); navSet('qcTab', t);
     if (t === 'ana') {
       document.getElementById('qcPage').classList.add('hidden');
       document.getElementById('orgPage').classList.remove('hidden');
@@ -1447,6 +1480,7 @@
   }
 
   function backToQc() {
+    navSet('page', 'cab');
     document.getElementById('orgPage').classList.add('hidden');
     document.getElementById('qcPage').classList.remove('hidden');
     qcTab('eval');
@@ -1550,7 +1584,7 @@
               (b.max > 0 ? '<span class="ev-bmax">макс. ' + b.max + ' б.</span>' : '') + '</div>';
       b.items.forEach(function (it) {
         const cur = evAnswers[it.id] || '';
-        html += '<div class="ev-row"><div class="ev-text">' + it.text +
+        html += '<div class="ev-row" id="r_' + it.id + '"><div class="ev-text">' + it.text +
                 '<span class="ev-minus" id="m_' + it.id + '"></span></div><div class="ev-opts">';
         it.options.forEach(function (o) {
           const on = cur === o.value ? ' ' + optClass(o.value) : '';
@@ -1569,6 +1603,8 @@
 
   function pickOpt(id, val) {
     if (evAnswers[id] === val) delete evAnswers[id]; else evAnswers[id] = val;
+    const row = document.getElementById('r_' + id);
+    if (row && evAnswers[id]) row.classList.remove('ev-missing');
     renderChecklist();
     recalcEval();
   }
@@ -1648,6 +1684,25 @@
     if (!payload.meta.operator) { evMsg('Выберите оператора', 'error'); return; }
     if (!payload.meta.callDate) { evMsg('Укажите дату звонка', 'error'); return; }
 
+    // Пустая форма сохранялась как честные 0,00% и портила статистику
+    // оператора и среднее по дивизиону. События (жалоба, благодарность)
+    // отмечают по факту, поэтому обязательны только балльные пункты.
+    const missing = [];
+    (evCfg ? evCfg.blocks : []).forEach(function (b) {
+      b.items.forEach(function (it) { if (it.type === 'score' && !evAnswers[it.id]) missing.push(it.id); });
+    });
+    document.querySelectorAll('.ev-row.ev-missing').forEach(function (r) { r.classList.remove('ev-missing'); });
+    if (missing.length) {
+      missing.forEach(function (id) {
+        const row = document.getElementById('r_' + id);
+        if (row) row.classList.add('ev-missing');
+      });
+      evMsg('Чек-лист заполнен не полностью: осталось пунктов — ' + missing.length, 'error');
+      const first = document.getElementById('r_' + missing[0]);
+      if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
     const btn = document.querySelector('#evSticky .btn-submit');
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Сохранение...';
     google.script.run
@@ -1681,6 +1736,7 @@
 
   function openReports(from) {
     repFrom = from || 'org';
+    navSet('page', 'rep'); navSet('repFrom', repFrom);
     ['operatorPage', 'qcPage', 'rgoPage', 'orgPage'].forEach(function (id) { document.getElementById(id).classList.add('hidden'); });
     document.getElementById('repPage').classList.remove('hidden');
     const u = JSON.parse(sessionStorage.getItem('user') || '{}');
@@ -1689,10 +1745,12 @@
     repTab('weekly');
   }
   function backFromReports() {
+    navSet('page', 'cab');
     document.getElementById('repPage').classList.add('hidden');
     document.getElementById(repFrom === 'qc' ? 'qcPage' : (repFrom === 'rgo' ? 'rgoPage' : 'orgPage')).classList.remove('hidden');
   }
   function repTab(t) {
+    navSet('repTab', t);
     const tabs = { weekly: ['repT1', 'repWeekly'], journal: ['repT2', 'repJournal'], kk: ['repT3', 'repKk'],
                    criteria: ['repT4', 'repCriteria'], topics: ['repT5', 'repTopics'], complaints: ['repT6', 'repComplaints'] };
     Object.keys(tabs).forEach(function (k) {

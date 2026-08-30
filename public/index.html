@@ -435,7 +435,7 @@
           <div class="form-group"><label>⏰ Время звонка (МСК) *</label><input type="time" id="callTime"></div>
           <div class="form-group full-width">
             <label>📞 Номер телефона *</label>
-            <input type="tel" id="phone" placeholder="79001234567" oninput="maskPhone(this)" inputmode="numeric" maxlength="11">
+            <input type="tel" id="phone" placeholder="+7 (777) 777-77-77">
             <small class="hint">Только цифры, без + - ( ). 10 или 11 знаков — приведём к виду 7XXXXXXXXXX</small>
           </div>
           <div class="form-group full-width"><label>💬 Комментарий (необязательно)</label><input type="text" id="opComment" placeholder="Напр.: тип звонка, контекст"></div>
@@ -499,7 +499,7 @@
           </div>
           <div class="form-group"><label>📅 Дата звонка *</label><input type="date" id="evDate"></div>
           <div class="form-group"><label>⏰ Время звонка</label><input type="time" id="evTime"></div>
-          <div class="form-group"><label>📞 Телефон</label><input type="tel" id="evPhone" oninput="this.value=this.value.replace(/\D/g,'').slice(0,11)" placeholder="79001234567"></div>
+          <div class="form-group"><label>📞 Телефон</label><input type="tel" id="evPhone" placeholder="+7 (777) 777-77-77"></div>
           <div class="form-group"><label>⏱ Критерий звонка</label><select id="evCriterion"></select></div>
           <div class="form-group"><label>🏷 Тематика</label><select id="evTopic" onchange="evTopicChanged()"></select></div>
           <div class="form-group"><label>🏷 Подтематика</label><select id="evSub"></select></div>
@@ -564,7 +564,7 @@
           <option value="Без звонка">Без звонка</option>
         </select>
         <input type="text" id="filterOperator" placeholder="Поиск по ФИО оператора">
-        <input type="text" id="filterPhone" placeholder="Поиск по телефону">
+        <input type="text" id="filterPhone" placeholder="Поиск по телефону" inputmode="tel">
         <input type="date" id="filterDate">
         <button class="btn-filter" onclick="applyFilters()"><i class="fas fa-search"></i> Применить</button>
         <button class="btn-filter" onclick="resetFilters()" style="background:#95a5a6;"><i class="fas fa-undo"></i> Сбросить</button>
@@ -849,7 +849,7 @@
     <form id="editForm" onsubmit="submitEdit(event)">
       <div class="form-group"><label>📅 Дата звонка *</label><input type="date" id="editCallDate" required></div>
       <div class="form-group"><label>⏰ Время звонка *</label><input type="time" id="editCallTime" required></div>
-      <div class="form-group"><label>📞 Номер телефона *</label><input type="tel" id="editPhone" required></div>
+      <div class="form-group"><label>📞 Номер телефона *</label><input type="tel" id="editPhone" placeholder="+7 (777) 777-77-77" required></div>
       <div class="btn-row">
         <button type="button" class="btn-cancel" onclick="closeEditModal()">Отмена</button>
         <button type="submit" class="btn-save"><i class="fas fa-save"></i> Сохранить</button>
@@ -863,6 +863,8 @@
   <script src="/gs-shim.js"></script>
   <!-- поиск и клавиатура в списках выбора; родной <select> остаётся источником правды -->
   <script src="/ui-select.js"></script>
+  <!-- номер телефона везде в одном виде: +7 (777) 777-77-77 -->
+  <script src="/ui-phone.js"></script>
   <script>
   let currentRequestId = null;
   let allRequests = [];
@@ -1080,7 +1082,7 @@
             '<td><strong>' + r.id + '</strong></td>' +
             '<td>' + formatDate(r.callDate) + '</td>' +
             '<td>' + formatTime(r.callTime) + '</td>' +
-            '<td>' + r.phone + '</td>' +
+            '<td>' + UiPhone.pretty(r.phone) + '</td>' +
             '<td><span class="status-badge ' + r.status.replace(/ /g, '_') + '">' + r.status + '</span></td>' +
             '<td>' + (r.rating ? r.rating + '%' : '-') + '</td>' +
             '<td>' + (r.comment || '-') + '</td>' +
@@ -1104,11 +1106,6 @@
     document.getElementById('noCallFields').classList.toggle('hidden', v !== 'no');
   }
 
-  // Даниил: без +, -, () — только цифры (нормализуем к 11 цифрам при отправке)
-  function maskPhone(el) {
-    el.value = el.value.replace(/\D/g, '').slice(0, 11);
-  }
-
   function submitRequest(event) {
     event.preventDefault();
     const pin = sessionStorage.getItem('token');
@@ -1122,7 +1119,7 @@
       if (d.length === 10) d = '7' + d;
       if (!callType) { showOpMessage('Выберите тип звонка', 'error'); return; }
       if (!callDate || !callTime) { showOpMessage('Укажите дату и время звонка', 'error'); return; }
-      if (d.length !== 11 || d[0] !== '7') { showOpMessage('Номер: только цифры, 10 или 11 знаков (напр. 79001234567)', 'error'); return; }
+      if (d.length !== 11 || d[0] !== '7') { showOpMessage('Введите номер полностью: +7 (777) 777-77-77', 'error'); return; }
       data = { pin: pin, hasCall: 'yes', callType: callType, callDate: callDate, callTime: callTime, phone: d, comment: document.getElementById('opComment').value.trim() };
     } else {
       const reason = document.getElementById('opReason').value.trim();
@@ -1283,12 +1280,13 @@
   function applyFilters() {
     const status = document.getElementById('filterStatus').value;
     const operator = document.getElementById('filterOperator').value.toLowerCase().trim();
-    const phone = document.getElementById('filterPhone').value.toLowerCase().trim();
+    const phone = UiPhone.digits(document.getElementById('filterPhone').value);
     const date = document.getElementById('filterDate').value;
     let f = allRequests;
     if (status) f = f.filter(function (r) { return r.status === status; });
     if (operator) f = f.filter(function (r) { return r.fullName && r.fullName.toLowerCase().indexOf(operator) >= 0; });
-    if (phone) f = f.filter(function (r) { return r.phone && r.phone.indexOf(phone) >= 0; });
+    // ищем по цифрам: и «7706», и вставленное «+7 (706)…» находят одно и то же
+    if (phone) f = f.filter(function (r) { return r.phone && UiPhone.digits(r.phone).indexOf(phone) >= 0; });
     if (date) { const p = date.split('-'); const s = p[2] + '.' + p[1] + '.' + p[0]; f = f.filter(function (r) { return formatDate(r.callDate) === s; }); }
     renderRequests(f);
   }
@@ -1309,7 +1307,7 @@
         '<div class="row"><span class="label">Оператор</span><span class="value">' + req.fullName + '</span></div>' +
         '<div class="row"><span class="label">Группа</span><span class="value">' + req.group + '</span></div>' +
         '<div class="row"><span class="label">Дата</span><span class="value">' + formatDate(req.callDate) + '</span></div>' +
-        '<div class="row"><span class="label">Телефон</span><span class="value">' + req.phone + '</span></div>' +
+        '<div class="row"><span class="label">Телефон</span><span class="value">' + UiPhone.pretty(req.phone) + '</span></div>' +
         (req.callType ? '<div class="row"><span class="label">Тип</span><span class="value">' + req.callType + '</span></div>' : '') +
         (req.opComment ? '<div class="row"><span class="label">Комментарий оператора</span><span class="value">' + req.opComment + '</span></div>' : '') +
       '</div>';
@@ -1533,7 +1531,7 @@
       if (!r.success) return;
       (r.requests || []).filter(function (x) { return x.status !== 'Без звонка'; }).forEach(function (x) {
         req.innerHTML += '<option value="' + x.id + '" data-date="' + x.callDate + '" data-time="' + x.callTime + '" data-phone="' + x.phone + '">' +
-          x.id + ' · ' + formatDate(x.callDate) + ' ' + formatTime(x.callTime) + ' · ' + x.phone + '</option>';
+          x.id + ' · ' + formatDate(x.callDate) + ' ' + formatTime(x.callTime) + ' · ' + UiPhone.pretty(x.phone) + '</option>';
       });
     }).getRequestsByOperator(sel.value);
   }

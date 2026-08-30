@@ -56,7 +56,7 @@
   .pin-input-container i{ position:absolute; left:16px; top:50%; transform:translateY(-50%); color:#5c6a86; font-size:16px; }
   .pin-input-container input{
     width:100%; padding:15px 44px 15px 46px; border:1.5px solid rgba(255,255,255,.12); border-radius:12px;
-    font-size:16px; outline:none; background:#0d1523; color:#fff; transition:border-color .2s, box-shadow .2s; margin-bottom:18px;
+    font-size:16px; outline:none; background:#0d1523; color:#fff; transition:border-color .2s, box-shadow .2s;
   }
   .pin-input-container input::placeholder{ color:#3a465e; }
   .pin-input-container input:focus{ border-color:var(--accent); box-shadow:0 0 0 4px rgba(43,89,240,.22); }
@@ -68,6 +68,10 @@
   }
   .login-btn:hover{ background:var(--accent-ink); transform:translateY(-1px); box-shadow:0 10px 26px rgba(43,89,240,.4); }
   .login-btn:active{ transform:translateY(0); }
+  .login-btn[disabled]{ opacity:.6; cursor:default; transform:none; box-shadow:none; }
+  #loginForm{ margin-top:4px; }
+  #loginForm .pin-input-container{ margin-bottom:14px; }
+  #loginForm .login-btn{ margin-top:4px; }
   .error-message{ color:#ff8a8a; font-size:14px; margin-top:15px; min-height:20px; }
 
   /* ===== ШАПКА ===== */
@@ -273,14 +277,21 @@
   <div class="login-container">
     <div class="logo"><i class="fas fa-headset"></i></div>
     <h1>Контроль качества</h1>
-    <p class="subtitle">Введите пароль для входа</p>
-    <div class="pin-input-container">
-      <i class="fas fa-lock"></i>
-      <input type="password" id="pinInput" placeholder="Пароль" autocomplete="current-password" autofocus>
-      <button type="button" class="pw-eye" onclick="togglePw()" title="Показать/скрыть"><i class="fas fa-eye" id="pwEye"></i></button>
-    </div>
-    <button class="login-btn" onclick="login()"><i class="fas fa-sign-in-alt"></i> Войти</button>
-    <div class="error-message" id="errorMessage"></div>
+    <p class="subtitle">Введите логин и пароль</p>
+    <form id="loginForm" onsubmit="return login(event)">
+      <div class="pin-input-container">
+        <i class="fas fa-user"></i>
+        <input type="text" id="loginInput" name="username" placeholder="Логин" autocomplete="username"
+               autocapitalize="off" autocorrect="off" spellcheck="false" autofocus>
+      </div>
+      <div class="pin-input-container">
+        <i class="fas fa-lock"></i>
+        <input type="password" id="pinInput" name="password" placeholder="Пароль" autocomplete="current-password">
+        <button type="button" class="pw-eye" onclick="togglePw()" title="Показать/скрыть"><i class="fas fa-eye" id="pwEye"></i></button>
+      </div>
+      <button type="submit" class="login-btn" id="loginBtn"><i class="fas fa-sign-in-alt"></i> Войти</button>
+    </form>
+    <div class="error-message" id="errorMessage" role="alert" aria-live="polite"></div>
   </div>
 </div>
 
@@ -830,32 +841,54 @@
     e.className = show ? 'fas fa-eye-slash' : 'fas fa-eye';
   }
 
-  function login() {
+  function login(ev) {
+    if (ev && ev.preventDefault) ev.preventDefault();
     const errorEl = document.getElementById('errorMessage');
-    const inp = document.getElementById('pinInput');
-    const pass = inp.value.trim();
-    if (!pass) { errorEl.textContent = 'Введите пароль'; errorEl.style.color = '#ff8a8a'; return; }
-    errorEl.textContent = '⏳ Проверка...'; errorEl.style.color = '#8fb3ff';
+    const nameEl = document.getElementById('loginInput');
+    const passEl = document.getElementById('pinInput');
+    const btn = document.getElementById('loginBtn');
+
+    function fail(msg) { errorEl.textContent = msg; errorEl.style.color = '#ff8a8a'; }
+    function busy(on) {
+      btn.disabled = on;
+      btn.innerHTML = on ? '<i class="fas fa-circle-notch fa-spin"></i> Проверка…'
+                         : '<i class="fas fa-sign-in-alt"></i> Войти';
+    }
+
+    const name = nameEl.value.trim();
+    const pass = passEl.value;            // пароль не подрезаем: пробел может быть его частью
+    if (!name) { fail('Введите логин'); nameEl.focus(); return false; }
+    if (!pass) { fail('Введите пароль'); passEl.focus(); return false; }
+
+    errorEl.textContent = '';
+    busy(true);
     google.script.run
       .withSuccessHandler(function (result) {
-        if (result.success) {
+        busy(false);
+        if (result && result.success) {
+          // Дальше всё ходит по токену: пароль на сервер больше не отправляется
+          // и нигде не хранится (resolveUser его как учётку не принимает).
           sessionStorage.setItem('user', JSON.stringify(result));
-          sessionStorage.setItem('pin', pass);
+          sessionStorage.setItem('token', result.token);
+          passEl.value = '';
           showApp(result);
           if (result.weak) setTimeout(function () { openPwModal(true); }, 600);
         } else {
-          errorEl.textContent = result.error || 'Неверный пароль';
-          errorEl.style.color = '#ff8a8a';
-          inp.value = ''; inp.focus();
+          fail((result && result.error) || 'Неверный логин или пароль');
+          passEl.value = ''; passEl.focus();     // логин оставляем: опечатка почти всегда в пароле
         }
       })
-      .withFailureHandler(function (error) { errorEl.textContent = 'Ошибка: ' + error; errorEl.style.color = '#ff8a8a'; })
-      .loginWithPin(pass);
+      .withFailureHandler(function (error) {
+        busy(false);
+        fail('Сервер недоступен: ' + (error && error.message ? error.message : error));
+      })
+      .login(name, pass);
+    return false;
   }
 
   // ---------- СМЕНА ПАРОЛЯ ----------
   function openPwModal(suggest) {
-    document.getElementById('pwOld').value = suggest ? sessionStorage.getItem('pin') : '';
+    document.getElementById('pwOld').value = '';
     document.getElementById('pwNew').value = '';
     document.getElementById('pwNew2').value = '';
     const m = document.getElementById('pwMessage');
@@ -874,7 +907,7 @@
     google.script.run
       .withSuccessHandler(function (r) {
         if (r.success) {
-          sessionStorage.setItem('pin', r.pin);
+          sessionStorage.setItem('token', r.token || r.pin);
           m.textContent = '✅ Пароль изменён'; m.className = 'message success'; m.style.display = 'block';
           setTimeout(closePwModal, 1200);
         } else { m.textContent = '❌ ' + r.error; m.className = 'message error'; m.style.display = 'block'; }
@@ -883,11 +916,15 @@
       .changePassword(oldP, n1);
   }
   function logout() {
-    sessionStorage.removeItem('user'); sessionStorage.removeItem('pin');
+    const t = sessionStorage.getItem('token');
+    if (t) google.script.run.logoutSession(t);    // иначе токен живёт на сервере до истечения срока
+    sessionStorage.removeItem('user'); sessionStorage.removeItem('token');
     ['operatorPage', 'qcPage', 'rgoPage', 'orgPage'].forEach(function (id) { document.getElementById(id).classList.add('hidden'); });
     document.getElementById('loginPage').classList.remove('hidden');
     document.getElementById('pinInput').value = '';
+    document.getElementById('loginInput').value = '';
     document.getElementById('errorMessage').textContent = '';
+    document.getElementById('loginInput').focus();
   }
 
   // ---------- РОУТИНГ ----------
@@ -932,7 +969,7 @@
         document.getElementById('opStatNew').textContent = s.new;
         document.getElementById('opStatInProgress').textContent = s.inProgress;
       }
-    }).getOperatorStats(sessionStorage.getItem('pin'));
+    }).getOperatorStats(sessionStorage.getItem('token'));
   }
 
   function loadOperatorRequests() {
@@ -958,7 +995,7 @@
       } else {
         container.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>У вас пока нет заявок</p></div>';
       }
-    }).getOperatorRequests(sessionStorage.getItem('pin'));
+    }).getOperatorRequests(sessionStorage.getItem('token'));
   }
 
   let hasCallState = 'yes';
@@ -977,7 +1014,7 @@
 
   function submitRequest(event) {
     event.preventDefault();
-    const pin = sessionStorage.getItem('pin');
+    const pin = sessionStorage.getItem('token');
     let data;
     if (hasCallState === 'yes') {
       const callType = document.getElementById('callType').value;
@@ -1054,7 +1091,7 @@
         html += '</div>';
       });
       box.innerHTML = html;
-    }).getMyEvaluations(sessionStorage.getItem('pin'));
+    }).getMyEvaluations(sessionStorage.getItem('token'));
   }
 
   // ---------- РЕДАКТИРОВАНИЕ ----------
@@ -1072,12 +1109,12 @@
           document.getElementById('editModal').classList.add('active');
         }
       }
-    }).getOperatorRequests(sessionStorage.getItem('pin'));
+    }).getOperatorRequests(sessionStorage.getItem('token'));
   }
   function closeEditModal() { document.getElementById('editModal').classList.remove('active'); editRequestId = null; }
   function submitEdit(event) {
     event.preventDefault();
-    const data = { pin: sessionStorage.getItem('pin'), requestId: editRequestId, callDate: document.getElementById('editCallDate').value, callTime: document.getElementById('editCallTime').value, phone: document.getElementById('editPhone').value.trim() };
+    const data = { pin: sessionStorage.getItem('token'), requestId: editRequestId, callDate: document.getElementById('editCallDate').value, callTime: document.getElementById('editCallTime').value, phone: document.getElementById('editPhone').value.trim() };
     if (!data.callDate || !data.callTime || !data.phone) { showEditMessage('Заполните все поля!', 'error'); return; }
     const btn = event.target.querySelector('.btn-save'); btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Сохранение...';
     google.script.run
@@ -1095,7 +1132,7 @@
   function loadAllRequests() {
     google.script.run.withSuccessHandler(function (result) {
       if (result.success) { allRequests = result.requests; renderRequests(allRequests); }
-    }).getAllRequests(sessionStorage.getItem('pin'));
+    }).getAllRequests(sessionStorage.getItem('token'));
   }
   function renderRequests(requests) {
     const container = document.getElementById('qcRequestsList');
@@ -1162,7 +1199,7 @@
 
   function submitReview(event) {
     event.preventDefault();
-    const p = sessionStorage.getItem('pin');
+    const p = sessionStorage.getItem('token');
     const status = document.getElementById('reviewStatus').value;
     const rating = document.getElementById('reviewRating').value || '';
     const comment = document.getElementById('reviewComment').value.trim() || '';
@@ -1184,7 +1221,7 @@
     google.script.run
       .withSuccessHandler(function (result) { if (result.success) { alert('✅ Удалено'); loadAllRequests(); } else { alert('❌ ' + result.error); } })
       .withFailureHandler(function (error) { alert('❌ Ошибка: ' + error); })
-      .deleteRequest(sessionStorage.getItem('pin'), requestId);
+      .deleteRequest(sessionStorage.getItem('token'), requestId);
   }
 
   // ---------- РГО ----------
@@ -1208,7 +1245,7 @@
       });
       html += '</tbody></table></div>';
       box.innerHTML = html;
-    }).getRgoDashboard(sessionStorage.getItem('pin'), document.getElementById('rgoPeriod').value);
+    }).getRgoDashboard(sessionStorage.getItem('token'), document.getElementById('rgoPeriod').value);
   }
 
   // ---------- ЧЕК-ЛИСТ v2: ОЦЕНКА ЗВОНКА ----------
@@ -1266,7 +1303,7 @@
       });
       html += '</tbody></table></div>';
       box.innerHTML = html;
-    }).getListeningPlan(sessionStorage.getItem('pin'), document.getElementById('planDate').value);
+    }).getListeningPlan(sessionStorage.getItem('token'), document.getElementById('planDate').value);
   }
 
   function openImport() {
@@ -1288,7 +1325,7 @@
       document.getElementById('planDate').value = r.date.split('.').reverse().join('-');
       setTimeout(function () { document.getElementById('importModal').classList.remove('active'); loadPlan(); }, r.unknown.length ? 3500 : 1200);
     }).withFailureHandler(function (e) { m.textContent = '❌ ' + e; m.className = 'message error'; m.style.display = 'block'; })
-      .importAcceptedCalls(sessionStorage.getItem('pin'), date, text);
+      .importAcceptedCalls(sessionStorage.getItem('token'), date, text);
   }
 
   function backToQc() {
@@ -1327,7 +1364,7 @@
       });
       if (g !== null) html += '</optgroup>';
       sel.innerHTML = html;
-    }).getOperatorsList(sessionStorage.getItem('pin'));
+    }).getOperatorsList(sessionStorage.getItem('token'));
   }
 
   function evOperatorChanged() {
@@ -1454,7 +1491,7 @@
     const cityName = document.getElementById('evCity').value;
     const cityRow = (evCfg ? evCfg.cities : []).filter(function (c) { return c.city === cityName; })[0];
     const payload = {
-      pin: sessionStorage.getItem('pin'),
+      pin: sessionStorage.getItem('token'),
       meta: {
         operator: sel.value,
         group: opt ? opt.getAttribute('data-group') : '',
@@ -1548,7 +1585,7 @@
       });
       html += '</tbody></table></div>';
       box.innerHTML = html;
-    }).getCriteriaReport(sessionStorage.getItem('pin'), document.getElementById('cPeriod').value);
+    }).getCriteriaReport(sessionStorage.getItem('token'), document.getElementById('cPeriod').value);
   }
 
   function loadTopics() {
@@ -1564,7 +1601,7 @@
       });
       html += '</tbody></table></div>';
       box.innerHTML = html;
-    }).getTopicsReport(sessionStorage.getItem('pin'), document.getElementById('tPeriod').value);
+    }).getTopicsReport(sessionStorage.getItem('token'), document.getElementById('tPeriod').value);
   }
 
   function loadComplaints() {
@@ -1583,7 +1620,7 @@
       });
       html += '</tbody></table></div>';
       box.innerHTML = html;
-    }).getComplaintsReport(sessionStorage.getItem('pin'), document.getElementById('cmpPeriod').value);
+    }).getComplaintsReport(sessionStorage.getItem('token'), document.getElementById('cmpPeriod').value);
   }
 
   function weekShift(d) { weekOffset += d; loadWeekly(); }
@@ -1615,7 +1652,7 @@
       });
       html += '</tbody></table></div>';
       box.innerHTML = html;
-    }).getWeeklyGrid(sessionStorage.getItem('pin'), weekOffset, document.getElementById('weekGroup').value);
+    }).getWeeklyGrid(sessionStorage.getItem('token'), weekOffset, document.getElementById('weekGroup').value);
   }
 
   function jFilters() {
@@ -1654,7 +1691,7 @@
       });
       html += '</tbody></table></div>';
       box.innerHTML = html;
-    }).getJournal(sessionStorage.getItem('pin'), jFilters());
+    }).getJournal(sessionStorage.getItem('token'), jFilters());
   }
 
   function loadKk() {
@@ -1671,7 +1708,7 @@
       });
       html += '</tbody></table></div>';
       box.innerHTML = html;
-    }).getKkReport(sessionStorage.getItem('pin'), 'month');
+    }).getKkReport(sessionStorage.getItem('token'), 'month');
   }
 
   // ---------- СКАЧИВАНИЕ ----------
@@ -1693,13 +1730,13 @@
     google.script.run.withSuccessHandler(function (r) {
       if (!r.success) { alert('❌ ' + r.error); return; }
       saveCsv(r.filename, r.content);
-    }).exportReport(sessionStorage.getItem('pin'), kind, params);
+    }).exportReport(sessionStorage.getItem('token'), kind, params);
   }
   function downloadEval(id) {
     google.script.run.withSuccessHandler(function (r) {
       if (!r.success) { alert('❌ ' + r.error); return; }
       saveCsv(r.filename, r.content);
-    }).exportReport(sessionStorage.getItem('pin'), 'evaluation', { id: id });
+    }).exportReport(sessionStorage.getItem('token'), 'evaluation', { id: id });
   }
 
   // ---------- ДИВИЗИОН (СРГО / МЕНЕДЖЕР) ----------
@@ -1751,7 +1788,7 @@
       groups.sort();
       gf.innerHTML = '<option value="">Все группы (по порядку)</option>' + groups.map(function (g) { return '<option value="' + g + '">' + g + '</option>'; }).join('');
       renderOrgOperators();
-    }).getOrgDashboard(sessionStorage.getItem('pin'), document.getElementById('orgPeriod').value);
+    }).getOrgDashboard(sessionStorage.getItem('token'), document.getElementById('orgPeriod').value);
   }
 
   function renderOrgOperators() {

@@ -33,3 +33,18 @@ export async function POST(req, { params }) {
     return Response.json({ ok: false, error: 'Внутренняя ошибка' }, { status: 500 });
   }
 }
+
+// Диагностику удобно открывать прямо в браузере, поэтому для неё —
+// и только для неё — разрешён GET. Остальное по-прежнему POST.
+export async function GET(req, { params }) {
+  const { fn } = await params;
+  if (fn !== 'health') {
+    return Response.json({ ok: false, error: 'Этот метод вызывается через POST' }, { status: 405 });
+  }
+  try {
+    return Response.json({ ok: true, result: await call('health', []) });
+  } catch (e) {
+    console.error('[api] health', e);
+    return Response.json({ ok: false, error: 'Внутренняя ошибка' }, { status: 500 });
+  }
+}

@@ -27,8 +27,12 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
 
   if (url.pathname.startsWith('/api/')) {
-    if (req.method !== 'POST') return send(res, 405, JSON.stringify({ ok: false, error: 'Только POST' }));
     const fn = decodeURIComponent(url.pathname.slice(5));
+    // health открываем и по GET — так же, как в app/api/[fn]/route.js
+    if (req.method === 'GET' && fn === 'health') {
+      return send(res, 200, JSON.stringify({ ok: true, result: await call('health', []) }));
+    }
+    if (req.method !== 'POST') return send(res, 405, JSON.stringify({ ok: false, error: 'Только POST' }));
     if (!Object.prototype.hasOwnProperty.call(HANDLERS, fn)) {
       return send(res, 404, JSON.stringify({ ok: false, error: 'Неизвестный метод: ' + fn }));
     }

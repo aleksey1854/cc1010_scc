@@ -208,6 +208,13 @@
   .status-badge.В_работе{ background:var(--mid-bg); color:#9a6206; }
   .status-badge.Проверена{ background:var(--good-bg); color:#0a6e3d; }
   .status-badge.Отклонена{ background:var(--bad-bg); color:#a52020; }
+  .hist-line{ display:flex; gap:12px; padding:11px 0; border-bottom:1px solid var(--border); }
+  .hist-line:last-child{ border-bottom:none; }
+  .hist-dot{ flex:0 0 auto; width:9px; height:9px; border-radius:50%; background:var(--accent); margin-top:6px; }
+  .hist-main{ flex:1 1 auto; min-width:0; }
+  .hist-what{ font-weight:600; font-size:14px; color:var(--ink); }
+  .hist-meta{ color:var(--muted); font-size:12.5px; margin-top:2px; }
+  .hist-det{ color:var(--ink-2); font-size:13px; margin-top:3px; }
   .ev-row.ev-missing{ background:var(--bad-bg); border-radius:8px; box-shadow:inset 3px 0 0 var(--bad); }
   .empty-state{ text-align:center; padding:40px; color:var(--muted); min-height:190px;
     display:flex; flex-direction:column; align-items:center; justify-content:center; }
@@ -814,6 +821,10 @@
   <div class="modal-content">
     <div class="modal-title"><i class="fas fa-check-circle"></i> Проверка заявки</div>
     <div id="requestDetail"></div>
+    <details class="hist-block" style="margin:6px 0 14px;">
+      <summary style="cursor:pointer;color:var(--accent);font-size:13.5px;">История заявки</summary>
+      <div id="reviewHist" style="margin-top:8px;"></div>
+    </details>
 
     <form id="reviewForm" onsubmit="submitReview(event)">
       <div class="form-group">
@@ -838,6 +849,17 @@
       </div>
     </form>
     <div class="message" id="reviewMessage"></div>
+  </div>
+</div>
+
+<!-- ИСТОРИЯ ЗАЯВКИ -->
+<div class="review-modal" id="histModal">
+  <div class="modal-content" style="max-width:560px;">
+    <div class="modal-title"><i class="fas fa-clock-rotate-left"></i> История заявки <span id="histId"></span></div>
+    <div id="histBody"></div>
+    <div class="btn-row">
+      <button type="button" class="btn-cancel" onclick="document.getElementById('histModal').classList.remove('active')">Закрыть</button>
+    </div>
   </div>
 </div>
 
@@ -1086,7 +1108,7 @@
             '<td><span class="status-badge ' + r.status.replace(/ /g, '_') + '">' + r.status + '</span></td>' +
             '<td>' + (r.rating ? r.rating + '%' : '-') + '</td>' +
             '<td>' + (r.comment || '-') + '</td>' +
-            '<td>' + (canEdit ? '<button class="btn-small" onclick="openEditModal(\'' + r.id + '\')"><i class="fas fa-edit"></i></button>' : '-') + '</td>' +
+            '<td>' + (canEdit ? '<button class="btn-small" onclick="openEditModal(\'' + r.id + '\')"><i class="fas fa-edit"></i></button> ' : '') + '<button class="btn-small" style="background:var(--surface-2);color:var(--ink-2);" title="История заявки" onclick="openHistory(\'' + r.id + '\')"><i class="fas fa-clock-rotate-left"></i></button></td>' +
           '</tr>';
         });
         html += '</tbody></table></div>';
@@ -1247,6 +1269,7 @@
       const noCall = r.status === 'Без звонка';
       const canReview = r.status === 'Новая' || r.status === 'В работе';
       const del = isAdmin ? '<button class="btn-small btn-danger" onclick="deleteRequest(\'' + r.id + '\')"><i class="fas fa-trash"></i></button>' : '';
+      const hist = '<button class="btn-small" style="background:var(--surface-2);color:var(--ink-2);" title="История заявки" onclick="openHistory(\'' + r.id + '\')"><i class="fas fa-clock-rotate-left"></i></button>';
       const rev = noCall ? '<span style="color:var(--muted);font-size:12px;">' + (r.opComment || '—') + '</span>' :
         (canReview ? '<button class="btn-small" onclick="openReview(\'' + r.id + '\')"><i class="fas fa-check"></i> Проверить</button>' : '<button class="btn-small" style="background:#95a5a6" onclick="openReview(\'' + r.id + '\')"><i class="fas fa-eye"></i></button>');
       html += '<tr>' +
@@ -1254,7 +1277,7 @@
         '<td>' + (noCall ? '—' : formatDate(r.callDate)) + '</td><td>' + (noCall ? '—' : formatTime(r.callTime)) + '</td><td>' + (noCall ? '—' : r.phone) + '</td>' +
         '<td><span class="status-badge ' + r.status.replace(/ /g, '_') + '">' + r.status + '</span></td>' +
         '<td>' + (r.rating ? r.rating + '%' : '-') + '</td>' +
-        '<td>' + rev + ' ' + del + '</td>' +
+        '<td>' + rev + ' ' + hist + ' ' + del + '</td>' +
       '</tr>';
     });
     html += '</tbody></table></div>';
@@ -1296,6 +1319,40 @@
     renderRequests(allRequests);
   }
 
+  // ---------- ИСТОРИЯ ЗАЯВКИ ----------
+  // Номера заявок фигурируют в работе постоянно, а восстановить ход дела
+  // было нечем: в базе хранилось только текущее состояние.
+  function openHistory(requestId) {
+    document.getElementById('histId').textContent = requestId;
+    document.getElementById('histBody').innerHTML =
+      '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Загрузка…</p></div>';
+    document.getElementById('histModal').classList.add('active');
+    google.script.run
+      .withSuccessHandler(function (r) { document.getElementById('histBody').innerHTML = histHtml(r); })
+      .withFailureHandler(function (e) {
+        document.getElementById('histBody').innerHTML =
+          '<div class="empty-state"><i class="fas fa-ban"></i><p>' + e + '</p></div>';
+      })
+      .getRequestHistory(sessionStorage.getItem('token'), requestId);
+  }
+
+  function histHtml(r) {
+    if (!r || !r.success) {
+      return '<div class="empty-state"><i class="fas fa-ban"></i><p>' + ((r && r.error) || 'Ошибка') + '</p></div>';
+    }
+    if (!r.events.length) {
+      // заявки, созданные до появления истории, событий не имеют
+      return '<div class="empty-state"><i class="fas fa-clock-rotate-left"></i><p>Событий пока нет</p></div>';
+    }
+    return r.events.map(function (e) {
+      return '<div class="hist-line"><div class="hist-dot"></div><div class="hist-main">' +
+        '<div class="hist-what">' + e.event + '</div>' +
+        '<div class="hist-meta">' + e.at + ' · ' + e.who + '</div>' +
+        (e.details ? '<div class="hist-det">' + e.details + '</div>' : '') +
+        '</div></div>';
+    }).join('');
+  }
+
   // ---------- QC: проверка с чек-листом ----------
   function openReview(requestId) {
     currentRequestId = requestId;
@@ -1314,6 +1371,10 @@
     document.getElementById('reviewStatus').value = (req.status === 'Новая' ? 'В работе' : req.status);
     document.getElementById('reviewComment').value = req.comment || '';
     document.getElementById('reviewMessage').className = 'message'; document.getElementById('reviewMessage').style.display = 'none';
+    google.script.run.withSuccessHandler(function (h) {
+      const box = document.getElementById('reviewHist');
+      if (box) box.innerHTML = histHtml(h);
+    }).getRequestHistory(sessionStorage.getItem('token'), requestId);
     document.getElementById('reviewModal').classList.add('active');
   }
   function closeModal() { document.getElementById('reviewModal').classList.remove('active'); }
@@ -1679,8 +1740,29 @@
       answers: evAnswers,
       comments: evComments
     };
-    if (!payload.meta.operator) { evMsg('Выберите оператора', 'error'); return; }
-    if (!payload.meta.callDate) { evMsg('Укажите дату звонка', 'error'); return; }
+    // Описание звонка заполняется целиком: иначе отчёты по тематикам и городам
+    // наполовину пустые, а оценку не сопоставить с конкретным звонком.
+    const need = [
+      ['evOperator', payload.meta.operator, 'Выберите оператора'],
+      ['evDate', payload.meta.callDate, 'Укажите дату звонка'],
+      ['evTime', payload.meta.callTime, 'Укажите время звонка'],
+      ['evPhone', payload.meta.phone, 'Укажите телефон'],
+      ['evCriterion', payload.meta.criterion, 'Выберите критерий звонка'],
+      ['evTopic', payload.meta.topic, 'Выберите тематику'],
+      ['evCity', payload.meta.city, 'Выберите город']
+    ];
+    const sub = document.getElementById('evSub');
+    if (!sub.disabled) need.push(['evSub', payload.meta.sub, 'Выберите подтематику']);
+
+    for (const [id, val, msg] of need) {
+      if (String(val || '').trim()) continue;
+      evMsg(msg, 'error');
+      const el = document.getElementById(id);
+      const box = el.closest('.uisel') || el;
+      box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      (box.querySelector('.uisel-btn') || el).focus({ preventScroll: true });
+      return;
+    }
 
     // Пустая форма сохранялась как честные 0,00% и портила статистику
     // оператора и среднее по дивизиону. События (жалоба, благодарность)

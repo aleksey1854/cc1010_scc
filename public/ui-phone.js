@@ -17,17 +17,24 @@
 
   function digitsOf(v) { return String(v == null ? '' : v).replace(/\D/g, ''); }
 
-  // Строка уже в нашем формате — её ведущая семёрка это префикс «+7»,
-  // а не первая цифра номера. Без этой проверки «+7 (7» на следующем
-  // нажатии превращалось в «+7 (77…».
+  // Наш собственный префикс — это ровно символы «+7», и убираем мы именно их,
+  // а не «первую цифру». Считать цифрами нельзя: у казахстанских номеров код
+  // оператора тоже начинается с семёрки (701, 707, 747, 777), и «7» из «+7»
+  // была бы неотличима от неё — на наборе 77011234567 терялась последняя цифра.
   function hasPrefix(s) { return /^\s*\+\s*7/.test(String(s == null ? '' : s)); }
+  function viewDigits(v) {
+    var t = String(v == null ? '' : v);
+    if (hasPrefix(t)) t = t.replace(/^\s*\+\s*7/, '');
+    return digitsOf(t);
+  }
 
-  // Десять цифр национального номера, без кода страны
+  // Десять цифр национального номера, без кода страны.
+  // Семёрка становится кодом страны только когда цифр набралось одиннадцать —
+  // до этого она законная первая цифра кода оператора.
   function national(v) {
-    var d = digitsOf(v);
-    if (hasPrefix(v)) d = d.slice(1);
-    else if (d.length >= 11) { if (d[0] === '7' || d[0] === '8') d = d.slice(1); }
-    else if (d[0] === '8') d = d.slice(1);
+    var d = viewDigits(v);
+    if (d.length >= 11 && (d[0] === '7' || d[0] === '8')) d = d.slice(1);
+    else if (d[0] === '8') d = d.slice(1);        // восьмёрка — старый междугородний префикс
     return d.slice(0, 10);
   }
 
@@ -53,10 +60,12 @@
   // ---------- каретка ----------
 
   function nationalDigitsBefore(value, pos) {
-    var before = digitsOf(String(value).slice(0, pos));
-    var all = digitsOf(value);
-    var hasCC = hasPrefix(value) || all.length >= 11 || all[0] === '8';
-    if (hasCC && before.length) before = before.slice(1);
+    var head = String(value == null ? '' : value).slice(0, pos);
+    if (hasPrefix(value)) head = head.replace(/^\s*\+\s*7/, '');
+    var before = digitsOf(head);
+    var all = viewDigits(value);
+    var dropFirst = (all.length >= 11 && (all[0] === '7' || all[0] === '8')) || all[0] === '8';
+    if (dropFirst && before.length) before = before.slice(1);
     return before.length;
   }
 
@@ -77,6 +86,8 @@
 
   function apply(el, value, digitsBefore) {
     var f = format(value);
+    // «8» съедена как код страны: пустое поле выглядело бы так, будто нажатие потерялось
+    if (!f && viewDigits(value)) f = '+7 (';
     rawSet.call(el, f);
     var c = caretForDigits(f, digitsBefore);
     try { el.setSelectionRange(c, c); } catch (e) {}

@@ -203,6 +203,18 @@ CREATE TABLE accepted_calls (
 
 -- ---------- журнал входов ----------
 
+-- история заявки: кто и что с ней делал
+CREATE TABLE request_events (
+  id         bigserial   PRIMARY KEY,
+  request_id bigint      NOT NULL REFERENCES call_requests(id) ON DELETE CASCADE,
+  at         timestamptz NOT NULL DEFAULT now(),
+  actor_id   bigint      REFERENCES staff(id),
+  actor_name text        NOT NULL DEFAULT '',   -- имя на момент события: люди меняются, история нет
+  event      text        NOT NULL,              -- created | edited | status | evaluated
+  details    text        NOT NULL DEFAULT ''
+);
+CREATE INDEX request_events_req_idx ON request_events (request_id, at);
+
 CREATE TABLE audit_log (
   id        bigserial PRIMARY KEY,
   at        timestamptz NOT NULL DEFAULT now(),

@@ -839,6 +839,45 @@
   }
   function scoreClass(s) { return s >= 90 ? 'ok' : (s >= 70 ? 'mid' : 'bad'); }
 
+  // ---------- ВОССТАНОВЛЕНИЕ СЕССИИ ----------
+  // sessionStorage переживает F5, но при загрузке его никто не читал:
+  // страница всегда открывалась формой входа, даже с живым токеном.
+  // Токен проверяем на сервере — истёкший или отозванный не должен
+  // пускать в кабинет по одному лишь наличию строки в хранилище.
+  window.addEventListener('DOMContentLoaded', function () {
+    const token = sessionStorage.getItem('token');
+    if (!token) return;
+
+    const form = document.getElementById('loginForm');
+    const err = document.getElementById('errorMessage');
+    form.style.display = 'none';
+    err.textContent = 'Восстановление сессии…';
+    err.style.color = '#8fb3ff';
+
+    function backToLogin(msg) {
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('user');
+      form.style.display = '';
+      err.textContent = msg || '';
+      err.style.color = '#ff8a8a';
+      document.getElementById('loginInput').focus();
+    }
+
+    google.script.run
+      .withSuccessHandler(function (u) {
+        if (u && u.success) {
+          sessionStorage.setItem('user', JSON.stringify(u));
+          form.style.display = '';
+          err.textContent = '';
+          showApp(u);
+        } else {
+          backToLogin(u && u.error);
+        }
+      })
+      .withFailureHandler(function () { backToLogin('Сервер недоступен'); })
+      .whoami(token);
+  });
+
   // ---------- ВХОД ----------
   function togglePw() {
     const i = document.getElementById('pinInput');

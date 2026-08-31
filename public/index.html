@@ -1336,6 +1336,16 @@
       .getRequestHistory(sessionStorage.getItem('token'), requestId);
   }
 
+  // Метка времени приходит в UTC — показываем в часовом поясе того,
+  // кто смотрит: колл-центр не в одном городе.
+  function histWhen(iso) {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return String(iso || '');
+    const p = n => String(n).padStart(2, '0');
+    return p(d.getDate()) + '.' + p(d.getMonth() + 1) + '.' + d.getFullYear() +
+           ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
   function histHtml(r) {
     if (!r || !r.success) {
       return '<div class="empty-state"><i class="fas fa-ban"></i><p>' + ((r && r.error) || 'Ошибка') + '</p></div>';
@@ -1347,7 +1357,7 @@
     return r.events.map(function (e) {
       return '<div class="hist-line"><div class="hist-dot"></div><div class="hist-main">' +
         '<div class="hist-what">' + e.event + '</div>' +
-        '<div class="hist-meta">' + e.at + ' · ' + e.who + '</div>' +
+        '<div class="hist-meta">' + histWhen(e.at) + ' · ' + e.who + '</div>' +
         (e.details ? '<div class="hist-det">' + e.details + '</div>' : '') +
         '</div></div>';
     }).join('');

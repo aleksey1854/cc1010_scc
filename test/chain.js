@@ -60,22 +60,59 @@ const R = (fn, ...a) => api.call(fn, a);
   const ans = {};
   boot.cfg.blocks.forEach(b => b.items.forEach(i => { if (i.type === 'score') ans[i.id] = 'Положительно'; }));
   ans.B2P1 = 'Сомнительно';
-  const ev = await R('saveEvaluation', { pin: qcT, meta: {
+  // Описание звонка теперь обязательно целиком, поэтому meta заполнена полностью
+  const META = {
     operator: OP[0], group: 'ИНВ-1', callDate: DATE, callTime: '11:20',
-    phone: '77011234567', topic: 'Анализы', city: 'Павлодар', reqId: REQ_ID
-  }, answers: ans, comments: { B2P1: 'перебивал клиента' } });
+    phone: '79161234567', criterion: 'Длит: средний (3-5 мин)',
+    topic: 'Анализы', sub: 'Стоимость', city: 'Москва', reqId: REQ_ID
+  };
+  const ev = await R('saveEvaluation', { pin: qcT, meta: META, answers: ans, comments: { B2P1: 'перебивал клиента' } });
   chk('оценка сохранена', ev.success === true, ev.error);
   chk('итог 98,33 — тот же, что в Apps Script', ev.result.score === 98.33, ev.result && ev.result.score);
   chk('некритичных 1, критичных 0', ev.result.minor === 1 && ev.result.critical === 0, ev.result);
   chk('заявка привязана', ev.linkedRequest === true);
-  chk('повторная оценка того же звонка запрещена',
-    (await R('saveEvaluation', { pin: qcT, meta: { operator: OP[0], group: 'ИНВ-1', callDate: DATE, callTime: '11:20', phone: '77011234567' }, answers: {}, comments: {} })).success === false);
+
+  // Тот же звонок целиком и с полным чек-листом: отказать должна база,
+  // а не проверка заполненности — иначе тест ловил бы не то, что заявлено
+  const again = await R('saveEvaluation', { pin: qcT, meta: { ...META, reqId: '' }, answers: ans, comments: {} });
+  chk('повторная оценка того же звонка запрещена', again.success === false, again);
+  chk('  и отказывает именно из-за дубля', /оцен/i.test(again.error || ''), again.error);
+
+  head('ШАГ 3а. ЧЕГО НЕ ПРОПУСКАЕТ');
+  const noAnswers = await R('saveEvaluation', { pin: qcT, meta: { ...META, reqId: '', callTime: '12:00' }, answers: {} });
+  chk('пустой чек-лист не сохраняется', noAnswers.success === false, noAnswers);
+  chk('  и говорит, сколько осталось', /осталось пунктов/.test(noAnswers.error || ''), noAnswers.error);
+
+  const half = { ...ans }; delete half[Object.keys(half)[0]];
+  chk('недозаполненный чек-лист не сохраняется',
+    (await R('saveEvaluation', { pin: qcT, meta: { ...META, reqId: '', callTime: '12:05' }, answers: half })).success === false);
+
+  for (const [поле, msg] of [['callTime', 'время'], ['phone', 'телефон'], ['criterion', 'критерий'],
+                             ['topic', 'тематику'], ['city', 'город'], ['sub', 'подтематику']]) {
+    const meta = { ...META, reqId: '', callTime: '12:10' };
+    meta[поле] = '';
+    const r = await R('saveEvaluation', { pin: qcT, meta, answers: ans });
+    chk('без «' + поле + '» не сохраняется', r.success === false && new RegExp(msg, 'i').test(r.error || ''), r.error);
+  }
+
   chk('оператор не может сохранять оценки',
-    (await R('saveEvaluation', { pin: opT, meta: { operator: OP[0], callDate: DATE }, answers: {} })).success === false);
+    (await R('saveEvaluation', { pin: opT, meta: META, answers: ans })).success === false);
   chk('оценка на несуществующее ФИО отклонена',
-    (await R('saveEvaluation', { pin: qcT, meta: { operator: 'Никого Нет', callDate: DATE }, answers: {} })).success === false);
+    (await R('saveEvaluation', { pin: qcT, meta: { ...META, operator: 'Никого Нет' }, answers: ans })).success === false);
   chk('дата из будущего отклонена',
-    (await R('saveEvaluation', { pin: qcT, meta: { operator: OP[0], callDate: '2099-01-01' }, answers: {} })).success === false);
+    (await R('saveEvaluation', { pin: qcT, meta: { ...META, callDate: '2099-01-01' }, answers: ans })).success === false);
+
+  head('ШАГ 3б. ИСТОРИЯ ЗАЯВКИ');
+  const hist = await R('getRequestHistory', qcT, REQ_ID);
+  chk('история отдана', hist.success === true, hist.error);
+  const events = (hist.events || []).map(e => e.event);
+  chk('в ней есть создание и оценка',
+    events.includes('Заявка создана') && events.includes('Звонок оценён'), events);
+  chk('у каждого события есть автор и время',
+    (hist.events || []).every(e => e.who && e.at), hist.events && hist.events[0]);
+  chk('чужую заявку оператору не отдаёт',
+    (await R('getRequestHistory', (await R('login', creds.find(x => x[2] === 'operator' && x[0] !== OP[0])[3],
+      creds.find(x => x[2] === 'operator' && x[0] !== OP[0])[4])).token, REQ_ID)).success === false);
 
   head('ШАГ 4. ОПЕРАТОР ВИДИТ РЕЗУЛЬТАТ');
   const ob = await R('getOperatorBootstrap', opT);

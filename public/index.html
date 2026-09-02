@@ -2544,16 +2544,66 @@
   }
 
   // ---------- ГРАФИКИ ----------
+  // Общие настройки графиков. Легенду не рисуем: серия одна, а подпись
+  // ей только мешала — подсказка вылезала прямо поверх неё.
+  function chartBase(extra) {
+    return Object.assign({
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          displayColors: false, padding: 10, caretPadding: 8,
+          backgroundColor: 'rgba(18,23,34,.92)', titleFont: { size: 12 }, bodyFont: { size: 13 }
+        }
+      }
+    }, extra || {});
+  }
+
+  // Баллы качества живут в узкой полосе у сотни: ось от нуля превращает
+  // график в прямую под потолком. Берём диапазон по самим данным.
+  function scoreScale(data) {
+    const vals = data.filter(function (v) { return typeof v === 'number' && isFinite(v); });
+    if (!vals.length) return { min: 0, max: 100 };
+    const lo = Math.min.apply(null, vals);
+    const min = lo >= 90 ? 85 : (lo >= 75 ? 70 : (lo >= 50 ? 40 : 0));
+    return { min: min, max: 100 };
+  }
+
   function drawLineChart(canvasId, label, labels, data) {
     const ctx = document.getElementById(canvasId); if (!ctx) return;
     if (charts[canvasId]) charts[canvasId].destroy();
     if (!labels.length) { emptyChart(ctx); return; }
+    const sc = scoreScale(data);
+    // Точек за месяц три десятка: крупные маркеры налезают друг на друга,
+    // поэтому они мельче, а под курсором подрастают.
+    const dense = labels.length > 14;
     charts[canvasId] = new Chart(ctx, {
       type: 'line',
-      data: { labels: labels, datasets: [{ label: label, data: data, borderColor: '#2B59F0', backgroundColor: 'rgba(43,89,240,0.10)', fill: true, tension: 0.3, pointRadius: 4, pointBackgroundColor: '#1B3AC2' }] },
-      options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 100 } }, plugins: { legend: { display: true, position: 'top' } } }
+      data: { labels: labels, datasets: [{
+        label: label, data: data,
+        borderColor: '#2B59F0', backgroundColor: 'rgba(43,89,240,0.10)',
+        fill: true, tension: 0.3, borderWidth: 2,
+        pointRadius: dense ? 2 : 4, pointHoverRadius: 6,
+        pointBackgroundColor: '#1B3AC2', pointBorderColor: '#fff', pointBorderWidth: 1
+      }] },
+      options: chartBase({
+        scales: {
+          y: { min: sc.min, max: sc.max, ticks: { callback: function (v) { return v + '%'; } } },
+          x: { ticks: { autoSkip: true, maxRotation: 0, maxTicksLimit: 12 }, grid: { display: false } }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            displayColors: false, padding: 10, caretPadding: 8,
+            backgroundColor: 'rgba(18,23,34,.92)',
+            callbacks: { label: function (c) { return label + ': ' + pct2(c.parsed.y); } }
+          }
+        }
+      })
     });
   }
+
   function drawBarChart(canvasId, label, labels, data) {
     const ctx = document.getElementById(canvasId); if (!ctx) return;
     if (charts[canvasId]) charts[canvasId].destroy();
@@ -2561,19 +2611,38 @@
     charts[canvasId] = new Chart(ctx, {
       type: 'bar',
       data: { labels: labels, datasets: [{ label: label, data: data, backgroundColor: '#E23A3A', borderRadius: 6 }] },
-      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { beginAtZero: true, ticks: { precision: 0 } } }, plugins: { legend: { display: true, position: 'top' } } }
+      options: chartBase({
+        indexAxis: 'y',
+        scales: { x: { beginAtZero: true, ticks: { precision: 0 } }, y: { grid: { display: false } } }
+      })
     });
   }
+
   function drawBarChartV(canvasId, label, labels, data) {
     const ctx = document.getElementById(canvasId); if (!ctx) return;
     if (charts[canvasId]) charts[canvasId].destroy();
     if (!labels.length) { emptyChart(ctx); return; }
+    const sc = scoreScale(data);
     charts[canvasId] = new Chart(ctx, {
       type: 'bar',
       data: { labels: labels, datasets: [{ label: label, data: data, backgroundColor: '#2B59F0', borderRadius: 6 }] },
-      options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 100 } }, plugins: { legend: { display: true, position: 'top' } } }
+      options: chartBase({
+        scales: {
+          y: { min: sc.min, max: sc.max, ticks: { callback: function (v) { return v + '%'; } } },
+          x: { grid: { display: false } }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            displayColors: false, padding: 10,
+            backgroundColor: 'rgba(18,23,34,.92)',
+            callbacks: { label: function (c) { return label + ': ' + pct2(c.parsed.y); } }
+          }
+        }
+      })
     });
   }
+
   function emptyChart(ctx) {
     const c = ctx.getContext('2d'); c.clearRect(0, 0, ctx.width, ctx.height);
     c.fillStyle = '#8b94a5'; c.font = '14px Inter'; c.textAlign = 'center';

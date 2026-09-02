@@ -11,12 +11,12 @@
 //   DATABASE_URL=... node scripts/apply-reference.js --dry
 // ============================================================
 const db = require('../lib/db');
-const { CHECKLIST, TOPICS, DEFAULTS } = require('./seed');
+const { CHECKLIST, TOPICS, CITIES, DEFAULTS } = require('./seed');
 
 const dry = process.argv.includes('--dry');
 
 async function main() {
-  const stat = { блоков: 0, пунктов: 0, погашено: 0, тематик: 0 };
+  const stat = { блоков: 0, пунктов: 0, погашено: 0, тематик: 0, городов: 0 };
 
   await db.tx(async (t) => {
     // ---------- чек-лист ----------
@@ -61,6 +61,16 @@ async function main() {
         [topic, sub || '']);
     }
     stat.тематик = (await t.one(`SELECT count(*)::int n FROM topics`)).n;
+
+    // ---------- города ----------
+    // Список нужен как подсказка и чтобы агломерация подставлялась сама;
+    // вписать в поле можно что угодно, справочник не ограничивает.
+    await t.q(`DELETE FROM cities`);
+    for (const [city, agg] of CITIES) {
+      await t.q(`INSERT INTO cities (city, agglomeration) VALUES ($1,$2) ON CONFLICT DO NOTHING`,
+        [city, agg || '']);
+    }
+    stat.городов = (await t.one(`SELECT count(*)::int n FROM cities`)).n;
 
     if (dry) throw new Error('--dry: откатываем, ничего не записано');
   }).catch(e => {

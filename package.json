@@ -13,6 +13,7 @@
     "test": "bash test/run.sh"
   },
   "dependencies": {
+    "exceljs": "^4.4.0",
     "next": "^15.0.0",
     "pg": "^8.23.0",
     "react": "^19.0.0",

@@ -523,7 +523,7 @@
             <datalist id="evCityList"></datalist>
           </div>
           <div class="form-group"><label>🗺 Агломерация</label>
-            <input type="text" id="evAgg" list="evAggList" autocomplete="off" placeholder="подставится по городу, можно поправить">
+            <input type="text" id="evAgg" list="evAggList" autocomplete="off" placeholder="напр. Москва">
             <datalist id="evAggList"></datalist>
           </div>
         </div>
@@ -2358,12 +2358,23 @@
   }
 
   // ---------- СКАЧИВАНИЕ ----------
-  function saveCsv(filename, content) {
-    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+  // Отчёты приходят готовым файлом Excel в base64: в CSV кириллица
+  // превращалась в кракозябры, а ширину колонок задать было нечем.
+  function saveFile(r) {
+    let blob;
+    if (r.contentBase64) {
+      const bin = atob(r.contentBase64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      blob = new Blob([bytes], { type: r.mime || 'application/octet-stream' });
+    } else {
+      blob = new Blob([r.content], { type: 'text/csv;charset=utf-8;' });
+    }
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = filename;
+    a.download = r.filename;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
   }
   function downloadReport(kind) {
     let params;
@@ -2375,13 +2386,13 @@
     else params = { period: 'month' };
     google.script.run.withSuccessHandler(function (r) {
       if (!r.success) { alert('❌ ' + r.error); return; }
-      saveCsv(r.filename, r.content);
+      saveFile(r);
     }).exportReport(sessionStorage.getItem('token'), kind, params);
   }
   function downloadEval(id) {
     google.script.run.withSuccessHandler(function (r) {
       if (!r.success) { alert('❌ ' + r.error); return; }
-      saveCsv(r.filename, r.content);
+      saveFile(r);
     }).exportReport(sessionStorage.getItem('token'), 'evaluation', { id: id });
   }
 

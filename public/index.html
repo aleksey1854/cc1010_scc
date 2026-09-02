@@ -2585,9 +2585,12 @@
         borderColor: '#2B59F0', backgroundColor: 'rgba(43,89,240,0.10)',
         fill: true, tension: 0.3, borderWidth: 2,
         pointRadius: dense ? 2 : 4, pointHoverRadius: 6,
-        pointBackgroundColor: '#1B3AC2', pointBorderColor: '#fff', pointBorderWidth: 1
+        pointBackgroundColor: '#1B3AC2', pointBorderColor: '#fff', pointBorderWidth: 1,
+        // сотка — верхняя граница шкалы, и точки на ней срезало краем области
+        clip: false
       }] },
       options: chartBase({
+        layout: { padding: { top: 10, right: 10 } },     // место для точки на сотне
         scales: {
           y: { min: sc.min, max: sc.max, ticks: { callback: function (v) { return v + '%'; } } },
           x: { ticks: { autoSkip: true, maxRotation: 0, maxTicksLimit: 12 }, grid: { display: false } }
@@ -2613,6 +2616,9 @@
       data: { labels: labels, datasets: [{ label: label, data: data, backgroundColor: '#E23A3A', borderRadius: 6 }] },
       options: chartBase({
         indexAxis: 'y',
+        // у лежачих столбцов индекс идёт по вертикали: без axis:'y' подсказка
+        // ищет ближайший столбец по горизонтали и показывает соседний
+        interaction: { mode: 'index', intersect: false, axis: 'y' },
         scales: { x: { beginAtZero: true, ticks: { precision: 0 } }, y: { grid: { display: false } } }
       })
     });

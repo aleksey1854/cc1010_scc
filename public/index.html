@@ -208,6 +208,9 @@
   .status-badge.В_работе{ background:var(--mid-bg); color:#9a6206; }
   .status-badge.Проверена{ background:var(--good-bg); color:#0a6e3d; }
   .status-badge.Отклонена{ background:var(--bad-bg); color:#a52020; }
+  .ev-linkbar{ display:flex; align-items:center; justify-content:space-between; gap:16px;
+    background:var(--accent-soft); border:1px solid var(--accent); color:var(--accent-ink); }
+  .ev-linkbar .hint{ color:var(--accent-ink); opacity:.75; margin-top:2px; }
   .staff-audit{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
   .staff-chip{ border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px 14px; background:var(--surface-2); }
   .staff-chip .n{ font-family:var(--display); font-size:22px; font-weight:600; }
@@ -504,6 +507,16 @@
 
     <!-- ОЦЕНКА ЗВОНКА (чек-лист v2) -->
     <div id="qcEvalTab">
+      <div class="card ev-linkbar hidden" id="evLinkBar">
+        <div>
+          <i class="fas fa-link"></i> Оценка по заявке <strong id="evLinkId"></strong>
+          <span id="evLinkWho"></span>
+          <div class="hint">Заявка закроется сама, как только оценка сохранится.</div>
+        </div>
+        <button type="button" class="btn-small" onclick="clearReqLink(true)">
+          <i class="fas fa-link-slash"></i> Снять привязку
+        </button>
+      </div>
       <div class="card">
         <div class="card-title"><i class="fas fa-headphones"></i> Данные звонка</div>
         <div class="form-grid">
@@ -1121,6 +1134,7 @@
   function resetState() {
     currentRequestId = null; editRequestId = null;
     allRequests = []; orgOperators = []; staffAll = []; staffEditing = null; myRequests = [];
+    evLinkedReq = '';
     evCfg = null; evAnswers = {}; evComments = {};
     hasCallState = 'yes'; weekOffset = 0; repFrom = 'org';
     ['opRequestsList', 'opEvalsList', 'qcRequestsList', 'rgoOperatorsList',
@@ -1214,7 +1228,7 @@
             '<td>' + formatTime(r.callTime) + '</td>' +
             '<td>' + UiPhone.pretty(r.phone) + '</td>' +
             '<td><span class="status-badge ' + r.status.replace(/ /g, '_') + '">' + r.status + '</span></td>' +
-            '<td>' + (r.rating ? r.rating + '%' : '-') + '</td>' +
+            '<td>' + (r.rating ? pct2(Number(r.rating)) : '-') + '</td>' +
             '<td>' + (r.comment || '-') + '</td>' +
             '<td>' + (canEdit ? '<button class="btn-small" onclick="openEditModal(\'' + r.id + '\')"><i class="fas fa-edit"></i></button> ' : '') + '<button class="btn-small" style="background:var(--surface-2);color:var(--ink-2);" title="История заявки" onclick="openHistory(\'' + r.id + '\')"><i class="fas fa-clock-rotate-left"></i></button></td>' +
           '</tr>';
@@ -1385,14 +1399,18 @@
       const canReview = r.status === 'Новая' || r.status === 'В работе';
       const del = isAdmin ? '<button class="btn-small btn-danger" onclick="deleteRequest(\'' + r.id + '\')"><i class="fas fa-trash"></i></button>' : '';
       const hist = '<button class="btn-small" style="background:var(--surface-2);color:var(--ink-2);" title="История заявки" onclick="openHistory(\'' + r.id + '\')"><i class="fas fa-clock-rotate-left"></i></button>';
+      // Оценка идёт от заявки: звонок уже описан, СКК не переписывает его руками
+      const evalBtn = (!noCall && canReview)
+        ? '<button class="btn-small" style="background:var(--good);" title="Открыть чек-лист по этой заявке" onclick="evaluateRequest(\'' + r.id + '\')"><i class="fas fa-clipboard-check"></i> Оценить</button> '
+        : '';
       const rev = noCall ? '<span style="color:var(--muted);font-size:12px;">' + (r.opComment || '—') + '</span>' :
         (canReview ? '<button class="btn-small" onclick="openReview(\'' + r.id + '\')"><i class="fas fa-check"></i> Проверить</button>' : '<button class="btn-small" style="background:#95a5a6" onclick="openReview(\'' + r.id + '\')"><i class="fas fa-eye"></i></button>');
       html += '<tr>' +
         '<td><strong>' + r.id + '</strong></td><td>' + r.fullName + '</td><td>' + r.group + '</td>' +
         '<td>' + (noCall ? '—' : formatDate(r.callDate)) + '</td><td>' + (noCall ? '—' : formatTime(r.callTime)) + '</td><td>' + (noCall ? '—' : r.phone) + '</td>' +
         '<td><span class="status-badge ' + r.status.replace(/ /g, '_') + '">' + r.status + '</span></td>' +
-        '<td>' + (r.rating ? r.rating + '%' : '-') + '</td>' +
-        '<td>' + rev + ' ' + hist + ' ' + del + '</td>' +
+        '<td>' + (r.rating ? pct2(Number(r.rating)) : '-') + '</td>' +
+        '<td>' + evalBtn + rev + ' ' + hist + ' ' + del + '</td>' +
       '</tr>';
     });
     html += '</tbody></table></div>';
@@ -1668,6 +1686,42 @@
       document.getElementById(id).addEventListener('change', renderStaff);
     });
   });
+
+  // ---------- ОЦЕНКА ПО ЗАЯВКЕ ----------
+  // Раньше СКК выбирал заявку выпадающим списком внутри формы. Теперь
+  // наоборот: он идёт от списка заявок, данные звонка подставляются,
+  // а связь проставляется сама — и заявка закрывается после сохранения.
+  let evLinkedReq = '';
+
+  function evaluateRequest(requestId) {
+    const r = allRequests.find(function (x) { return x.id === requestId; });
+    if (!r) return;
+
+    qcTab('eval');
+    evLinkedReq = requestId;
+    document.getElementById('evLinkId').textContent = requestId;
+    document.getElementById('evLinkWho').textContent =
+      '· ' + r.fullName + ' · ' + formatDate(r.callDate) + ' ' + formatTime(r.callTime);
+    document.getElementById('evLinkBar').classList.remove('hidden');
+
+    const sel = document.getElementById('evOperator');
+    sel.value = r.fullName;
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    if (sel.value !== r.fullName) {
+      evMsg('Оператор «' + r.fullName + '» не найден в составе — выберите вручную', 'error');
+    }
+    if (r.callDate) document.getElementById('evDate').value = r.callDate;
+    if (r.callTime) document.getElementById('evTime').value = r.callTime;
+    if (r.phone) document.getElementById('evPhone').value = r.phone;
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function clearReqLink(byHand) {
+    evLinkedReq = '';
+    document.getElementById('evLinkBar').classList.add('hidden');
+    if (byHand) evMsg('Привязка снята: заявка останется открытой', 'error');
+  }
 
   // ---------- ИСТОРИЯ ЗАЯВКИ ----------
   // Номера заявок фигурируют в работе постоянно, а восстановить ход дела
@@ -1963,6 +2017,11 @@
     const opt = sel.options[sel.selectedIndex];
     const g = opt ? opt.getAttribute('data-group') : '';
     document.getElementById('evGroupHint').textContent = g ? ('Группа: ' + g) : 'Группа подставится автоматически';
+    // выбрали другого оператора — заявка предыдущего тут ни при чём
+    if (evLinkedReq) {
+      const r = allRequests.find(function (x) { return x.id === evLinkedReq; });
+      if (r && r.fullName !== sel.value) clearReqLink(false);
+    }
   }
 
 
@@ -2107,7 +2166,7 @@
         sub: document.getElementById('evSub').value,
         city: cityName,
         agg: cityRow ? cityRow.agg : '',
-        reqId: ''
+        reqId: evLinkedReq
       },
       answers: evAnswers,
       comments: evComments
@@ -2163,6 +2222,7 @@
         if (!res.success) { evMsg('❌ ' + res.error, 'error'); return; }
         evMsg('✅ Оценка ' + res.id + ' сохранена: ' + pct2(res.result.score) + ' (' + res.week + ')', 'success');
         evAnswers = defaultAnswers(); evComments = {};
+        if (evLinkedReq) { clearReqLink(false); allRequests = []; }   // заявка уже «Проверена»
         document.getElementById('evPhone').value = '';
         document.getElementById('evTime').value = '';
         renderChecklist(); recalcEval();

@@ -512,19 +512,20 @@
             <select id="evOperator" onchange="evOperatorChanged()"><option value="">Загрузка...</option></select>
             <small class="hint" id="evGroupHint">Группа подставится автоматически</small>
           </div>
-          <div class="form-group full-width">
-            <label>🔗 Источник звонка</label>
-            <select id="evReq" onchange="evReqChanged()"><option value="">СКК выбрал сам</option></select>
-            <small class="hint">Если оператор выгрузил звонок заявкой — выберите её, чтобы засчитать в план</small>
-          </div>
           <div class="form-group"><label>📅 Дата звонка *</label><input type="date" id="evDate"></div>
           <div class="form-group"><label>⏰ Время звонка (МСК)</label><input type="time" id="evTime"></div>
           <div class="form-group"><label>📞 Телефон</label><input type="tel" id="evPhone" placeholder="+7 (777) 777-77-77"></div>
           <div class="form-group"><label>⏱ Критерий звонка</label><select id="evCriterion"></select></div>
           <div class="form-group"><label>🏷 Тематика</label><select id="evTopic" onchange="evTopicChanged()"></select></div>
           <div class="form-group"><label>🏷 Подтематика</label><select id="evSub"></select></div>
-          <div class="form-group"><label>🏙 Город</label><select id="evCity" onchange="evCityChanged()"></select></div>
-          <div class="form-group"><label>🗺 Агломерация</label><input type="text" id="evAgg" readonly placeholder="Подставится по городу"></div>
+          <div class="form-group"><label>🏙 Город</label>
+            <input type="text" id="evCity" list="evCityList" autocomplete="off" placeholder="напр. Москва" onchange="evCityChanged()">
+            <datalist id="evCityList"></datalist>
+          </div>
+          <div class="form-group"><label>🗺 Агломерация</label>
+            <input type="text" id="evAgg" list="evAggList" autocomplete="off" placeholder="подставится по городу, можно поправить">
+            <datalist id="evAggList"></datalist>
+          </div>
         </div>
       </div>
 
@@ -1919,9 +1920,15 @@
       document.getElementById('evTopic').innerHTML = '<option value="">—</option>' + topics.map(function (t) { return '<option>' + t + '</option>'; }).join('');
       document.getElementById('evSub').disabled = true;
       document.getElementById('evSub').innerHTML = '<option value="">Сначала выберите тематику</option>';
-      const cities = [];
-      res.cities.forEach(function (c) { if (cities.indexOf(c.city) < 0) cities.push(c.city); });
-      document.getElementById('evCity').innerHTML = '<option value="">—</option>' + cities.map(function (c) { return '<option>' + c + '</option>'; }).join('');
+      // Город и агломерацию пишут руками: список — только подсказка,
+      // новые города появляются быстрее, чем справочник успевают править.
+      const cities = [], aggs = [];
+      res.cities.forEach(function (c) {
+        if (cities.indexOf(c.city) < 0) cities.push(c.city);
+        if (c.agg && aggs.indexOf(c.agg) < 0) aggs.push(c.agg);
+      });
+      document.getElementById('evCityList').innerHTML = cities.map(function (c) { return '<option value="' + c + '">'; }).join('');
+      document.getElementById('evAggList').innerHTML = aggs.sort().map(function (a) { return '<option value="' + a + '">'; }).join('');
       renderChecklist();
       recalcEval();
     };
@@ -1952,28 +1959,9 @@
     const opt = sel.options[sel.selectedIndex];
     const g = opt ? opt.getAttribute('data-group') : '';
     document.getElementById('evGroupHint').textContent = g ? ('Группа: ' + g) : 'Группа подставится автоматически';
-    // заявки этого оператора → в источник
-    const req = document.getElementById('evReq');
-    req.innerHTML = '<option value="">СКК выбрал сам</option>';
-    if (!sel.value) return;
-    google.script.run.withSuccessHandler(function (r) {
-      if (!r.success) return;
-      (r.requests || []).filter(function (x) { return x.status !== 'Без звонка'; }).forEach(function (x) {
-        req.innerHTML += '<option value="' + x.id + '" data-date="' + x.callDate + '" data-time="' + x.callTime + '" data-phone="' + x.phone + '">' +
-          x.id + ' · ' + formatDate(x.callDate) + ' ' + formatTime(x.callTime) + ' · ' + UiPhone.pretty(x.phone) + '</option>';
-      });
-    }).getRequestsByOperator(sel.value);
   }
 
-  // автоподстановка даты/времени/телефона из выбранной заявки
-  function evReqChanged() {
-    const req = document.getElementById('evReq');
-    const o = req.options[req.selectedIndex];
-    if (!o || !o.value) return;
-    if (o.getAttribute('data-date')) document.getElementById('evDate').value = o.getAttribute('data-date');
-    if (o.getAttribute('data-time')) document.getElementById('evTime').value = o.getAttribute('data-time');
-    if (o.getAttribute('data-phone')) document.getElementById('evPhone').value = o.getAttribute('data-phone');
-  }
+
   function evTopicChanged() {
     const t = document.getElementById('evTopic').value;
     const sub = document.getElementById('evSub');
@@ -1993,9 +1981,13 @@
   // Раньше она подставлялась только в момент сохранения, и поле всё время
   // выглядело пустым и сломанным.
   function evCityChanged() {
-    const city = document.getElementById('evCity').value;
+    const agg = document.getElementById('evAgg');
+    const city = document.getElementById('evCity').value.trim();
     const row = (evCfg ? evCfg.cities : []).filter(function (c) { return c.city === city; })[0];
-    document.getElementById('evAgg').value = row ? (row.agg || '') : '';
+    // не затираем то, что вписали руками
+    if (agg.value && agg.value !== agg.dataset.auto) return;
+    agg.value = row ? (row.agg || '') : '';
+    agg.dataset.auto = agg.value;
   }
 
   function optClass(v) {
@@ -2103,7 +2095,7 @@
         sub: document.getElementById('evSub').value,
         city: cityName,
         agg: cityRow ? cityRow.agg : '',
-        reqId: document.getElementById('evReq').value
+        reqId: ''
       },
       answers: evAnswers,
       comments: evComments
@@ -2161,7 +2153,6 @@
         evAnswers = {}; evComments = {};
         document.getElementById('evPhone').value = '';
         document.getElementById('evTime').value = '';
-        document.getElementById('evReq').innerHTML = '<option value="">СКК выбрал сам</option>';
         renderChecklist(); recalcEval();
         window.scrollTo({ top: 0, behavior: 'smooth' });
       })

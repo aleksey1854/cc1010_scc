@@ -1,133 +1,54 @@
 /* ============================================================
-   ui-phone.js — номер телефона в одном виде: +7 (777) 777-77-77.
+   ui-phone.js — номер телефона одними цифрами.
 
-   Вешается на каждый input[type=tel] и на всё с data-phone.
-   Наружу, на сервер, по-прежнему уходит то, что там и ждали:
-   core.normPhone всё равно оставляет одни цифры.
-
-   Ведущая «7» считается кодом страны только когда цифр набралось
-   одиннадцать: до этого она может быть первой цифрой номера, и
-   решать раньше времени нельзя. «8» — старый междугородний префикс,
-   его отбрасываем сразу: национальный номер с восьмёрки не начинается.
+   Ни пробелов, ни скобок, ни дефисов, ни плюса: набирают как удобно —
+   с семёркой, с восьмёркой или сразу с кода оператора, — а в поле
+   остаются только цифры. Приведением к единому виду занимается
+   сервер: core.normPhone делает 8→7 и дописывает семёрку к десяти
+   цифрам, поэтому на хранение всё равно уходит 11 цифр.
    ============================================================ */
 (function () {
   'use strict';
 
-  var PLACEHOLDER = '+7 (777) 777-77-77';
+  var PLACEHOLDER = '79001234567';
+  var MAX = 11;
 
-  function digitsOf(v) { return String(v == null ? '' : v).replace(/\D/g, ''); }
+  function digitsOf(v) { return String(v == null ? '' : v).replace(/\D/g, '').slice(0, MAX); }
 
-  // Наш собственный префикс — это ровно символы «+7», и убираем мы именно их,
-  // а не «первую цифру»: иначе на наборе 79161234567 терялась последняя цифра,
-  // потому что «7» из «+7» была неотличима от первой цифры номера.
-  function hasPrefix(s) { return /^\s*\+\s*7/.test(String(s == null ? '' : s)); }
-  function viewDigits(v) {
-    var t = String(v == null ? '' : v);
-    if (hasPrefix(t)) t = t.replace(/^\s*\+\s*7/, '');
-    return digitsOf(t);
-  }
-
-  // Десять цифр национального номера, без кода страны.
-  // Семёрка становится кодом страны только когда цифр набралось одиннадцать —
-  // до этого она законная первая цифра кода оператора.
-  function national(v) {
-    var d = viewDigits(v);
-    if (d.length >= 11 && (d[0] === '7' || d[0] === '8')) d = d.slice(1);
-    else if (d[0] === '8') d = d.slice(1);        // восьмёрка — старый междугородний префикс
-    return d.slice(0, 10);
-  }
-
-  function format(v) {
-    var d = national(v);
-    if (!d) return '';
-    var out = '+7 (' + d.slice(0, 3);
-    if (d.length >= 3) out += ')';
-    if (d.length > 3) out += ' ' + d.slice(3, 6);
-    if (d.length > 6) out += '-' + d.slice(6, 8);
-    if (d.length > 8) out += '-' + d.slice(8, 10);
-    return out;
-  }
-
-  // Для показа в таблицах: недобитые номера оставляем как есть,
-  // врать про формат хуже, чем показать сырое значение.
-  function pretty(v) {
-    var d = digitsOf(v);
-    if (!d) return '';
-    return national(v).length === 10 ? format(v) : String(v);
-  }
-
-  // ---------- каретка ----------
-
-  function nationalDigitsBefore(value, pos) {
-    var head = String(value == null ? '' : value).slice(0, pos);
-    if (hasPrefix(value)) head = head.replace(/^\s*\+\s*7/, '');
-    var before = digitsOf(head);
-    var all = viewDigits(value);
-    var dropFirst = (all.length >= 11 && (all[0] === '7' || all[0] === '8')) || all[0] === '8';
-    if (dropFirst && before.length) before = before.slice(1);
-    return before.length;
-  }
-
-  function caretForDigits(formatted, n) {
-    if (n <= 0) return Math.min(4, formatted.length);      // сразу после «+7 (»
-    var seen = 0, cc = false;
-    for (var i = 0; i < formatted.length; i++) {
-      if (!/\d/.test(formatted[i])) continue;
-      if (!cc) { cc = true; continue; }                    // это семёрка из «+7»
-      seen++;
-      if (seen === n) return i + 1;
-    }
-    return formatted.length;
-  }
+  // Для показа: что в базе, то и на экране — придумывать формат не надо
+  function pretty(v) { return String(v == null ? '' : v); }
 
   var rawSet = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
   var rawGet = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').get;
-
-  function apply(el, value, digitsBefore) {
-    var f = format(value);
-    // «8» съедена как код страны: пустое поле выглядело бы так, будто нажатие потерялось
-    if (!f && viewDigits(value)) f = '+7 (';
-    rawSet.call(el, f);
-    var c = caretForDigits(f, digitsBefore);
-    try { el.setSelectionRange(c, c); } catch (e) {}
-  }
 
   function enhance(el) {
     if (!el || el.dataset.uiphone) return;
     el.dataset.uiphone = 'on';
 
-    el.setAttribute('inputmode', 'tel');
+    el.setAttribute('inputmode', 'numeric');
     if (!el.getAttribute('autocomplete')) el.setAttribute('autocomplete', 'tel');
-    el.removeAttribute('maxlength');                       // маска длиннее одиннадцати знаков
-    if (!el.placeholder || /^\d+$/.test(el.placeholder)) el.placeholder = PLACEHOLDER;
-    el.removeAttribute('oninput');                         // старая маска «только цифры» больше не нужна
+    el.setAttribute('maxlength', String(MAX));
+    if (!el.placeholder || /[()+\-\s]/.test(el.placeholder)) el.placeholder = PLACEHOLDER;
+    el.removeAttribute('oninput');
 
     el.addEventListener('input', function () {
-      apply(el, rawGet.call(el), nationalDigitsBefore(rawGet.call(el), el.selectionStart));
+      var pos = el.selectionStart;
+      var was = rawGet.call(el);
+      var now = digitsOf(was);
+      if (now === was) return;                 // ничего не вырезали — каретку не трогаем
+      rawSet.call(el, now);
+      var back = was.length - now.length;      // сколько символов исчезло слева от каретки
+      try { el.setSelectionRange(Math.max(0, pos - back), Math.max(0, pos - back)); } catch (e) {}
     });
 
-    // Backspace на скобке или дефисе должен убирать цифру, а не разделитель:
-    // иначе символ стирается, маска возвращает его обратно и курсор стоит на месте.
-    el.addEventListener('keydown', function (e) {
-      if (e.key !== 'Backspace' || el.selectionStart !== el.selectionEnd) return;
-      var pos = el.selectionStart, v = rawGet.call(el);
-      if (pos === 0 || /\d/.test(v[pos - 1])) return;
-      e.preventDefault();
-      var i = pos - 1;
-      while (i >= 0 && !/\d/.test(v[i])) i--;
-      if (i < 0) return;
-      var next = v.slice(0, i) + v.slice(i + 1);
-      apply(el, next, nationalDigitsBefore(next, i));
-    });
-
-    // Значение ставят и из кода — например, при открытии заявки на правку
+    // значение ставят и из кода — при открытии заявки на правку
     Object.defineProperty(el, 'value', {
       configurable: true,
       get: function () { return rawGet.call(this); },
-      set: function (v) { rawSet.call(this, format(v)); }
+      set: function (v) { rawSet.call(this, digitsOf(v)); }
     });
 
-    if (rawGet.call(el)) rawSet.call(el, format(rawGet.call(el)));
+    if (rawGet.call(el)) rawSet.call(el, digitsOf(rawGet.call(el)));
   }
 
   function enhanceAll(root) {
@@ -135,7 +56,7 @@
     Array.prototype.forEach.call(scope.querySelectorAll('input[type=tel], input[data-phone]'), enhance);
   }
 
-  window.UiPhone = { enhance: enhance, enhanceAll: enhanceAll, format: format, pretty: pretty, digits: digitsOf };
+  window.UiPhone = { enhance: enhance, enhanceAll: enhanceAll, pretty: pretty, digits: digitsOf };
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function () { enhanceAll(document); });

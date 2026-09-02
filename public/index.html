@@ -1912,6 +1912,9 @@
     const renderCfg = function (res) {
       if (!res.success) { document.getElementById('evChecklist').innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + res.error + '</p></div>'; return; }
       evCfg = res;
+      // Лист открывается заполненным, как оригинальная таблица: 100%
+      // и вниз по мере отметки ошибок. «Не требуется» там, где так в оригинале.
+      evAnswers = defaultAnswers();
       // справочники
       const crit = document.getElementById('evCriterion');
       crit.innerHTML = '<option value="">—</option>' + res.callCriteria.map(function (c) { return '<option>' + c + '</option>'; }).join('');
@@ -1993,6 +1996,14 @@
   function optClass(v) {
     if (v === V.POS) return 'on-pos'; if (v === V.DBT) return 'on-dbt'; if (v === V.NEG) return 'on-neg';
     if (v === V.NA) return 'on-na'; if (v === V.YES) return 'on-yes'; return 'on-no';
+  }
+
+  function defaultAnswers() {
+    const a = {};
+    (evCfg ? evCfg.blocks : []).forEach(function (b) {
+      b.items.forEach(function (it) { if (it.def) a[it.id] = it.def; });
+    });
+    return a;
   }
 
   function renderChecklist() {
@@ -2150,7 +2161,7 @@
         btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Сохранить оценку';
         if (!res.success) { evMsg('❌ ' + res.error, 'error'); return; }
         evMsg('✅ Оценка ' + res.id + ' сохранена: ' + pct2(res.result.score) + ' (' + res.week + ')', 'success');
-        evAnswers = {}; evComments = {};
+        evAnswers = defaultAnswers(); evComments = {};
         document.getElementById('evPhone').value = '';
         document.getElementById('evTime').value = '';
         renderChecklist(); recalcEval();

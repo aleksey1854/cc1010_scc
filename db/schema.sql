@@ -78,6 +78,7 @@ CREATE TABLE checklist_items (
   pts_dbt     numeric(6,2),
   pts_neg     numeric(6,2),
   pts_na      numeric(6,2),
+  default_value answer_value,              -- чем пункт заполнен при открытии
   active      boolean NOT NULL DEFAULT true,
   sort_order  int     NOT NULL
 );

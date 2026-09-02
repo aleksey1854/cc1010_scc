@@ -69,11 +69,12 @@ async function main() {
       }
       const num = v => { const s = cell(r, v); return s === '' ? null : Number(s.replace(',', '.')); };
       await t.q(`INSERT INTO checklist_items
-                   (block_id, code, text, kind, rule, pts_pos, pts_dbt, pts_neg, pts_na, active, sort_order)
-                 VALUES ((SELECT id FROM checklist_blocks WHERE code=$1),$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+                   (block_id, code, text, kind, rule, pts_pos, pts_dbt, pts_neg, pts_na, active, sort_order, default_value)
+                 VALUES ((SELECT id FROM checklist_blocks WHERE code=$1),$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
                  ON CONFLICT (code) DO NOTHING`,
         [bcode, id, cell(r, 2), cell(r, 3) || 'score', cell(r, 8) || null,
-         num(4), num(5), num(6), num(7), cell(r, 9) !== 'Нет', i]);
+         num(4), num(5), num(6), num(7), cell(r, 9) !== 'Нет', i,
+         cell(r, 10) || ((cell(r, 3) || 'score') === 'flag' ? 'no' : 'pos')]);
     }
     stat.blocks = (await t.one('SELECT count(*)::int n FROM checklist_blocks')).n;
     stat.items = (await t.one('SELECT count(*)::int n FROM checklist_items')).n;

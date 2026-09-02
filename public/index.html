@@ -208,6 +208,17 @@
   .status-badge.В_работе{ background:var(--mid-bg); color:#9a6206; }
   .status-badge.Проверена{ background:var(--good-bg); color:#0a6e3d; }
   .status-badge.Отклонена{ background:var(--bad-bg); color:#a52020; }
+  .staff-audit{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
+  .staff-chip{ border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px 14px; background:var(--surface-2); }
+  .staff-chip .n{ font-family:var(--display); font-size:22px; font-weight:600; }
+  .staff-chip .t{ color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.4px; margin-top:2px; }
+  .staff-chip.bad .n{ color:var(--bad); }
+  .staff-chip.ok  .n{ color:var(--good); }
+  .staff-note{ margin-top:12px; font-size:13px; color:var(--ink-2); }
+  .staff-note b{ color:var(--bad); }
+  .role-badge{ display:inline-block; padding:3px 9px; border-radius:20px; font-size:12px;
+    background:var(--accent-soft); color:var(--accent-ink); white-space:nowrap; }
+  .no-pass{ color:var(--bad); font-size:12px; }
   .hist-line{ display:flex; gap:12px; padding:11px 0; border-bottom:1px solid var(--border); }
   .hist-line:last-child{ border-bottom:none; }
   .hist-dot{ flex:0 0 auto; width:9px; height:9px; border-radius:50%; background:var(--accent); margin-top:6px; }
@@ -487,6 +498,7 @@
       <button type="button" class="seg-btn" id="tabReqBtn" onclick="qcTab('req')">Заявки операторов</button>
       <button type="button" class="seg-btn hidden" id="tabAnaBtn" onclick="qcTab('ana')">Аналитика</button>
       <button type="button" class="seg-btn hidden" id="tabRepBtn" onclick="openReports('qc')">Отчёты</button>
+      <button type="button" class="seg-btn hidden" id="tabStaffBtn" onclick="qcTab('staff')">Сотрудники</button>
     </div>
 
     <!-- ОЦЕНКА ЗВОНКА (чек-лист v2) -->
@@ -505,7 +517,7 @@
             <small class="hint">Если оператор выгрузил звонок заявкой — выберите её, чтобы засчитать в план</small>
           </div>
           <div class="form-group"><label>📅 Дата звонка *</label><input type="date" id="evDate"></div>
-          <div class="form-group"><label>⏰ Время звонка</label><input type="time" id="evTime"></div>
+          <div class="form-group"><label>⏰ Время звонка (МСК)</label><input type="time" id="evTime"></div>
           <div class="form-group"><label>📞 Телефон</label><input type="tel" id="evPhone" placeholder="+7 (777) 777-77-77"></div>
           <div class="form-group"><label>⏱ Критерий звонка</label><select id="evCriterion"></select></div>
           <div class="form-group"><label>🏷 Тематика</label><select id="evTopic" onchange="evTopicChanged()"></select></div>
@@ -558,6 +570,24 @@
     </div>
 
     <!-- ЗАЯВКИ -->
+    <!-- СОТРУДНИКИ: только администратор -->
+    <div id="qcStaffTab" class="hidden">
+      <div class="card">
+        <div class="card-title"><i class="fas fa-shield-halved"></i> Состояние учётных записей</div>
+        <div id="staffAudit"></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="fas fa-address-book"></i> Состав</div>
+        <div class="filter-bar">
+          <input type="text" id="staffSearch" placeholder="Поиск по ФИО или логину">
+          <select id="staffRoleFilter"><option value="">Все роли</option></select>
+          <select id="staffGroupFilter"><option value="">Все группы</option></select>
+          <button class="btn-filter" style="margin-left:auto;" onclick="openStaffModal()"><i class="fas fa-user-plus"></i> Добавить</button>
+        </div>
+        <div id="staffList"></div>
+      </div>
+    </div>
+
     <div id="qcReqTab" class="hidden">
     <div class="card">
       <div class="card-title"><i class="fas fa-filter"></i> Фильтры</div>
@@ -852,6 +882,34 @@
   </div>
 </div>
 
+<!-- СОТРУДНИК -->
+<div class="review-modal" id="staffModal">
+  <div class="modal-content" style="max-width:540px;">
+    <div class="modal-title"><i class="fas fa-user-pen"></i> <span id="staffModalTitle">Новый сотрудник</span></div>
+    <form id="staffForm" onsubmit="return submitStaff(event)">
+      <div class="form-group"><label>ФИО *</label><input type="text" id="stName" required autocomplete="off"></div>
+      <div class="form-group"><label>Группа</label>
+        <input type="text" id="stGroup" list="stGroups" placeholder="напр. ИНВ-1" autocomplete="off">
+        <datalist id="stGroups"></datalist>
+      </div>
+      <div class="form-group"><label>Роль *</label><select id="stRole"></select></div>
+      <div class="form-group"><label>Логин</label>
+        <input type="text" id="stLogin" placeholder="пусто — соберём из ФИО" autocomplete="off"
+               autocapitalize="off" spellcheck="false">
+      </div>
+      <div class="form-group"><label id="stPassLabel">Пароль *</label>
+        <input type="text" id="stPass" placeholder="минимум 6 символов" autocomplete="off">
+        <small class="hint" id="stPassHint">Виден вам целиком — передайте сотруднику и попросите сменить.</small>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn-cancel" onclick="closeStaffModal()">Отмена</button>
+        <button type="submit" class="btn-save"><i class="fas fa-save"></i> Сохранить</button>
+      </div>
+    </form>
+    <div class="message" id="staffMessage"></div>
+  </div>
+</div>
+
 <!-- ИСТОРИЯ ЗАЯВКИ -->
 <div class="review-modal" id="histModal">
   <div class="modal-content" style="max-width:560px;">
@@ -870,7 +928,7 @@
     <div id="editRequestDetail"></div>
     <form id="editForm" onsubmit="submitEdit(event)">
       <div class="form-group"><label>📅 Дата звонка *</label><input type="date" id="editCallDate" required></div>
-      <div class="form-group"><label>⏰ Время звонка *</label><input type="time" id="editCallTime" required></div>
+      <div class="form-group"><label>⏰ Время звонка (МСК) *</label><input type="time" id="editCallTime" required></div>
       <div class="form-group"><label>📞 Номер телефона *</label><input type="tel" id="editPhone" placeholder="+7 (777) 777-77-77" required></div>
       <div class="btn-row">
         <button type="button" class="btn-cancel" onclick="closeEditModal()">Отмена</button>
@@ -1053,11 +1111,11 @@
   // чужие заявки — до первой перезагрузки страницы данные не перечитываются.
   function resetState() {
     currentRequestId = null; editRequestId = null;
-    allRequests = []; orgOperators = [];
+    allRequests = []; orgOperators = []; staffAll = []; staffEditing = null; myRequests = [];
     evCfg = null; evAnswers = {}; evComments = {};
     hasCallState = 'yes'; weekOffset = 0; repFrom = 'org';
     ['opRequestsList', 'opEvalsList', 'qcRequestsList', 'rgoOperatorsList',
-     'orgOperatorsTable', 'planTable', 'evChecklist'].forEach(function (id) {
+     'orgOperatorsTable', 'planTable', 'evChecklist', 'staffList', 'staffAudit'].forEach(function (id) {
       const el = document.getElementById(id);
       if (el) el.innerHTML = '';
     });
@@ -1085,6 +1143,7 @@
       const isSqc = user.role === 'sqc' || user.role === 'admin';
       document.getElementById('tabAnaBtn').classList.toggle('hidden', !isSqc);
       document.getElementById('tabRepBtn').classList.toggle('hidden', !isSqc);
+      document.getElementById('tabStaffBtn').classList.toggle('hidden', user.role !== 'admin');
       qcTab('eval');
       loadEvalPage();
     } else {
@@ -1092,29 +1151,48 @@
       document.getElementById('opUserName').textContent = user.fullName;
       document.getElementById('opUserGroup').textContent = user.group;
       document.getElementById('callDate').value = new Date().toISOString().split('T')[0];
-      loadOperatorStats();
-      loadOperatorRequests();
-      loadMyEvaluations();
+      loadOperatorAll();
     }
     restoreView(user, want);
   }
 
   // ---------- ОПЕРАТОР: заявки/стата ----------
-  function loadOperatorStats() {
-    google.script.run.withSuccessHandler(function (result) {
+  // Кабинет оператора собирается одним запросом: на serverless каждый
+  // лишний вызов — это отдельный запуск функции и своя дорога до базы.
+  function loadOperatorAll() {
+    google.script.run.withSuccessHandler(function (b) {
+      if (!b.success) {
+        document.getElementById('opRequestsList').innerHTML =
+          '<div class="empty-state"><i class="fas fa-ban"></i><p>' + (b.error || 'Ошибка') + '</p></div>';
+        return;
+      }
+      loadOperatorStats({ success: true, stats: b.stats });
+      loadOperatorRequests({ success: true, requests: b.requests });
+      loadMyEvaluations(b.evals);
+    }).getOperatorBootstrap(sessionStorage.getItem('token'));
+  }
+
+  // pre — уже полученный ответ: тогда просто рисуем, без похода на сервер
+  function loadOperatorStats(pre) {
+    const render = function (result) {
       if (result.success) {
         const s = result.stats;
         document.getElementById('opStatNew').textContent = s.new;
         document.getElementById('opStatInProgress').textContent = s.inProgress;
       }
-    }).getOperatorStats(sessionStorage.getItem('token'));
+    };
+    if (pre) return render(pre);
+    google.script.run.withSuccessHandler(render).getOperatorStats(sessionStorage.getItem('token'));
   }
 
-  function loadOperatorRequests() {
-    google.script.run.withSuccessHandler(function (result) {
+  let myRequests = [];        // список для окна правки: второй раз спрашивать незачем
+
+  function loadOperatorRequests(pre) {
+    const render = function (result) {
       const container = document.getElementById('opRequestsList');
+      myRequests = (result && result.requests) || [];
       if (result.success && result.requests && result.requests.length > 0) {
-        let html = '<div class="table-wrapper"><table><thead><tr><th>ID</th><th>Дата</th><th>Время</th><th>Телефон</th><th>Статус</th><th>Оценка</th><th>Комментарий</th><th>Действия</th></tr></thead><tbody>';
+        let html = '<div class="table-wrapper"><table><thead><tr><th>ID</th><th>Дата</th><th>Время, МСК</th><th>Телефон</th><th>Статус</th><th>Оценка</th><th>Комментарий</th><th>Действия</th></tr></thead><tbody>';
         result.requests.forEach(function (r) {
           const canEdit = r.status === 'Новая';
           html += '<tr>' +
@@ -1133,7 +1211,9 @@
       } else {
         container.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>У вас пока нет заявок</p></div>';
       }
-    }).getOperatorRequests(sessionStorage.getItem('token'));
+    };
+    if (pre) return render(pre);
+    google.script.run.withSuccessHandler(render).getOperatorRequests(sessionStorage.getItem('token'));
   }
 
   let hasCallState = 'yes';
@@ -1173,7 +1253,7 @@
           showOpMessage('✅ Отправлено' + (result.requestId ? ' (#' + result.requestId + ')' : ''), 'success');
           document.getElementById('phone').value = ''; document.getElementById('opComment').value = ''; document.getElementById('opReason').value = ''; document.getElementById('callType').value = '';
           setHasCall('yes');
-          loadOperatorStats(); loadOperatorRequests();
+          loadOperatorAll();
         } else { showOpMessage('❌ ' + result.error, 'error'); }
       })
       .withFailureHandler(function (error) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Отправить'; showOpMessage('❌ Ошибка: ' + error, 'error'); })
@@ -1182,8 +1262,8 @@
   function showOpMessage(text, type) { const el = document.getElementById('opFormMessage'); el.textContent = text; el.className = 'message ' + type; el.style.display = 'block'; setTimeout(function () { el.style.display = 'none'; }, 5000); }
 
   // ---------- ОПЕРАТОР: оценки КК (чек-лист v2) ----------
-  function loadMyEvaluations() {
-    google.script.run.withSuccessHandler(function (res) {
+  function loadMyEvaluations(pre) {
+    const render = function (res) {
       const box = document.getElementById('opEvalList');
       if (!res.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + res.error + '</p></div>'; return; }
 
@@ -1224,13 +1304,15 @@
         html += '</div>';
       });
       box.innerHTML = html;
-    }).getMyEvaluations(sessionStorage.getItem('token'));
+    };
+    if (pre) return render(pre);
+    google.script.run.withSuccessHandler(render).getMyEvaluations(sessionStorage.getItem('token'));
   }
 
   // ---------- РЕДАКТИРОВАНИЕ ----------
   function openEditModal(requestId) {
     editRequestId = requestId;
-    google.script.run.withSuccessHandler(function (result) {
+    const show = function (result) {
       if (result.success && result.requests) {
         const req = result.requests.find(function (r) { return r.id === requestId; });
         if (req) {
@@ -1242,7 +1324,10 @@
           document.getElementById('editModal').classList.add('active');
         }
       }
-    }).getOperatorRequests(sessionStorage.getItem('token'));
+    };
+    // список уже в памяти — лишний запрос ради одной строки не нужен
+    if (myRequests.length) return show({ success: true, requests: myRequests });
+    google.script.run.withSuccessHandler(show).getOperatorRequests(sessionStorage.getItem('token'));
   }
   function closeEditModal() { document.getElementById('editModal').classList.remove('active'); editRequestId = null; }
   function submitEdit(event) {
@@ -1253,7 +1338,7 @@
     google.script.run
       .withSuccessHandler(function (result) {
         btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Сохранить';
-        if (result.success) { showEditMessage('✅ Обновлено!', 'success'); setTimeout(function () { closeEditModal(); loadOperatorRequests(); loadOperatorStats(); }, 1200); }
+        if (result.success) { showEditMessage('✅ Обновлено!', 'success'); setTimeout(function () { closeEditModal(); loadOperatorAll(); }, 1200); }
         else { showEditMessage('❌ ' + result.error, 'error'); }
       })
       .withFailureHandler(function (error) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Сохранить'; showEditMessage('❌ Ошибка: ' + error, 'error'); })
@@ -1281,7 +1366,7 @@
     }
     const user = JSON.parse(sessionStorage.getItem('user') || '{}');
     const isAdmin = user.role === 'admin';
-    let html = '<div class="table-wrapper"><table><thead><tr><th>ID</th><th>Оператор</th><th>Группа</th><th>Дата</th><th>Время</th><th>Телефон</th><th>Статус</th><th>Оценка</th><th>Действия</th></tr></thead><tbody>';
+    let html = '<div class="table-wrapper"><table><thead><tr><th>ID</th><th>Оператор</th><th>Группа</th><th>Дата</th><th>Время, МСК</th><th>Телефон</th><th>Статус</th><th>Оценка</th><th>Действия</th></tr></thead><tbody>';
     requests.forEach(function (r) {
       const noCall = r.status === 'Без звонка';
       const canReview = r.status === 'Новая' || r.status === 'В работе';
@@ -1335,6 +1420,214 @@
     document.getElementById('filterPhone').value = ''; document.getElementById('filterDate').value = '';
     renderRequests(allRequests);
   }
+
+  // ---------- СОТРУДНИКИ (администратор) ----------
+  // Восемь методов сервера уже умели всё нужное — не хватало только экрана.
+  // Сотрудник опознаётся по ФИО: так устроены и оценки, и заявки.
+
+  const ROLES = [
+    ['operator', 'Оператор'], ['qc', 'Контролёр СКК'], ['sqc', 'Старший контролёр'],
+    ['rgo', 'РГО'], ['srgo', 'Старший РГО'], ['manager', 'Руководитель'], ['admin', 'Администратор']
+  ];
+  const roleRu = c => (ROLES.find(r => r[0] === c) || [c, c])[1];
+  let staffAll = [];
+  let staffEditing = null;
+
+  function loadStaff() {
+    const box = document.getElementById('staffList');
+    box.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Загрузка…</p></div>';
+    const t = sessionStorage.getItem('token');
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
+      staffAll = r.users;
+      fillStaffFilters();
+      renderStaff();
+    }).getAllUsers(t);
+
+    google.script.run.withSuccessHandler(renderStaffAudit).auditAccounts(t);
+  }
+
+  function renderStaffAudit(a) {
+    const box = document.getElementById('staffAudit');
+    if (!a || !a.success) { box.innerHTML = ''; return; }
+    const chip = (n, t, cls) => '<div class="staff-chip ' + (cls || '') + '"><div class="n">' + n + '</div><div class="t">' + t + '</div></div>';
+    let html = '<div class="staff-audit">' +
+      chip(a.total, 'всего в составе') +
+      chip(a.noLogin.length, 'без логина', a.noLogin.length ? 'bad' : 'ok') +
+      chip(a.noPassword.length, 'без пароля', a.noPassword.length ? 'bad' : 'ok') +
+      chip(a.duplicateLogins.length, 'дубли логинов', a.duplicateLogins.length ? 'bad' : 'ok') +
+      chip(a.sameName.length, 'тёзки', a.sameName.length ? 'bad' : 'ok') +
+      '</div>';
+    const notes = [];
+    if (a.noLogin.length) notes.push('<b>Без логина:</b> ' + a.noLogin.join(', ') + ' — войти не смогут.');
+    if (a.noPassword.length) notes.push('<b>Без пароля:</b> ' + a.noPassword.join(', ') + ' — задайте через «Изменить».');
+    if (a.duplicateLogins.length) notes.push('<b>Логин занят дважды:</b> ' +
+      a.duplicateLogins.map(d => d.login + ' (' + d.people.join(', ') + ')').join('; '));
+    if (a.sameName.length) notes.push('<b>Полные тёзки:</b> ' + a.sameName.map(x => x.fullName).join(', ') +
+      ' — оценки связаны по ФИО, войти они не смогут, пока ФИО не различаются.');
+    if (notes.length) html += '<div class="staff-note">' + notes.join('<br>') + '</div>';
+    else html += '<div class="staff-note">Замечаний нет.</div>';
+    box.innerHTML = html;
+  }
+
+  function fillStaffFilters() {
+    const roleSel = document.getElementById('staffRoleFilter');
+    if (roleSel.options.length <= 1) {
+      roleSel.innerHTML = '<option value="">Все роли</option>' +
+        ROLES.map(r => '<option value="' + r[0] + '">' + r[1] + '</option>').join('');
+    }
+    const groups = [...new Set(staffAll.map(u => u.group).filter(Boolean))].sort();
+    document.getElementById('staffGroupFilter').innerHTML =
+      '<option value="">Все группы</option>' + groups.map(g => '<option>' + g + '</option>').join('');
+    document.getElementById('stGroups').innerHTML = groups.map(g => '<option value="' + g + '">').join('');
+  }
+
+  function renderStaff() {
+    const q = document.getElementById('staffSearch').value.toLowerCase().trim();
+    const role = document.getElementById('staffRoleFilter').value;
+    const group = document.getElementById('staffGroupFilter').value;
+    const box = document.getElementById('staffList');
+
+    const list = staffAll.filter(u =>
+      (!role || u.role === role) &&
+      (!group || u.group === group) &&
+      (!q || (u.fullName + ' ' + (u.login || '')).toLowerCase().indexOf(q) >= 0));
+
+    if (!list.length) {
+      box.innerHTML = '<div class="empty-state"><i class="fas fa-user-slash"></i><p>' +
+        (staffAll.length ? 'Никто не подошёл под фильтры' : 'Состав пуст') + '</p></div>';
+      return;
+    }
+
+    const rows = list.map(u =>
+      '<tr>' +
+        '<td><strong>' + u.fullName + '</strong></td>' +
+        '<td>' + (u.group || '—') + '</td>' +
+        '<td><span class="role-badge">' + roleRu(u.role) + '</span></td>' +
+        '<td>' + (u.login || '<span class="no-pass">нет логина</span>') + '</td>' +
+        '<td>' + (u.hasPassword ? '✓' : '<span class="no-pass">нет пароля</span>') + '</td>' +
+        '<td>' + (u.hired || '—') + '</td>' +
+        '<td>' +
+          '<button class="btn-small" data-staff-edit type="button"><i class="fas fa-pen"></i> Изменить</button> ' +
+          '<button class="btn-small btn-danger" data-staff-del type="button"><i class="fas fa-user-minus"></i></button>' +
+        '</td>' +
+      '</tr>').join('');
+
+    box.innerHTML = '<div class="table-wrapper"><table><thead><tr>' +
+      '<th>ФИО</th><th>Группа</th><th>Роль</th><th>Логин</th><th>Пароль</th><th>Принят</th><th>Действия</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+
+    // имена подставляем через свойство, а не в разметку: кавычки в ФИО ничего не сломают
+    [...box.querySelectorAll('tbody tr')].forEach((tr, i) => {
+      tr.querySelector('[data-staff-edit]').onclick = () => openStaffModal(list[i].fullName);
+      tr.querySelector('[data-staff-del]').onclick = () => deleteStaff(list[i].fullName);
+    });
+  }
+
+  function openStaffModal(fullName) {
+    staffEditing = fullName || null;
+    const u = fullName ? staffAll.find(x => x.fullName === fullName) : null;
+    document.getElementById('staffModalTitle').textContent = u ? 'Сотрудник: ' + u.fullName : 'Новый сотрудник';
+    document.getElementById('stRole').innerHTML = ROLES.map(r => '<option value="' + r[0] + '">' + r[1] + '</option>').join('');
+    document.getElementById('stName').value = u ? u.fullName : '';
+    document.getElementById('stGroup').value = u ? (u.group || '') : '';
+    document.getElementById('stRole').value = u ? u.role : 'operator';
+    document.getElementById('stLogin').value = u ? (u.login || '') : '';
+    document.getElementById('stPass').value = '';
+    document.getElementById('stPassLabel').textContent = u ? 'Новый пароль' : 'Пароль *';
+    document.getElementById('stPassHint').textContent = u
+      ? 'Пусто — пароль не меняется. Новый гасит все сессии сотрудника.'
+      : 'Виден вам целиком — передайте сотруднику и попросите сменить.';
+    const m = document.getElementById('staffMessage');
+    m.style.display = 'none'; m.className = 'message';
+    document.getElementById('staffModal').classList.add('active');
+    setTimeout(() => document.getElementById('stName').focus(), 50);
+  }
+  function closeStaffModal() { document.getElementById('staffModal').classList.remove('active'); }
+
+  function staffMsg(text, kind) {
+    const m = document.getElementById('staffMessage');
+    m.textContent = text;
+    m.className = 'message ' + (kind || '');
+    m.style.display = 'block';
+  }
+
+  function submitStaff(ev) {
+    ev.preventDefault();
+    const name = document.getElementById('stName').value.trim();
+    const group = document.getElementById('stGroup').value.trim();
+    const role = document.getElementById('stRole').value;
+    const login = document.getElementById('stLogin').value.trim();
+    const pass = document.getElementById('stPass').value.trim();
+    if (!name) { staffMsg('Укажите ФИО', 'error'); return false; }
+
+    const t = sessionStorage.getItem('token');
+    const btn = document.querySelector('#staffForm .btn-save');
+    btn.disabled = true;
+
+    const done = function (msg) {
+      btn.disabled = false;
+      staffMsg('✅ ' + msg, 'success');
+      loadStaff();
+      setTimeout(closeStaffModal, 900);
+    };
+    const failed = function (err) { btn.disabled = false; staffMsg('❌ ' + err, 'error'); };
+
+    if (!staffEditing) {
+      if (!pass) { btn.disabled = false; staffMsg('Задайте пароль — иначе сотрудник не войдёт', 'error'); return false; }
+      google.script.run
+        .withSuccessHandler(r => r.success ? done('Добавлен, логин: ' + r.login) : failed(r.error))
+        .withFailureHandler(e => failed(e))
+        .addUser(t, name, group, role, login, pass);
+      return false;
+    }
+
+    // правка: ФИО/группа/роль, затем логин и пароль — отдельными методами
+    const was = staffAll.find(x => x.fullName === staffEditing) || {};
+    google.script.run
+      .withSuccessHandler(function (r) {
+        if (!r.success) return failed(r.error);
+        const after = [];
+        if (login && login !== (was.login || '')) {
+          after.push(new Promise(res => google.script.run
+            .withSuccessHandler(x => res(x.success ? null : x.error))
+            .withFailureHandler(e => res(String(e))).setLogin(t, name, login)));
+        }
+        if (pass) {
+          after.push(new Promise(res => google.script.run
+            .withSuccessHandler(x => res(x.success ? null : x.error))
+            .withFailureHandler(e => res(String(e))).resetPassword(t, name, pass)));
+        }
+        Promise.all(after).then(errs => {
+          const bad = errs.filter(Boolean);
+          if (bad.length) failed(bad.join('; ')); else done('Сохранено');
+        });
+      })
+      .withFailureHandler(e => failed(e))
+      .updateUser(t, staffEditing, name, group, role);
+    return false;
+  }
+
+  function deleteStaff(fullName) {
+    if (!confirm('Удалить «' + fullName + '»?\n\nУчётка выключается, логин освобождается, сессии гаснут.\nОценки и заявки остаются в отчётах.')) return;
+    google.script.run
+      .withSuccessHandler(function (r) {
+        if (!r.success) { alert(r.error); return; }
+        loadStaff();
+      })
+      .withFailureHandler(e => alert(e))
+      .deleteUser(sessionStorage.getItem('token'), fullName);
+  }
+
+  window.addEventListener('DOMContentLoaded', function () {
+    let t = null;
+    document.getElementById('staffSearch').addEventListener('input', function () {
+      clearTimeout(t); t = setTimeout(renderStaff, 180);
+    });
+    ['staffRoleFilter', 'staffGroupFilter'].forEach(function (id) {
+      document.getElementById(id).addEventListener('change', renderStaff);
+    });
+  });
 
   // ---------- ИСТОРИЯ ЗАЯВКИ ----------
   // Номера заявок фигурируют в работе постоянно, а восстановить ход дела
@@ -1391,6 +1684,7 @@
         '<div class="row"><span class="label">Оператор</span><span class="value">' + req.fullName + '</span></div>' +
         '<div class="row"><span class="label">Группа</span><span class="value">' + req.group + '</span></div>' +
         '<div class="row"><span class="label">Дата</span><span class="value">' + formatDate(req.callDate) + '</span></div>' +
+        '<div class="row"><span class="label">Время, МСК</span><span class="value">' + (formatTime(req.callTime) || '—') + '</span></div>' +
         '<div class="row"><span class="label">Телефон</span><span class="value">' + UiPhone.pretty(req.phone) + '</span></div>' +
         (req.callType ? '<div class="row"><span class="label">Тип</span><span class="value">' + req.callType + '</span></div>' : '') +
         (req.opComment ? '<div class="row"><span class="label">Комментарий оператора</span><span class="value">' + req.opComment + '</span></div>' : '') +
@@ -1512,7 +1806,9 @@
     document.getElementById('qcEvalTab').classList.toggle('hidden', t !== 'eval');
     document.getElementById('qcPlanTab').classList.toggle('hidden', t !== 'plan');
     document.getElementById('qcReqTab').classList.toggle('hidden', t !== 'req');
+    document.getElementById('qcStaffTab').classList.toggle('hidden', t !== 'staff');
     if (t === 'req' && !allRequests.length) loadAllRequests();
+    if (t === 'staff' && !staffAll.length) loadStaff();
     if (t === 'plan') { if (!document.getElementById('planDate').value) document.getElementById('planDate').value = yesterdayStr(); loadPlan(); }
   }
 
@@ -1572,9 +1868,9 @@
     qcTab('eval');
   }
 
-  function loadEvalPage() {
+  function loadEvalPage(pre) {
     document.getElementById('evDate').value = new Date().toISOString().split('T')[0];
-    google.script.run.withSuccessHandler(function (res) {
+    const renderCfg = function (res) {
       if (!res.success) { document.getElementById('evChecklist').innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + res.error + '</p></div>'; return; }
       evCfg = res;
       // справочники
@@ -1590,9 +1886,9 @@
       document.getElementById('evCity').innerHTML = '<option value="">—</option>' + cities.map(function (c) { return '<option>' + c + '</option>'; }).join('');
       renderChecklist();
       recalcEval();
-    }).getChecklistConfig(sessionStorage.getItem('token'));
+    };
 
-    google.script.run.withSuccessHandler(function (res) {
+    const renderOps = function (res) {
       const sel = document.getElementById('evOperator');
       if (!res.success) { sel.innerHTML = '<option value="">Ошибка загрузки</option>'; return; }
       let html = '<option value="">Выберите оператора</option>';
@@ -1603,7 +1899,14 @@
       });
       if (g !== null) html += '</optgroup>';
       sel.innerHTML = html;
-    }).getOperatorsList(sessionStorage.getItem('token'));
+    };
+
+    // Один запрос вместо двух: сервер отдаёт справочник и состав разом
+    google.script.run.withSuccessHandler(function (b) {
+      if (!b.success) { renderCfg(b); return; }
+      renderCfg(b.cfg);
+      renderOps({ success: true, operators: b.operators });
+    }).getQcBootstrap(sessionStorage.getItem('token'));
   }
 
   function evOperatorChanged() {

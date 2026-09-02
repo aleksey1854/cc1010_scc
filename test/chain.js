@@ -102,6 +102,33 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('дата из будущего отклонена',
     (await R('saveEvaluation', { pin: qcT, meta: { ...META, callDate: '2099-01-01' }, answers: ans })).success === false);
 
+  head('ШАГ 3в. СОСТАВ ВЕДУТ СРГО, РУКОВОДИТЕЛЬ И АДМИН');
+  // токены СРГО и руководителя уже получены на шаге входа
+  chk('СРГО видит состав', (await R('getAllUsers', srgoT)).success === true);
+  chk('руководитель видит состав', (await R('getAllUsers', mgrT)).success === true);
+  chk('СКК к составу не пускают', (await R('getAllUsers', qcT)).success === false);
+  chk('оператора к составу не пускают', (await R('getAllUsers', opT)).success === false);
+
+  const NEW_NAME = 'Проверка Составом';
+  const added = await R('addUser', srgoT, NEW_NAME, 'ИНВ-3', 'operator', '', 'Sostav77x');
+  chk('СРГО заводит сотрудника', added.success === true, added.error);
+  chk('  логин собрался из ФИО', /^proverka/.test(added.login || ''), added.login);
+  chk('  и он входит', (await R('login', added.login, 'Sostav77x')).success === true);
+  chk('СРГО меняет роль и группу',
+    (await R('updateUser', srgoT, NEW_NAME, NEW_NAME, 'СКК', 'qc')).success === true);
+  chk('СРГО сбрасывает пароль',
+    (await R('resetPassword', srgoT, NEW_NAME, 'Drug0jPar')).success === true);
+  chk('  старый пароль погас', (await R('login', added.login, 'Sostav77x')).success === false);
+  chk('  новый работает', (await R('login', added.login, 'Drug0jPar')).role === 'qc');
+  chk('СКК завести сотрудника не может',
+    (await R('addUser', qcT, 'Никто Никакой', '', 'operator', '', 'Parol123x')).success === false);
+  chk('СРГО увольняет', (await R('deleteUser', srgoT, NEW_NAME)).success === true);
+  chk('  уволенный не входит', (await R('login', added.login, 'Drug0jPar')).success === false);
+  chk('себя удалить нельзя', (await R('deleteUser', srgoT, SRGO[0])).success === false);
+
+  const audit = await R('auditAccounts', srgoT);
+  chk('состояние учёток считается', audit.success === true && typeof audit.total === 'number', audit);
+
   head('ШАГ 3б. ИСТОРИЯ ЗАЯВКИ');
   const hist = await R('getRequestHistory', qcT, REQ_ID);
   chk('история отдана', hist.success === true, hist.error);

@@ -487,6 +487,7 @@
     <div class="user-info">
       <span class="user-badge"><i class="fas fa-user"></i> <span id="qcUserName"></span></span>
       <span class="user-badge"><i class="fas fa-users"></i> <span id="qcUserGroup"></span></span>
+      <button class="logout-btn hidden" id="backToOrg" onclick="backToOrgPage()"><i class="fas fa-arrow-left"></i> К дивизиону</button>
       <button class="logout-btn" onclick="openPwModal(false)" title="Сменить пароль"><i class="fas fa-key"></i></button>
       <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Выйти</button>
     </div>
@@ -578,6 +579,11 @@
       </div>
       <div class="card">
         <div class="card-title"><i class="fas fa-address-book"></i> Состав</div>
+        <div class="staff-note" style="margin:0 0 14px;">
+          Пароль посмотреть нельзя ни одной ролью: в базе хранится необратимый хеш,
+          исходного пароля нет нигде. Если сотрудник забыл — задайте новый в «Изменить»
+          и передайте ему; все его сессии при этом погаснут.
+        </div>
         <div class="filter-bar">
           <input type="text" id="staffSearch" placeholder="Поиск по ФИО или логину">
           <select id="staffRoleFilter"><option value="">Все роли</option></select>
@@ -663,6 +669,7 @@
     <div class="user-info">
       <button class="logout-btn hidden" id="backToQc" onclick="backToQc()"><i class="fas fa-arrow-left"></i> К оценке</button>
       <button class="logout-btn" onclick="openReports('org')"><i class="fas fa-table"></i> Отчёты</button>
+      <button class="logout-btn hidden" id="orgStaffBtn" onclick="openStaffPage()"><i class="fas fa-users"></i> Сотрудники</button>
       <select id="orgPeriod" onchange="loadOrgDashboard(JSON.parse(sessionStorage.getItem('user')||'{}').role)" style="padding:7px 12px;border:1px solid var(--border-strong);border-radius:9px;font-size:13px;font-family:inherit;">
         <option value="all">За всё время</option>
         <option value="week">Эта неделя</option>
@@ -1130,6 +1137,8 @@
       document.getElementById('orgUserName').textContent = user.fullName;
       document.getElementById('orgUserGroup').textContent = user.group;
       document.getElementById('orgTitle').textContent = user.role === 'manager' ? 'Кабинет менеджера проекта' : 'Дивизион · старший РГО';
+      document.getElementById('orgStaffBtn').classList.toggle('hidden',
+        ['srgo', 'manager', 'admin'].indexOf(user.role) < 0);
       loadOrgDashboard(user.role);
     } else if (user.role === 'rgo') {
       document.getElementById('rgoPage').classList.remove('hidden');
@@ -1143,7 +1152,9 @@
       const isSqc = user.role === 'sqc' || user.role === 'admin';
       document.getElementById('tabAnaBtn').classList.toggle('hidden', !isSqc);
       document.getElementById('tabRepBtn').classList.toggle('hidden', !isSqc);
-      document.getElementById('tabStaffBtn').classList.toggle('hidden', user.role !== 'admin');
+      // состав ведут старший РГО, руководитель проекта и администратор
+      document.getElementById('tabStaffBtn').classList.toggle('hidden',
+        ['srgo', 'manager', 'admin'].indexOf(user.role) < 0);
       qcTab('eval');
       loadEvalPage();
     } else {
@@ -1445,6 +1456,33 @@
     }).getAllUsers(t);
 
     google.script.run.withSuccessHandler(renderStaffAudit).auditAccounts(t);
+  }
+
+  // СРГО и руководитель работают на своей странице — вкладка состава
+  // живёт в кабинете СКК, поэтому переводим их туда целиком.
+  function openStaffPage() {
+    ['operatorPage', 'rgoPage', 'orgPage', 'repPage'].forEach(function (id) {
+      document.getElementById(id).classList.add('hidden');
+    });
+    document.getElementById('qcPage').classList.remove('hidden');
+    const u = JSON.parse(sessionStorage.getItem('user') || '{}');
+    document.getElementById('qcUserName').textContent = u.fullName || '';
+    document.getElementById('qcUserGroup').textContent = u.group || '';
+    ['tabEvalBtn', 'tabPlanBtn', 'tabReqBtn', 'tabAnaBtn', 'tabRepBtn'].forEach(function (id) {
+      document.getElementById(id).classList.add('hidden');    // им тут нужен только состав
+    });
+    document.getElementById('backToOrg').classList.remove('hidden');
+    qcTab('staff');
+  }
+
+  function backToOrgPage() {
+    document.getElementById('qcPage').classList.add('hidden');
+    ['tabEvalBtn', 'tabPlanBtn', 'tabReqBtn'].forEach(function (id) {
+      document.getElementById(id).classList.remove('hidden');
+    });
+    document.getElementById('backToOrg').classList.add('hidden');
+    const u = JSON.parse(sessionStorage.getItem('user') || '{}');
+    showApp(u);
   }
 
   function renderStaffAudit(a) {

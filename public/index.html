@@ -1037,6 +1037,7 @@
   function logout() {
     const t = sessionStorage.getItem('token');
     if (t) google.script.run.logoutSession(t);    // иначе токен живёт на сервере до истечения срока
+    resetState();
     sessionStorage.removeItem('user'); sessionStorage.removeItem('token'); sessionStorage.removeItem('nav');
     ['operatorPage', 'qcPage', 'rgoPage', 'orgPage'].forEach(function (id) { document.getElementById(id).classList.add('hidden'); });
     document.getElementById('loginPage').classList.remove('hidden');
@@ -1047,8 +1048,24 @@
   }
 
   // ---------- РОУТИНГ ----------
+  // Одной вкладкой в колл-центре пользуются по очереди. Всё, что осталось
+  // в памяти от прошлого входа, обязано исчезнуть: иначе следующий увидит
+  // чужие заявки — до первой перезагрузки страницы данные не перечитываются.
+  function resetState() {
+    currentRequestId = null; editRequestId = null;
+    allRequests = []; orgOperators = [];
+    evCfg = null; evAnswers = {}; evComments = {};
+    hasCallState = 'yes'; weekOffset = 0; repFrom = 'org';
+    ['opRequestsList', 'opEvalsList', 'qcRequestsList', 'rgoOperatorsList',
+     'orgOperatorsTable', 'planTable', 'evChecklist'].forEach(function (id) {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = '';
+    });
+  }
+
   function showApp(user) {
     const want = navSnapshot();
+    resetState();
     document.getElementById('loginPage').classList.add('hidden');
     if (user.role === 'manager' || user.role === 'srgo') {
       document.getElementById('orgPage').classList.remove('hidden');
@@ -1573,7 +1590,7 @@
       document.getElementById('evCity').innerHTML = '<option value="">—</option>' + cities.map(function (c) { return '<option>' + c + '</option>'; }).join('');
       renderChecklist();
       recalcEval();
-    }).getChecklistConfig();
+    }).getChecklistConfig(sessionStorage.getItem('token'));
 
     google.script.run.withSuccessHandler(function (res) {
       const sel = document.getElementById('evOperator');

@@ -2362,6 +2362,12 @@
   // превращалась в кракозябры, а ширину колонок задать было нечем.
   function saveFile(r) {
     let blob;
+    // Пустой файл сохранять нельзя: Excel потом ругается «формат недопустим»,
+    // и непонятно, что сломалось — сервер или страница.
+    if (!r || (!r.contentBase64 && !r.content)) {
+      alert('❌ Сервер не прислал файл. Обновите страницу (Ctrl+F5) и повторите.');
+      return;
+    }
     if (r.contentBase64) {
       const bin = atob(r.contentBase64);
       const bytes = new Uint8Array(bin.length);

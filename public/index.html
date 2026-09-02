@@ -783,7 +783,8 @@
           <input type="text" id="jQc" placeholder="СКК" oninput="loadJournal()">
           <label style="display:flex;align-items:center;gap:6px;font-size:14px;color:var(--ink-2);"><input type="checkbox" id="jErrors" onchange="loadJournal()" style="width:16px;height:16px;"> только с ошибками</label>
           <label style="display:flex;align-items:center;gap:6px;font-size:14px;color:var(--ink-2);"><input type="checkbox" id="jKo" onchange="loadJournal()" style="width:16px;height:16px;"> только ПЖ/НС</label>
-          <button class="btn-filter" style="margin-left:auto;background:var(--good);" onclick="downloadReport('journal')"><i class="fas fa-download"></i> Скачать</button>
+          <button class="btn-filter" style="margin-left:auto;background:var(--good);" onclick="downloadReport('journal')"><i class="fas fa-download"></i> Скачать журнал</button>
+          <button class="btn-filter" style="background:var(--accent);" title="Все чек-листы, попавшие под фильтры, одним файлом" onclick="downloadReport('checklists')"><i class="fas fa-file-arrow-down"></i> Скачать чек-листы</button>
         </div>
       </div>
       <div class="card"><div id="journalList"></div></div>
@@ -2367,7 +2368,7 @@
   function downloadReport(kind) {
     let params;
     if (kind === 'weekly') params = { weekOffset: weekOffset, group: document.getElementById('weekGroup').value };
-    else if (kind === 'journal') params = jFilters();
+    else if (kind === 'journal' || kind === 'checklists') params = jFilters();
     else if (kind === 'criteria') params = { period: document.getElementById('cPeriod').value };
     else if (kind === 'topics') params = { period: document.getElementById('tPeriod').value };
     else if (kind === 'complaints') params = { period: document.getElementById('cmpPeriod').value };

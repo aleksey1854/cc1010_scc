@@ -322,6 +322,8 @@
   .ev-chip.ko{ background:var(--bad); color:#fff; }
 
   .chart-box{ position:relative; height:260px; }
+  .chart-cap{ font-size:13px; font-weight:600; color:var(--ink-2); margin-bottom:8px; }
+  .chart-cell{ min-width:0; }
   .charts-2{ display:grid; grid-template-columns:1fr 1fr; gap:22px; }
 
   @keyframes rise{ from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:none; } }
@@ -424,8 +426,8 @@
     <div class="card">
       <div class="card-title"><i class="fas fa-chart-line"></i> Моё качество</div>
       <div class="charts-2">
-        <div class="chart-box"><canvas id="opTrendChart"></canvas></div>
-        <div class="chart-box"><canvas id="opFailsChart"></canvas></div>
+        <div class="chart-cell"><div class="chart-cap"></div><div class="chart-box"><canvas id="opTrendChart"></canvas></div></div>
+        <div class="chart-cell"><div class="chart-cap"></div><div class="chart-box"><canvas id="opFailsChart"></canvas></div></div>
       </div>
     </div>
 
@@ -664,8 +666,8 @@
     <div class="card">
       <div class="card-title"><i class="fas fa-chart-line"></i> Качество группы</div>
       <div class="charts-2">
-        <div class="chart-box"><canvas id="rgoTrendChart"></canvas></div>
-        <div class="chart-box"><canvas id="rgoFailsChart"></canvas></div>
+        <div class="chart-cell"><div class="chart-cap"></div><div class="chart-box"><canvas id="rgoTrendChart"></canvas></div></div>
+        <div class="chart-cell"><div class="chart-cap"></div><div class="chart-box"><canvas id="rgoFailsChart"></canvas></div></div>
       </div>
     </div>
 
@@ -714,15 +716,15 @@
 
     <div class="card">
       <div class="card-title"><i class="fas fa-layer-group"></i> Качество по группам</div>
-      <div class="chart-box"><canvas id="orgGroupChart"></canvas></div>
+      <div class="chart-cell"><div class="chart-cap"></div><div class="chart-box"><canvas id="orgGroupChart"></canvas></div></div>
       <div id="orgGroupTable" style="margin-top:18px;"></div>
     </div>
 
     <div class="card">
       <div class="card-title"><i class="fas fa-chart-line"></i> Динамика и частые провалы</div>
       <div class="charts-2">
-        <div class="chart-box"><canvas id="orgTrendChart"></canvas></div>
-        <div class="chart-box"><canvas id="orgFailsChart"></canvas></div>
+        <div class="chart-cell"><div class="chart-cap"></div><div class="chart-box"><canvas id="orgTrendChart"></canvas></div></div>
+        <div class="chart-cell"><div class="chart-cap"></div><div class="chart-box"><canvas id="orgFailsChart"></canvas></div></div>
       </div>
     </div>
 
@@ -2546,6 +2548,14 @@
   // ---------- ГРАФИКИ ----------
   // Общие настройки графиков. Легенду не рисуем: серия одна, а подпись
   // ей только мешала — подсказка вылезала прямо поверх неё.
+  // Легенды у графиков нет, поэтому подпись выносим заголовком над холстом.
+  // Берём ту же строку, что уходит в подсказку — расходиться им незачем.
+  function chartCaption(ctx, label) {
+    const cell = ctx.closest('.chart-cell');
+    const cap = cell && cell.querySelector('.chart-cap');
+    if (cap) cap.textContent = String(label || '').replace(/,\s*%$/, '');
+  }
+
   function chartBase(extra) {
     return Object.assign({
       responsive: true, maintainAspectRatio: false,
@@ -2572,6 +2582,7 @@
 
   function drawLineChart(canvasId, label, labels, data) {
     const ctx = document.getElementById(canvasId); if (!ctx) return;
+    chartCaption(ctx, label);
     if (charts[canvasId]) charts[canvasId].destroy();
     if (!labels.length) { emptyChart(ctx); return; }
     const sc = scoreScale(data);
@@ -2609,6 +2620,7 @@
 
   function drawBarChart(canvasId, label, labels, data) {
     const ctx = document.getElementById(canvasId); if (!ctx) return;
+    chartCaption(ctx, label);
     if (charts[canvasId]) charts[canvasId].destroy();
     if (!labels.length) { emptyChart(ctx); return; }
     charts[canvasId] = new Chart(ctx, {
@@ -2626,6 +2638,7 @@
 
   function drawBarChartV(canvasId, label, labels, data) {
     const ctx = document.getElementById(canvasId); if (!ctx) return;
+    chartCaption(ctx, label);
     if (charts[canvasId]) charts[canvasId].destroy();
     if (!labels.length) { emptyChart(ctx); return; }
     const sc = scoreScale(data);

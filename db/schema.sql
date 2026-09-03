@@ -160,6 +160,7 @@ CREATE TABLE evaluations (
   complaint     boolean      NOT NULL DEFAULT false,
   gratitude     boolean      NOT NULL DEFAULT false,
   complaint_mark boolean     NOT NULL DEFAULT false,
+  complaint_source text       NOT NULL DEFAULT '',   -- Клиент / Заказчик
 
   reply_date    date,
   reply_status  text        NOT NULL DEFAULT '',
@@ -188,7 +189,9 @@ CREATE TABLE evaluation_answers (
   value         answer_value NOT NULL,
   comment       text         NOT NULL DEFAULT '',
   PRIMARY KEY (evaluation_id, item_code),
-  CONSTRAINT only_deviations CHECK (value <> 'pos')
+  -- «Положительно» без комментария не храним: это значение по умолчанию.
+  -- С комментарием — храним: СКК пишет замечания и к выполненным пунктам.
+  CONSTRAINT only_deviations CHECK (value <> 'pos' OR comment <> '')
 );
 -- частичный индекс: нужен только для отчёта по критериям
 CREATE INDEX evaluation_answers_item_idx ON evaluation_answers (item_code) WHERE value IN ('neg','dbt');

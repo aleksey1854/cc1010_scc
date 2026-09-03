@@ -87,7 +87,7 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('недозаполненный чек-лист не сохраняется',
     (await R('saveEvaluation', { pin: qcT, meta: { ...META, reqId: '', callTime: '12:05' }, answers: half })).success === false);
 
-  for (const [поле, msg] of [['callTime', 'время'], ['phone', 'телефон'], ['criterion', 'критерий'],
+  for (const [поле, msg] of [['callTime', 'время'], ['phone', 'телефон'], ['criterion', 'длительность'],
                              ['topic', 'тематику'], ['city', 'город'], ['sub', 'подтематику']]) {
     const meta = { ...META, reqId: '', callTime: '12:10' };
     meta[поле] = '';
@@ -101,6 +101,54 @@ const R = (fn, ...a) => api.call(fn, a);
     (await R('saveEvaluation', { pin: qcT, meta: { ...META, operator: 'Никого Нет' }, answers: ans })).success === false);
   chk('дата из будущего отклонена',
     (await R('saveEvaluation', { pin: qcT, meta: { ...META, callDate: '2099-01-01' }, answers: ans })).success === false);
+
+  head('ШАГ 3б. ЖАЛОБА, ЗАМЕЧАНИЯ И ПРАВКА ПО АПЕЛЛЯЦИИ');
+  // на другого оператора, чтобы не мешать проверке его кабинета ниже
+  const OP2 = creds.find(x => x[2] === 'operator' && x[1] === 'ИНВ-1' && x[0] !== OP[0]);
+  const cAns = { ...ans, B8P3: 'Обнаружено' };
+  const cMeta = { ...META, operator: OP2[0], reqId: '', callTime: '13:00' };
+  const noSrc = await R('saveEvaluation', { pin: qcT, meta: cMeta, answers: cAns });
+  chk('признак жалобы без источника не сохраняется', noSrc.success === false, noSrc);
+  chk('  и говорит, чего не хватает', /от кого жалоба/i.test(noSrc.error || ''), noSrc.error);
+  chk('чужой источник отклонён',
+    (await R('saveEvaluation', { pin: qcT, meta: { ...cMeta, complaintSource: 'Кто-то' }, answers: cAns })).success === false);
+
+  // замечание к выполненному пункту: раньше такая строка молча терялась
+  const cEv = await R('saveEvaluation', {
+    pin: qcT, meta: { ...cMeta, complaintSource: 'Клиент' }, answers: cAns,
+    comments: { B2P1: 'перебивал', B1P1: 'поздоровался, но тихо' }
+  });
+  chk('жалоба с источником сохранена', cEv.success === true, cEv.error);
+
+  const card = await R('getEvaluationCard', qcT, cEv.id);
+  chk('карточка оценки открывается', card.success === true, card.error);
+  chk('  источник жалобы вернулся', card.meta.complaintSource === 'Клиент', card.meta);
+  chk('  замечание к «Положительно» сохранилось',
+    card.comments.B1P1 === 'поздоровался, но тихо', card.comments);
+  chk('  выполненный пункт вернулся как «Положительно»',
+    card.answers.B3P1 === 'Положительно', card.answers.B3P1);
+  chk('оператору карточка закрыта', (await R('getEvaluationCard', opT, cEv.id)).success === false);
+
+  // апелляция: снимаем ошибку и убираем комментарий
+  const fixed = { ...cAns, B2P1: 'Положительно' };
+  const upd = await R('updateEvaluation', {
+    pin: qcT, meta: { ...cMeta, complaintSource: 'Клиент', evId: cEv.id },
+    answers: fixed, comments: {}
+  });
+  chk('СКК правит оценку по апелляции', upd.success === true, upd.error);
+  chk('  балл пересчитан вверх', upd.result.score > cEv.result.score, [cEv.result.score, upd.result.score]);
+  const after = await R('getEvaluationCard', qcT, cEv.id);
+  chk('  комментарий убран', !after.comments.B2P1, after.comments);
+  chk('  замечание тоже снято', !after.comments.B1P1, after.comments);
+  chk('  ошибок не осталось', after.answers.B2P1 === 'Положительно', after.answers.B2P1);
+  chk('оператор править не может',
+    (await R('updateEvaluation', { pin: opT, meta: { ...cMeta, evId: cEv.id }, answers: fixed })).success === false);
+  chk('несуществующая оценка не правится',
+    (await R('updateEvaluation', { pin: qcT, meta: { ...cMeta, evId: 'EV-НЕТ' }, answers: fixed })).success === false);
+
+  const cmp = await R('getComplaintsReport', mgrT, 'all');
+  chk('жалоба попала в отчёт', cmp.success === true && cmp.summary.total >= 1, cmp.summary);
+  chk('  и учтена как «от клиента»', cmp.summary.confClient + cmp.summary.unconfClient >= 1, cmp.summary);
 
   head('ШАГ 3в. СОСТАВ ВЕДУТ СРГО, РУКОВОДИТЕЛЬ И АДМИН');
   // токены СРГО и руководителя уже получены на шаге входа

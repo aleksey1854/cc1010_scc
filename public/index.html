@@ -208,6 +208,16 @@
   .status-badge.В_работе{ background:var(--mid-bg); color:#9a6206; }
   .status-badge.Проверена{ background:var(--good-bg); color:#0a6e3d; }
   .status-badge.Отклонена{ background:var(--bad-bg); color:#a52020; }
+  .ev-addcmt{ display:block; margin:2px 0 6px auto; padding:2px 8px; border:0; background:none;
+    color:var(--muted); font-size:12px; cursor:pointer; border-radius:6px; }
+  .ev-addcmt:hover{ color:var(--accent-ink); background:var(--accent-soft); }
+  .ev-src{ display:flex; align-items:center; gap:10px; margin:2px 0 8px; padding:8px 12px;
+    background:var(--bad-bg); border:1px solid var(--bad); border-radius:8px; }
+  .ev-src label{ font-size:13px; font-weight:600; color:#a52020; margin:0; }
+  .ev-src select{ max-width:220px; }
+  .ev-editbar{ display:flex; align-items:center; justify-content:space-between; gap:16px;
+    background:var(--mid-bg); border:1px solid var(--mid); color:#8a5600; }
+  .ev-editbar .hint{ color:#8a5600; opacity:.8; margin-top:2px; }
   .ev-linkbar{ display:flex; align-items:center; justify-content:space-between; gap:16px;
     background:var(--accent-soft); border:1px solid var(--accent); color:var(--accent-ink); }
   .ev-linkbar .hint{ color:var(--accent-ink); opacity:.75; margin-top:2px; }
@@ -303,7 +313,8 @@
   .ev-opt.on-pos{ background:var(--good-bg); border-color:var(--good); color:#0a6e3d; }
   .ev-opt.on-dbt{ background:var(--mid-bg); border-color:var(--mid); color:#9a6206; }
   .ev-opt.on-neg{ background:var(--bad-bg); border-color:var(--bad); color:#a52020; }
-  .ev-opt.on-na{ background:#eceff5; border-color:var(--border-strong); color:#6b7585; }
+  /* «Не требуется» серым не читалось: выбрано или нет — не разобрать */
+  .ev-opt.on-na{ background:var(--accent-soft); border-color:var(--accent); color:var(--accent-ink); font-weight:600; }
   .ev-opt.on-yes{ background:var(--bad-bg); border-color:var(--bad); color:#a52020; }
   .ev-opt.on-no{ background:#eceff5; border-color:var(--border-strong); color:#6b7585; }
   .ev-cmt{ width:100%; margin-top:8px; padding:8px 11px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; font-family:inherit; outline:none; }
@@ -509,6 +520,16 @@
 
     <!-- ОЦЕНКА ЗВОНКА (чек-лист v2) -->
     <div id="qcEvalTab">
+      <div class="card ev-editbar hidden" id="evEditBar">
+        <div>
+          <i class="fas fa-pen-to-square"></i> Правка оценки <strong id="evEditId"></strong>
+          <span id="evEditWho"></span>
+          <div class="hint">Сохранение перезапишет оценку; прежний балл останется в журнале действий.</div>
+        </div>
+        <button type="button" class="btn-small" onclick="cancelEdit(true)">
+          <i class="fas fa-xmark"></i> Отменить правку
+        </button>
+      </div>
       <div class="card ev-linkbar hidden" id="evLinkBar">
         <div>
           <i class="fas fa-link"></i> Оценка по заявке <strong id="evLinkId"></strong>
@@ -530,7 +551,7 @@
           <div class="form-group"><label>📅 Дата звонка *</label><input type="date" id="evDate"></div>
           <div class="form-group"><label>⏰ Время звонка (МСК)</label><input type="time" id="evTime"></div>
           <div class="form-group"><label>📞 Телефон</label><input type="tel" id="evPhone" placeholder="+7 (777) 777-77-77"></div>
-          <div class="form-group"><label>⏱ Критерий звонка</label><select id="evCriterion"></select></div>
+          <div class="form-group"><label>⏱ Длительность звонка</label><select id="evCriterion"></select></div>
           <div class="form-group"><label>🏷 Тематика</label><select id="evTopic" onchange="evTopicChanged()"></select></div>
           <div class="form-group"><label>🏷 Подтематика</label><select id="evSub"></select></div>
           <div class="form-group"><label>🏙 Город</label>
@@ -854,6 +875,8 @@
         <div class="stat-card"><div class="number new" id="cmpTotal">0</div><div class="label">Всего жалоб</div></div>
         <div class="stat-card"><div class="number rejected" id="cmpConf">0</div><div class="label">Обоснованные</div></div>
         <div class="stat-card"><div class="number checked" id="cmpUnconf">0</div><div class="label">Необоснованные</div></div>
+        <div class="stat-card"><div class="number" id="cmpClient">0</div><div class="label">От клиентов</div></div>
+        <div class="stat-card"><div class="number" id="cmpCustomer">0</div><div class="label">От заказчика</div></div>
       </div>
       <div class="card">
         <div class="filter-bar" style="margin-bottom:0;">
@@ -1136,7 +1159,7 @@
   function resetState() {
     currentRequestId = null; editRequestId = null;
     allRequests = []; orgOperators = []; staffAll = []; staffEditing = null; myRequests = [];
-    evLinkedReq = '';
+    evLinkedReq = ''; evEditing = ''; evComplaintSrc = ''; evCmtOpen = {};
     evCfg = null; evAnswers = {}; evComments = {};
     hasCallState = 'yes'; weekOffset = 0; repFrom = 'org';
     ['opRequestsList', 'opEvalsList', 'qcRequestsList', 'rgoOperatorsList',
@@ -1851,6 +1874,9 @@
   let evCfg = null;          // {blocks, maxTotal, topics, cities, callCriteria}
   let evAnswers = {};        // id -> значение
   let evComments = {};       // id -> комментарий
+  let evCmtOpen = {};        // id -> поле замечания раскрыто вручную
+  let evComplaintSrc = '';   // от кого жалоба: Клиент / Заказчик
+  let evEditing = '';        // правим сохранённую оценку EV-…
 
   const V = { POS: 'Положительно', DBT: 'Сомнительно', NEG: 'Отрицательно', NA: 'Не требуется', YES: 'Обнаружено', NO: 'Не обнаружено' };
 
@@ -2083,14 +2109,40 @@
           html += '<button type="button" class="ev-opt' + on + '" onclick="pickOpt(\'' + it.id + '\',\'' + o.value + '\')">' + o.value + '</button>';
         });
         html += '</div></div>';
-        if (cur === V.NEG || cur === V.DBT) {
-          html += '<input type="text" class="ev-cmt" id="c_' + it.id + '" placeholder="Комментарий к ошибке (увидит оператор)" value="' +
+
+        // Признак жалобы: сразу спрашиваем, от кого она — иначе в конце
+        // недели долю клиентов и заказчиков не собрать.
+        if (it.rule === 'marker' && cur === V.YES) {
+          const srcs = (evCfg.complaintSources || ['Клиент', 'Заказчик']);
+          html += '<div class="ev-src"><label>От кого жалоба *</label>' +
+                  '<select id="evComplaintSource" onchange="evComplaintSrc=this.value">' +
+                  '<option value="">— выберите —</option>' +
+                  srcs.map(function (x) { return '<option' + (evComplaintSrc === x ? ' selected' : '') + '>' + x + '</option>'; }).join('') +
+                  '</select></div>';
+        }
+
+        // Замечание пишут не только к ошибке: к выполненному пункту тоже
+        // бывает что сказать. К ошибке поле открыто сразу, к остальным —
+        // по ссылке, чтобы форма не превращалась в стену из полей.
+        const isErr = (cur === V.NEG || cur === V.DBT);
+        if (isErr || evComments[it.id] || evCmtOpen[it.id]) {
+          html += '<input type="text" class="ev-cmt" id="c_' + it.id + '" placeholder="' +
+                  (isErr ? 'Комментарий к ошибке (увидит оператор)' : 'Замечание к пункту (увидит оператор)') + '" value="' +
                   (evComments[it.id] || '').replace(/"/g, '&quot;') + '" oninput="evComments[\'' + it.id + '\']=this.value">';
+        } else {
+          html += '<button type="button" class="ev-addcmt" onclick="openCmt(\'' + it.id + '\')">+ замечание</button>';
         }
       });
       html += '</div>';
     });
     document.getElementById('evChecklist').innerHTML = html;
+  }
+
+  function openCmt(id) {
+    evCmtOpen[id] = true;
+    renderChecklist();
+    const el = document.getElementById('c_' + id);
+    if (el) el.focus();
   }
 
   function pickOpt(id, val) {
@@ -2168,7 +2220,9 @@
         sub: document.getElementById('evSub').value,
         city: cityName,
         agg: cityRow ? cityRow.agg : '',
-        reqId: evLinkedReq
+        reqId: evLinkedReq,
+        complaintSource: evComplaintSrc,
+        evId: evEditing
       },
       answers: evAnswers,
       comments: evComments
@@ -2180,7 +2234,7 @@
       ['evDate', payload.meta.callDate, 'Укажите дату звонка'],
       ['evTime', payload.meta.callTime, 'Укажите время звонка'],
       ['evPhone', payload.meta.phone, 'Укажите телефон'],
-      ['evCriterion', payload.meta.criterion, 'Выберите критерий звонка'],
+      ['evCriterion', payload.meta.criterion, 'Выберите длительность звонка'],
       ['evTopic', payload.meta.topic, 'Выберите тематику'],
       ['evCity', payload.meta.city, 'Выберите город']
     ];
@@ -2194,6 +2248,23 @@
       const box = el.closest('.uisel') || el;
       box.scrollIntoView({ behavior: 'smooth', block: 'center' });
       (box.querySelector('.uisel-btn') || el).focus({ preventScroll: true });
+      return;
+    }
+
+    // Признак жалобы отмечен, а от кого она — не сказано: недельную сводку
+    // по клиентам и заказчикам потом не собрать.
+    let markerOn = null;
+    (evCfg ? evCfg.blocks : []).forEach(function (b) {
+      b.items.forEach(function (it) {
+        if (it.rule === 'marker' && evAnswers[it.id] === V.YES) markerOn = it.id;
+      });
+    });
+    if (markerOn && !evComplaintSrc) {
+      evMsg('Укажите, от кого жалоба: клиент или заказчик', 'error');
+      const row = document.getElementById('r_' + markerOn);
+      if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const sr = document.getElementById('evComplaintSource');
+      if (sr) sr.focus({ preventScroll: true });
       return;
     }
 
@@ -2217,24 +2288,98 @@
     }
 
     const btn = document.querySelector('#evSticky .btn-submit');
+    const editing = evEditing;
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Сохранение...';
-    google.script.run
+    const run = google.script.run
       .withSuccessHandler(function (res) {
-        btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Сохранить оценку';
-        if (!res.success) { evMsg('❌ ' + res.error, 'error'); return; }
-        evMsg('✅ Оценка ' + res.id + ' сохранена: ' + pct2(res.result.score) + ' (' + res.week + ')', 'success');
-        evAnswers = defaultAnswers(); evComments = {};
+        if (!res.success) { evSubmitReady(); evMsg('❌ ' + res.error, 'error'); return; }
+        if (editing) {
+          evMsg('✅ Оценка ' + res.id + ' пересмотрена: ' + pct2(res.was) + ' → ' + pct2(res.result.score), 'success');
+          cancelEdit(false);
+          loadJournal();
+        } else {
+          evMsg('✅ Оценка ' + res.id + ' сохранена: ' + pct2(res.result.score) + ' (' + res.week + ')', 'success');
+        }
         if (evLinkedReq) { clearReqLink(false); allRequests = []; }   // заявка уже «Проверена»
-        document.getElementById('evPhone').value = '';
-        document.getElementById('evTime').value = '';
-        renderChecklist(); recalcEval();
+        resetEvalForm();
+        evSubmitReady();
         window.scrollTo({ top: 0, behavior: 'smooth' });
       })
       .withFailureHandler(function (e) {
-        btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Сохранить оценку';
+        evSubmitReady();
         evMsg('❌ Ошибка: ' + e, 'error');
-      })
-      .saveEvaluation(payload);
+      });
+    if (editing) run.updateEvaluation(payload); else run.saveEvaluation(payload);
+  }
+
+  function evSubmitReady() {
+    const btn = document.querySelector('#evSticky .btn-submit');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-save"></i> ' + (evEditing ? 'Сохранить правку' : 'Сохранить оценку');
+  }
+
+  // Форма после сохранения должна быть пустой: следующий звонок — другой
+  // оператор и другая тематика, а подставленные прошлые значения незаметно
+  // уезжают в новую оценку.
+  function resetEvalForm() {
+    evAnswers = defaultAnswers(); evComments = {}; evCmtOpen = {}; evComplaintSrc = '';
+    ['evPhone', 'evTime', 'evCity'].forEach(function (id) { document.getElementById(id).value = ''; });
+    const agg = document.getElementById('evAgg');
+    agg.value = ''; agg.dataset.auto = '';
+    ['evOperator', 'evCriterion', 'evTopic'].forEach(function (id) {
+      const el = document.getElementById(id);
+      el.value = '';
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    document.querySelectorAll('.ev-row.ev-missing').forEach(function (r) { r.classList.remove('ev-missing'); });
+    renderChecklist(); recalcEval();
+  }
+
+  // ---------- ПРАВКА ОЦЕНКИ ПО АПЕЛЛЯЦИИ ----------
+  // Меняются скрипты, ошибается СКК — оператор подаёт апелляцию. Оценку
+  // открываем в той же форме и переписываем целиком, включая комментарии.
+  function editEvaluation(evId) {
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) { alert(r.error); return; }
+      qcTab('eval');
+      clearReqLink(false);
+      evEditing = r.id;
+      document.getElementById('evEditId').textContent = r.id;
+      document.getElementById('evEditWho').textContent =
+        '· ' + r.meta.operator + ' · ' + formatDate(r.meta.callDate) + ' · было ' + pct2(r.score);
+      document.getElementById('evEditBar').classList.remove('hidden');
+
+      const set = function (id, val, fire) {
+        const el = document.getElementById(id);
+        el.value = val || '';
+        if (fire) el.dispatchEvent(new Event('change', { bubbles: true }));
+      };
+      set('evOperator', r.meta.operator, true);
+      set('evDate', r.meta.callDate);
+      set('evTime', r.meta.callTime);
+      set('evPhone', r.meta.phone);
+      set('evCriterion', r.meta.criterion, true);
+      set('evTopic', r.meta.topic, true);
+      evTopicChanged();
+      set('evSub', r.meta.sub, true);
+      set('evCity', r.meta.city);
+      const agg = document.getElementById('evAgg');
+      agg.value = r.meta.agg || ''; agg.dataset.auto = agg.value;
+
+      evAnswers = r.answers || {};
+      evComments = r.comments || {};
+      evCmtOpen = {};
+      evComplaintSrc = r.meta.complaintSource || '';
+      renderChecklist(); recalcEval(); evSubmitReady();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }).getEvaluationCard(sessionStorage.getItem('token'), evId);
+  }
+
+  function cancelEdit(byHand) {
+    evEditing = '';
+    document.getElementById('evEditBar').classList.add('hidden');
+    evSubmitReady();
+    if (byHand) { resetEvalForm(); evMsg('Правка отменена, оценка осталась прежней', 'error'); }
   }
 
   function evMsg(text, type) {
@@ -2319,12 +2464,25 @@
       document.getElementById('cmpTotal').textContent = r.summary.total;
       document.getElementById('cmpConf').textContent = r.summary.confirmed;
       document.getElementById('cmpUnconf').textContent = r.summary.unconfirmed;
+      document.getElementById('cmpClient').textContent = r.summary.confClient + r.summary.unconfClient;
+      document.getElementById('cmpCustomer').textContent = r.summary.confCustomer + r.summary.unconfCustomer;
       if (!r.rows.length) { box.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Жалоб нет</p></div>'; return; }
-      let html = '<div class="table-wrapper"><table><thead><tr><th>Тематика</th><th>Неделя</th><th>Всего</th><th>Обоснованные</th><th>Необоснованные</th><th>Доля обоснованных</th></tr></thead><tbody>';
+      // Колонки повторяют недельный блок отчёта ОБД: «Общий % жалоб» там
+      // считается от всех жалоб недели, а не внутри тематики.
+      let html = '<div class="table-wrapper"><table><thead><tr>' +
+        '<th>Тематика</th><th>Неделя</th><th>Всего жалоб</th><th>Обоснованные</th>' +
+        '<th>Обосн. от клиентов</th><th>Обосн. от заказчика</th>' +
+        '<th>Необосн. от клиентов</th><th>Необосн. от заказчика</th>' +
+        '<th>Общий % жалоб</th></tr></thead><tbody>';
       r.rows.forEach(function (x) {
-        html += '<tr><td><strong>' + x.topic + '</strong></td><td>' + x.week + '</td><td>' + x.total + '</td>' +
+        const noSrc = x.total - x.confClient - x.confCustomer - x.unconfClient - x.unconfCustomer;
+        html += '<tr><td><strong>' + x.topic + '</strong>' +
+          (noSrc ? ' <span class="hint" title="Источник жалобы не указан">(' + noSrc + ' без источника)</span>' : '') +
+          '</td><td>' + x.week + '</td><td>' + x.total + '</td>' +
           '<td>' + (x.confirmed ? '<span class="fail-tag">' + x.confirmed + '</span>' : '0') + '</td>' +
-          '<td>' + x.unconfirmed + '</td><td>' + pct2(x.share) + '</td></tr>';
+          '<td>' + x.confClient + '</td><td>' + x.confCustomer + '</td>' +
+          '<td>' + x.unconfClient + '</td><td>' + x.unconfCustomer + '</td>' +
+          '<td><strong>' + pct2(x.weekShare) + '</strong></td></tr>';
       });
       html += '</tbody></table></div>';
       box.innerHTML = html;
@@ -2376,6 +2534,8 @@
 
   function loadJournal() {
     const box = document.getElementById('journalList');
+    const me = JSON.parse(sessionStorage.getItem('user') || '{}');
+    const canEditEval = ['qc', 'sqc', 'manager', 'admin'].indexOf(me.role) >= 0;
     google.script.run.withSuccessHandler(function (r) {
       if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
       const gs = document.getElementById('jGroup');
@@ -2392,10 +2552,15 @@
           ? e.failed.map(function (f) { return '<div style="margin:2px 0;"><span class="fail-tag' + (f.critical ? '' : ' minor') + '">' + f.text + '</span>' + (f.comment ? '<span style="color:var(--muted);font-size:12px;"> — ' + f.comment + '</span>' : '') + '</div>'; }).join('')
           : '<span style="color:var(--good);font-weight:600;">без ошибок</span>';
         const flags = (e.violation ? ' <span class="fail-tag">НС</span>' : '') + (e.complaint ? ' <span class="fail-tag">ПЖ</span>' : '') + (e.gratitude ? ' <span class="fail-tag minor">★</span>' : '');
+        // апелляции разбирает весь КК, поэтому правка доступна и СКК
+        const edit = canEditEval
+          ? '<button class="btn-small" style="background:var(--mid);" title="Изменить оценку по апелляции" onclick="editEvaluation(\'' + e.id + '\')"><i class="fas fa-pen-to-square"></i></button> '
+          : '';
         html += '<tr><td>' + e.callDate + '</td><td>' + e.operator + '</td><td>' + e.group + '</td><td>' + e.qc + '</td><td>' + (e.topic || '—') + '</td>' +
           '<td><strong style="color:' + scoreColorHex(e.score) + '">' + pct2(e.score) + '</strong>' + flags + '</td>' +
           '<td style="max-width:420px;">' + errs + '</td>' +
-          '<td><button class="btn-small" onclick="downloadEval(\'' + e.id + '\')"><i class="fas fa-file-excel"></i></button></td></tr>';
+          '<td style="white-space:nowrap;">' + edit +
+          '<button class="btn-small" title="Скачать чек-лист" onclick="downloadEval(\'' + e.id + '\')"><i class="fas fa-file-excel"></i></button></td></tr>';
       });
       html += '</tbody></table></div>';
       box.innerHTML = html;

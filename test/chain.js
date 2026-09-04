@@ -145,6 +145,14 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('  ошибок не осталось', after.answers.B2P1 === 'Положительно', after.answers.B2P1);
   chk('оператор править не может',
     (await R('updateEvaluation', { pin: opT, meta: { ...cMeta, evId: cEv.id }, answers: fixed })).success === false);
+  // правкой можно въехать в уже оценённый звонок — тот же уникальный индекс
+  const clash = await R('updateEvaluation', {
+    pin: qcT, meta: { ...META, reqId: '', complaintSource: 'Клиент', evId: cEv.id },
+    answers: fixed, comments: {}
+  });
+  chk('правка в уже оценённый звонок отклонена', clash.success === false, clash);
+  chk('  и объясняет причину, а не падает', /оцен/i.test(clash.error || ''), clash.error);
+
   chk('несуществующая оценка не правится',
     (await R('updateEvaluation', { pin: qcT, meta: { ...cMeta, evId: 'EV-НЕТ' }, answers: fixed })).success === false);
 
@@ -163,8 +171,20 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('  плановая прослушка попала в качество',
     plain && plain.scores.length > 0 && plain.avg !== null, plain);
   chk('  в отчёте видны все операторы, а не только прослушанные',
-    prod.operators > prod.checked, [prod.operators, prod.checked]);
+    prod.operators > prod.planTotal, [prod.operators, prod.planTotal]);
+
+  // средняя по группе живёт по другому правилу: плановые + подтверждённые
+  // жалобы, необоснованные не входят никуда
+  const grp = prod.groups.find(g => g.name === 'ИНВ-1');
+  chk('  жалоба без подтверждения в среднюю по группе не попала',
+    grp && grp.checked === grp.plan, grp && [grp.checked, grp.plan, grp.pjConfirmed]);
+  chk('  и посчитана как необоснованная',
+    grp && grp.pj === 1 && grp.pjConfirmed === 0, grp && [grp.pj, grp.pjConfirmed]);
   chk('оператору отчёт закрыт', (await R('getProductionReport', opT, DATE, DATE, '')).success === false);
+  chk('оператору не отдают весь состав КЦ', (await R('getOperatorsList', opT)).success === false);
+  chk('  а СКК отдают', (await R('getOperatorsList', qcT)).success === true);
+  chk('правка оценки закрыта тем, у кого нет формы',
+    (await R('updateEvaluation', { pin: mgrT, meta: { evId: cEv.id }, answers: {} })).success === false);
 
   head('ШАГ 3в. СОСТАВ ВЕДУТ СРГО, РУКОВОДИТЕЛЬ И АДМИН');
   // токены СРГО и руководителя уже получены на шаге входа

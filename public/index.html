@@ -198,6 +198,8 @@
   .date-range{ display:flex; align-items:center; gap:6px; }
   .date-range label{ margin:0; font-size:13px; color:var(--muted); }
   .date-range input{ width:auto; }
+  .btn-small.btn-mute{ background:var(--surface-2); color:var(--ink-2); }
+  .btn-small.btn-mute:hover{ background:var(--border-strong); color:var(--ink); }
   .btn-small.btn-warn{ background:var(--mid-bg); color:#8a5600; }
   .btn-small.btn-warn:hover{ background:var(--mid); color:#fff; }
   .btn-small.btn-ok{ background:var(--good-bg); color:#0a6e3d; }
@@ -895,8 +897,8 @@
     <div id="repProduction" class="hidden">
       <div class="stats-grid">
         <div class="stat-card"><div class="number" id="prOverall">—</div><div class="label">Качество за период</div></div>
-        <div class="stat-card"><div class="number new" id="prChecked">0</div><div class="label">Прослушано звонков</div></div>
-        <div class="stat-card"><div class="number rejected" id="prPj">0</div><div class="label">Оценок по жалобам</div></div>
+        <div class="stat-card"><div class="number new" id="prChecked">0</div><div class="label">Плановых прослушек</div></div>
+        <div class="stat-card"><div class="number rejected" id="prPj">0</div><div class="label">Жалоб: подтв. / необосн.</div></div>
         <div class="stat-card"><div class="number checked" id="prOps">0</div><div class="label">Операторов</div></div>
       </div>
       <div class="card">
@@ -906,7 +908,7 @@
             <label>по</label><input type="date" id="prTo" onchange="loadProduction()">
           </span>
           <select id="prGroup" onchange="loadProduction()"><option value="">Все группы</option></select>
-          <span style="color:var(--muted);font-size:13px;">качество считается только по плановой прослушке, оценки по жалобам — отдельно</span>
+          <span style="color:var(--muted);font-size:13px;">качество оператора — только плановая прослушка; средняя по группе — плановая плюс подтверждённые жалобы</span>
           <button class="btn-filter" style="margin-left:auto;background:var(--good);" onclick="downloadReport('production')"><i class="fas fa-download"></i> Скачать</button>
         </div>
       </div>
@@ -1477,7 +1479,7 @@
         ? '<button class="btn-small btn-ok" title="Открыть чек-лист по этой заявке" onclick="evaluateRequest(\'' + r.id + '\')"><i class="fas fa-clipboard-check"></i> Оценить</button> '
         : '';
       const rev = noCall ? '<span style="color:var(--muted);font-size:12px;">' + (r.opComment || '—') + '</span>' :
-        (canReview ? '<button class="btn-small" onclick="openReview(\'' + r.id + '\')"><i class="fas fa-check"></i> Проверить</button>' : '<button class="btn-small" style="background:#95a5a6" onclick="openReview(\'' + r.id + '\')"><i class="fas fa-eye"></i></button>');
+        (canReview ? '<button class="btn-small" onclick="openReview(\'' + r.id + '\')"><i class="fas fa-check"></i> Проверить</button>' : '<button class="btn-small btn-mute" title="Посмотреть заявку" onclick="openReview(\'' + r.id + '\')"><i class="fas fa-eye"></i></button>');
       html += '<tr>' +
         '<td><strong>' + r.id + '</strong></td><td>' + r.fullName + '</td><td>' + r.group + '</td>' +
         '<td>' + (noCall ? '—' : formatDate(r.callDate)) + '</td><td>' + (noCall ? '—' : formatTime(r.callTime)) + '</td><td>' + (noCall ? '—' : r.phone) + '</td>' +
@@ -2612,8 +2614,9 @@
       if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
       document.getElementById('prOverall').textContent = r.overall === null ? '—' : pct2(r.overall);
       document.getElementById('prOverall').style.color = r.overall === null ? '' : scoreColorHex(r.overall);
-      document.getElementById('prChecked').textContent = r.checked;
-      document.getElementById('prPj').textContent = r.pjTotal;
+      document.getElementById('prChecked').textContent = r.planTotal;
+      document.getElementById('prPj').textContent =
+        r.pjConfirmedTotal + ' / ' + (r.pjTotal - r.pjConfirmedTotal);
       document.getElementById('prOps').textContent = r.operators;
 
       const gs = document.getElementById('prGroup');
@@ -2642,12 +2645,16 @@
           }
           for (let i = 0; i < r.maxPj; i++) {
             const x = o.pj[i];
-            html += '<td class="pj-col"' + (x ? ' title="' + x.id + ' · ' + x.date + '"' : '') + '>' +
-              (x ? pct2(x.score) : '') + '</td>';
+            html += '<td class="pj-col"' +
+              (x ? ' title="' + x.id + ' · ' + x.date + ' · ' + (x.confirmed ? 'подтверждённая, входит в среднюю по группе' : 'необоснованная, никуда не входит') + '"' : '') + '>' +
+              (x ? (x.confirmed
+                    ? '<strong style="color:var(--bad);">' + pct2(x.score) + '</strong>'
+                    : '<span style="color:var(--muted);">' + pct2(x.score) + '</span>') : '') + '</td>';
           }
           html += '</tr>';
         });
-        html += '<tr class="pr-total"><td>' + g.name + '</td><td>Итого по группе</td>' +
+        html += '<tr class="pr-total"><td>' + g.name + '</td>' +
+          '<td title="плановая прослушка плюс подтверждённые жалобы">Итого по группе</td>' +
           '<td><strong>' + (g.avg === null ? '—' : pct2(g.avg)) + '</strong></td>' +
           '<td>' + g.checked + '</td><td colspan="' + (r.maxScores + r.maxPj) + '"></td></tr>';
       });

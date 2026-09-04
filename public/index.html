@@ -191,6 +191,9 @@
   .btn-small:hover{ background:var(--accent); color:#fff; }
   .btn-small.btn-danger{ background:var(--bad-bg); color:var(--bad); }
   .btn-small.btn-danger:hover{ background:var(--bad); color:#fff; }
+  .date-range{ display:flex; align-items:center; gap:6px; }
+  .date-range label{ margin:0; font-size:13px; color:var(--muted); }
+  .date-range input{ width:auto; }
   .btn-small.btn-warn{ background:var(--mid-bg); color:#8a5600; }
   .btn-small.btn-warn:hover{ background:var(--mid); color:#fff; }
   .btn-small.btn-ok{ background:var(--good-bg); color:#0a6e3d; }
@@ -390,9 +393,15 @@
 <div class="review-modal" id="importModal">
   <div class="modal-content" style="max-width:520px;">
     <div class="modal-title"><i class="fas fa-upload"></i> Статистика принятых звонков</div>
+    <div class="form-group">
+      <label>Файл из веб-статистики</label>
+      <input type="file" id="impFile" accept=".xlsx,.xls" onchange="impFilePicked()"
+             style="width:100%;padding:10px;border:1.5px dashed var(--border-strong);border-radius:10px;font-size:13px;background:var(--surface-2);">
+      <small class="hint">«ОтчетПринятыеЗвонкиПоЗадачам.xlsx» — как скачали, ничего не перекладывая. Дата возьмётся из отчёта.</small>
+    </div>
     <div class="form-group"><label>Дата</label><input type="date" id="impDate"></div>
     <div class="form-group">
-      <label>Вставьте из веб-статистики: ФИО и количество принятых звонков</label>
+      <label>…или вставьте вручную: ФИО и количество принятых звонков</label>
       <textarea id="impText" rows="10" placeholder="Иванов Иван Иванович; 58&#10;Петрова Мария Сергеевна; 101&#10;..." style="width:100%;padding:11px;border:1.5px solid var(--border-strong);border-radius:10px;font-family:monospace;font-size:13px;outline:none;"></textarea>
       <small class="hint">Одна строка = один оператор. Разделитель: точка с запятой, запятая или таб (можно копировать прямо из Excel). Префикс группы «ИНВ-1_» и «(У)» распознаются автоматически.</small>
     </div>
@@ -812,12 +821,10 @@
     <div id="repJournal" class="hidden">
       <div class="card">
         <div class="filter-bar" style="margin-bottom:0;">
-          <select id="jPeriod" onchange="loadJournal()">
-            <option value="month">Этот месяц</option>
-            <option value="week">Эта неделя</option>
-            <option value="year">Этот год</option>
-            <option value="all">За всё время</option>
-          </select>
+          <span class="date-range">
+            <label>с</label><input type="date" id="jFrom" onchange="loadJournal()">
+            <label>по</label><input type="date" id="jTo" onchange="loadJournal()">
+          </span>
           <select id="jGroup" onchange="loadJournal()"><option value="">Все группы</option></select>
           <input type="text" id="jOperator" placeholder="Оператор" oninput="loadJournal()">
           <input type="text" id="jQc" placeholder="СКК" oninput="loadJournal()">
@@ -845,11 +852,13 @@
     <div id="repCriteria" class="hidden">
       <div class="card">
         <div class="filter-bar" style="margin-bottom:0;">
-          <select id="cPeriod" onchange="loadCriteria()">
-            <option value="all">За всё время</option>
-            <option value="month">Этот месяц</option>
-            <option value="year">Этот год</option>
-          </select>
+          <span class="date-range">
+            <label>с</label><input type="date" id="cFrom" onchange="loadCriteria()">
+            <label>по</label><input type="date" id="cTo" onchange="loadCriteria()">
+          </span>
+          <button type="button" class="btn-filter" onclick="clearRange('c', loadCriteria)" title="Показать за всё время">
+            <i class="fas fa-rotate-left"></i> За всё время
+          </button>
           <span style="color:var(--muted);font-size:13px;">% выполнения каждого критерия по неделям</span>
           <button class="btn-filter" style="margin-left:auto;background:var(--good);" onclick="downloadReport('criteria')"><i class="fas fa-download"></i> Скачать</button>
         </div>
@@ -861,12 +870,13 @@
     <div id="repTopics" class="hidden">
       <div class="card">
         <div class="filter-bar" style="margin-bottom:0;">
-          <select id="tPeriod" onchange="loadTopics()">
-            <option value="all">За всё время</option>
-            <option value="month">Этот месяц</option>
-            <option value="week">Эта неделя</option>
-            <option value="year">Этот год</option>
-          </select>
+          <span class="date-range">
+            <label>с</label><input type="date" id="tFrom" onchange="loadTopics()">
+            <label>по</label><input type="date" id="tTo" onchange="loadTopics()">
+          </span>
+          <button type="button" class="btn-filter" onclick="clearRange('t', loadTopics)" title="Показать за всё время">
+            <i class="fas fa-rotate-left"></i> За всё время
+          </button>
           <button class="btn-filter" style="margin-left:auto;background:var(--good);" onclick="downloadReport('topics')"><i class="fas fa-download"></i> Скачать</button>
         </div>
       </div>
@@ -884,11 +894,13 @@
       </div>
       <div class="card">
         <div class="filter-bar" style="margin-bottom:0;">
-          <select id="cmpPeriod" onchange="loadComplaints()">
-            <option value="all">За всё время</option>
-            <option value="month">Этот месяц</option>
-            <option value="year">Этот год</option>
-          </select>
+          <span class="date-range">
+            <label>с</label><input type="date" id="cmpFrom" onchange="loadComplaints()">
+            <label>по</label><input type="date" id="cmpTo" onchange="loadComplaints()">
+          </span>
+          <button type="button" class="btn-filter" onclick="cmpClearDates()" title="Показать за всё время">
+            <i class="fas fa-rotate-left"></i> За всё время
+          </button>
           <button class="btn-filter" style="margin-left:auto;background:var(--good);" onclick="downloadReport('complaints')"><i class="fas fa-download"></i> Скачать</button>
         </div>
       </div>
@@ -1968,23 +1980,51 @@
   function openImport() {
     document.getElementById('impDate').value = document.getElementById('planDate').value || yesterdayStr();
     document.getElementById('impText').value = '';
+    document.getElementById('impFile').value = '';
     document.getElementById('impMessage').style.display = 'none';
     document.getElementById('importModal').classList.add('active');
   }
-  function submitImport() {
-    const date = document.getElementById('impDate').value;
-    const text = document.getElementById('impText').value;
+
+  // Файл отчёта сам знает свой период — ручное поле даты тогда лишнее
+  function impFilePicked() {
+    const has = !!document.getElementById('impFile').files.length;
+    document.getElementById('impDate').disabled = has;
+    document.getElementById('impText').disabled = has;
+  }
+
+  function fileToBase64(f) {
+    return new Promise(function (res, rej) {
+      const fr = new FileReader();
+      fr.onload = function () { res(String(fr.result).split(',')[1] || ''); };
+      fr.onerror = function () { rej(fr.error); };
+      fr.readAsDataURL(f);
+    });
+  }
+
+  async function submitImport() {
     const m = document.getElementById('impMessage');
-    if (!date) { m.textContent = '❌ Укажите дату'; m.className = 'message error'; m.style.display = 'block'; return; }
+    const file = document.getElementById('impFile').files[0];
+    const date = document.getElementById('impDate').value;
+    const text = file ? '' : document.getElementById('impText').value;
+    if (!file && !date) { m.textContent = '❌ Укажите дату'; m.className = 'message error'; m.style.display = 'block'; return; }
+    if (!file && !text.trim()) { m.textContent = '❌ Выберите файл или вставьте строки'; m.className = 'message error'; m.style.display = 'block'; return; }
+
+    let base64 = '';
+    if (file) {
+      m.textContent = 'Читаю файл…'; m.className = 'message success'; m.style.display = 'block';
+      try { base64 = await fileToBase64(file); }
+      catch (e) { m.textContent = '❌ Файл не прочитался: ' + e; m.className = 'message error'; return; }
+    }
+
     google.script.run.withSuccessHandler(function (r) {
       if (!r.success) { m.textContent = '❌ ' + r.error; m.className = 'message error'; m.style.display = 'block'; return; }
-      let txt = '✅ Загружено строк: ' + r.imported;
-      if (r.unknown.length) txt += '. Не распознаны (' + r.unknown.length + '): ' + r.unknown.slice(0, 5).join(', ') + (r.unknown.length > 5 ? '…' : '');
+      let txt = '✅ Загружено строк: ' + r.imported + ' за ' + r.date;
+      if (r.unknown.length) txt += '. Нет в составе (' + r.unknown.length + '): ' + r.unknown.join(', ');
       m.textContent = txt; m.className = r.unknown.length ? 'message error' : 'message success'; m.style.display = 'block';
       document.getElementById('planDate').value = r.date.split('.').reverse().join('-');
       setTimeout(function () { document.getElementById('importModal').classList.remove('active'); loadPlan(); }, r.unknown.length ? 3500 : 1200);
     }).withFailureHandler(function (e) { m.textContent = '❌ ' + e; m.className = 'message error'; m.style.display = 'block'; })
-      .importAcceptedCalls(sessionStorage.getItem('token'), date, text);
+      .importAcceptedCalls(sessionStorage.getItem('token'), date, text, base64);
   }
 
   function backToQc() {
@@ -2428,7 +2468,16 @@
       document.getElementById(tabs[k][1]).classList.toggle('hidden', k !== t);
     });
     if (t === 'weekly') loadWeekly();
-    if (t === 'journal') loadJournal();
+    if (t === 'journal') {
+      // по умолчанию — текущий месяц, дальше диапазон правят руками
+      const f = document.getElementById('jFrom'), to = document.getElementById('jTo');
+      if (!f.value && !to.value) {
+        const now = new Date();
+        f.value = new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString('sv');
+        to.value = now.toLocaleDateString('sv');
+      }
+      loadJournal();
+    }
     if (t === 'kk') loadKk();
     if (t === 'criteria') loadCriteria();
     if (t === 'topics') loadTopics();
@@ -2450,7 +2499,8 @@
       });
       html += '</tbody></table></div>';
       box.innerHTML = html;
-    }).getCriteriaReport(sessionStorage.getItem('token'), document.getElementById('cPeriod').value);
+    }).getCriteriaReport(sessionStorage.getItem('token'), 'all',
+      document.getElementById('cFrom').value, document.getElementById('cTo').value);
   }
 
   function loadTopics() {
@@ -2466,7 +2516,8 @@
       });
       html += '</tbody></table></div>';
       box.innerHTML = html;
-    }).getTopicsReport(sessionStorage.getItem('token'), document.getElementById('tPeriod').value);
+    }).getTopicsReport(sessionStorage.getItem('token'), 'all',
+      document.getElementById('tFrom').value, document.getElementById('tTo').value);
   }
 
   function loadComplaints() {
@@ -2498,8 +2549,16 @@
       });
       html += '</tbody></table></div>';
       box.innerHTML = html;
-    }).getComplaintsReport(sessionStorage.getItem('token'), document.getElementById('cmpPeriod').value);
+    }).getComplaintsReport(sessionStorage.getItem('token'), 'all',
+      document.getElementById('cmpFrom').value, document.getElementById('cmpTo').value);
   }
+
+  function clearRange(prefix, reload) {
+    document.getElementById(prefix + 'From').value = '';
+    document.getElementById(prefix + 'To').value = '';
+    reload();
+  }
+  function cmpClearDates() { clearRange('cmp', loadComplaints); }
 
   function weekShift(d) { weekOffset += d; loadWeekly(); }
 
@@ -2535,7 +2594,9 @@
 
   function jFilters() {
     return {
-      period: document.getElementById('jPeriod').value,
+      period: 'all',
+      from: document.getElementById('jFrom').value,
+      to: document.getElementById('jTo').value,
       group: document.getElementById('jGroup').value,
       operator: document.getElementById('jOperator').value.trim(),
       qc: document.getElementById('jQc').value.trim(),
@@ -2626,9 +2687,12 @@
     let params;
     if (kind === 'weekly') params = { weekOffset: weekOffset, group: document.getElementById('weekGroup').value };
     else if (kind === 'journal' || kind === 'checklists') params = jFilters();
-    else if (kind === 'criteria') params = { period: document.getElementById('cPeriod').value };
-    else if (kind === 'topics') params = { period: document.getElementById('tPeriod').value };
-    else if (kind === 'complaints') params = { period: document.getElementById('cmpPeriod').value };
+    else if (kind === 'criteria') params = { period: 'all',
+      from: document.getElementById('cFrom').value, to: document.getElementById('cTo').value };
+    else if (kind === 'topics') params = { period: 'all',
+      from: document.getElementById('tFrom').value, to: document.getElementById('tTo').value };
+    else if (kind === 'complaints') params = { period: 'all',
+      from: document.getElementById('cmpFrom').value, to: document.getElementById('cmpTo').value };
     else params = { period: 'month' };
     google.script.run.withSuccessHandler(function (r) {
       if (!r.success) { alert('❌ ' + r.error); return; }

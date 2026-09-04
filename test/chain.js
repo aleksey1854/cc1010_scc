@@ -262,6 +262,36 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('РГО получил доступ к тематикам (было «Нет доступа»)', rgoRep.success === true, rgoRep.error);
   chk('оператору отчёты закрыты', (await R('getKkReport', opT, 'all')).success === false);
 
+  // СКК ведёт качество по всему КЦ — отчёты ему нужны наравне со старшим
+  for (const [n, fn, args] of [
+    ['СКК: оценки по неделям', 'getWeeklyGrid', [qcT, 0, '']],
+    ['СКК: жалобы', 'getComplaintsReport', [qcT, 'all']],
+    ['СКК: тематики', 'getTopicsReport', [qcT, 'all']],
+    ['СКК: критерии', 'getCriteriaReport', [qcT, 'all']]
+  ]) {
+    const r = await api.call(fn, args);
+    chk(n + ' (было «Нет доступа»)', r.success === true, r.error);
+  }
+
+  // выгрузку сдают за конкретный отрезок, а не за «этот месяц»
+  const jAll = await R('getJournal', qcT, { period: 'all' });
+  const one = await R('getJournal', qcT, { from: DATE, to: DATE });
+  chk('журнал за диапазон дат', one.success === true && one.rows.length > 0, one.error);
+  chk('  диапазон отсекает лишнее', one.rows.length <= jAll.rows.length, [one.rows.length, jAll.rows.length]);
+  chk('  все строки внутри диапазона',
+    one.rows.every(r => r.callDate === core.fmtDate(DATE)), one.rows.slice(0, 2));
+  // ищем по части ФИО — под одну фамилию может попасть несколько человек
+  const part = OP[0].split(' ')[0];
+  const byOp = await R('getJournal', qcT, { period: 'all', operator: part });
+  chk('фильтр по оператору работает (был мёртвым)',
+    byOp.success === true && byOp.rows.length > 0 && byOp.rows.every(r => r.operator.includes(part)),
+    byOp.rows && byOp.rows.map(r => r.operator));
+  chk('  несуществующее ФИО даёт пусто',
+    (await R('getJournal', qcT, { period: 'all', operator: 'Такого Нет' })).rows.length === 0);
+  const cmpRange = await R('getComplaintsReport', qcT, 'all', '2000-01-01', '2000-01-02');
+  chk('жалобы за пустой диапазон — ноль строк',
+    cmpRange.success === true && cmpRange.rows.length === 0, cmpRange);
+
   head('ШАГ 10. СЕССИИ');
   await R('logoutSession', opT);
   chk('после выхода токен не работает', (await R('getOperatorStats', opT)).success === false);

@@ -191,6 +191,10 @@
   .btn-small:hover{ background:var(--accent); color:#fff; }
   .btn-small.btn-danger{ background:var(--bad-bg); color:var(--bad); }
   .btn-small.btn-danger:hover{ background:var(--bad); color:#fff; }
+  .btn-small.btn-warn{ background:var(--mid-bg); color:#8a5600; }
+  .btn-small.btn-warn:hover{ background:var(--mid); color:#fff; }
+  .btn-small.btn-ok{ background:var(--good-bg); color:#0a6e3d; }
+  .btn-small.btn-ok:hover{ background:var(--good); color:#fff; }
 
   .message{ padding:11px 16px; border-radius:var(--radius-sm); margin-top:15px; display:none; font-size:14px; font-weight:500; }
   .message.success{ display:block; background:var(--good-bg); color:#0a6e3d; border:1px solid #b7e6c9; }
@@ -1426,7 +1430,7 @@
       const hist = '<button class="btn-small" style="background:var(--surface-2);color:var(--ink-2);" title="История заявки" onclick="openHistory(\'' + r.id + '\')"><i class="fas fa-clock-rotate-left"></i></button>';
       // Оценка идёт от заявки: звонок уже описан, СКК не переписывает его руками
       const evalBtn = (!noCall && canReview)
-        ? '<button class="btn-small" style="background:var(--good);" title="Открыть чек-лист по этой заявке" onclick="evaluateRequest(\'' + r.id + '\')"><i class="fas fa-clipboard-check"></i> Оценить</button> '
+        ? '<button class="btn-small btn-ok" title="Открыть чек-лист по этой заявке" onclick="evaluateRequest(\'' + r.id + '\')"><i class="fas fa-clipboard-check"></i> Оценить</button> '
         : '';
       const rev = noCall ? '<span style="color:var(--muted);font-size:12px;">' + (r.opComment || '—') + '</span>' :
         (canReview ? '<button class="btn-small" onclick="openReview(\'' + r.id + '\')"><i class="fas fa-check"></i> Проверить</button>' : '<button class="btn-small" style="background:#95a5a6" onclick="openReview(\'' + r.id + '\')"><i class="fas fa-eye"></i></button>');
@@ -2341,6 +2345,13 @@
   function editEvaluation(evId) {
     google.script.run.withSuccessHandler(function (r) {
       if (!r.success) { alert(r.error); return; }
+      // Журнал живёт на отдельной странице отчётов. Без этого форма
+      // заполнялась, а человек оставался в журнале и решал, что кнопка
+      // не работает.
+      ['operatorPage', 'rgoPage', 'orgPage', 'repPage'].forEach(function (id) {
+        document.getElementById(id).classList.add('hidden');
+      });
+      document.getElementById('qcPage').classList.remove('hidden');
       qcTab('eval');
       clearReqLink(false);
       evEditing = r.id;
@@ -2371,6 +2382,7 @@
       evCmtOpen = {};
       evComplaintSrc = r.meta.complaintSource || '';
       renderChecklist(); recalcEval(); evSubmitReady();
+      evMsg('Правка ' + r.id + ' · ' + r.meta.operator + ': измените, что нужно, и нажмите «Сохранить правку»', 'success');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }).getEvaluationCard(sessionStorage.getItem('token'), evId);
   }
@@ -2535,7 +2547,8 @@
   function loadJournal() {
     const box = document.getElementById('journalList');
     const me = JSON.parse(sessionStorage.getItem('user') || '{}');
-    const canEditEval = ['qc', 'sqc', 'manager', 'admin'].indexOf(me.role) >= 0;
+    // правим в той же форме оценки, а она есть только у КК и админа
+    const canEditEval = ['qc', 'sqc', 'admin'].indexOf(me.role) >= 0;
     google.script.run.withSuccessHandler(function (r) {
       if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
       const gs = document.getElementById('jGroup');
@@ -2554,7 +2567,7 @@
         const flags = (e.violation ? ' <span class="fail-tag">НС</span>' : '') + (e.complaint ? ' <span class="fail-tag">ПЖ</span>' : '') + (e.gratitude ? ' <span class="fail-tag minor">★</span>' : '');
         // апелляции разбирает весь КК, поэтому правка доступна и СКК
         const edit = canEditEval
-          ? '<button class="btn-small" style="background:var(--mid);" title="Изменить оценку по апелляции" onclick="editEvaluation(\'' + e.id + '\')"><i class="fas fa-pen-to-square"></i></button> '
+          ? '<button class="btn-small btn-warn" title="Изменить оценку по апелляции" onclick="editEvaluation(\'' + e.id + '\')"><i class="fas fa-pen-to-square"></i> Правка</button> '
           : '';
         html += '<tr><td>' + e.callDate + '</td><td>' + e.operator + '</td><td>' + e.group + '</td><td>' + e.qc + '</td><td>' + (e.topic || '—') + '</td>' +
           '<td><strong style="color:' + scoreColorHex(e.score) + '">' + pct2(e.score) + '</strong>' + flags + '</td>' +

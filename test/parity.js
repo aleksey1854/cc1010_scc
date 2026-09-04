@@ -110,6 +110,14 @@ chk('pct2 формат', core.pct2(91.11) === '91,11%' && core.pct2(undefined) =
   };
 
   console.log('\n\u2501\u2501\u2501 МАКЕТ ЧЕК-ЛИСТА \u2501\u2501\u2501');
+  // зашитая копия макета должна совпадать с файлом, иначе на проде уедет
+  // старый бланк, а локально всё будет выглядеть правильно
+  const crypto = require('crypto'), fsx = require('fs');
+  const embedded = require('../lib/checklist-template');
+  chk('зашитый макет совпадает с assets/checklist-template.xlsx',
+    crypto.createHash('sha256').update(fsx.readFileSync(tpl.TEMPLATE)).digest('hex') === embedded.sha256,
+    'перегенерируйте: node scripts/embed-template.js');
+
   chk('не найден только несуществующий пункт',
     missed.length === 1 && missed[0] === 'Такого пункта нет', missed);
   chk('результат встал в строку пункта', at('F4') === 'отрицательно', at('F4'));

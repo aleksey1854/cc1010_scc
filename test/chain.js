@@ -150,6 +150,20 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('жалоба попала в отчёт', cmp.success === true && cmp.summary.total >= 1, cmp.summary);
   chk('  и учтена как «от клиента»', cmp.summary.confClient + cmp.summary.unconfClient >= 1, cmp.summary);
 
+  // Производственные показатели: качество только по плановой прослушке
+  const prod = await R('getProductionReport', qcT, DATE, DATE, '');
+  chk('производственные показатели считаются', prod.success === true, prod.error);
+  const find = n => [].concat(...prod.groups.map(g => g.operators)).find(o => o.name === n);
+  const withPj = find(OP2[0]);
+  chk('  оценка по жалобе ушла в колонку ПЖ', withPj && withPj.pj.length === 1, withPj);
+  chk('  и в качество не попала', withPj && withPj.scores.length === 0 && withPj.avg === null, withPj);
+  const plain = find(OP[0]);
+  chk('  плановая прослушка попала в качество',
+    plain && plain.scores.length > 0 && plain.avg !== null, plain);
+  chk('  в отчёте видны все операторы, а не только прослушанные',
+    prod.operators > prod.checked, [prod.operators, prod.checked]);
+  chk('оператору отчёт закрыт', (await R('getProductionReport', opT, DATE, DATE, '')).success === false);
+
   head('ШАГ 3в. СОСТАВ ВЕДУТ СРГО, РУКОВОДИТЕЛЬ И АДМИН');
   // токены СРГО и руководителя уже получены на шаге входа
   chk('СРГО видит состав', (await R('getAllUsers', srgoT)).success === true);

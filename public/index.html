@@ -191,6 +191,8 @@
   .btn-small:hover{ background:var(--accent); color:#fff; }
   .btn-small.btn-danger{ background:var(--bad-bg); color:var(--bad); }
   .btn-small.btn-danger:hover{ background:var(--bad); color:#fff; }
+  .pr-total td{ background:var(--surface-2); font-weight:600; }
+  .pj-col{ background:var(--bad-bg); }
   .chk{ display:flex; align-items:center; gap:6px; font-size:14px; color:var(--ink-2); }
   .chk input{ width:16px; height:16px; }
   .date-range{ display:flex; align-items:center; gap:6px; }
@@ -803,6 +805,7 @@
       <button type="button" class="seg-btn" id="repT4" onclick="repTab('criteria')">Критерии по неделям</button>
       <button type="button" class="seg-btn" id="repT5" onclick="repTab('topics')">Тематики</button>
       <button type="button" class="seg-btn" id="repT6" onclick="repTab('complaints')">Жалобы</button>
+      <button type="button" class="seg-btn" id="repT7" onclick="repTab('production')">Производственные показатели</button>
     </div>
 
     <!-- Оценки по неделям -->
@@ -886,6 +889,28 @@
         </div>
       </div>
       <div class="card"><div id="topicsTable"></div></div>
+    </div>
+
+    <!-- Производственные показатели -->
+    <div id="repProduction" class="hidden">
+      <div class="stats-grid">
+        <div class="stat-card"><div class="number" id="prOverall">—</div><div class="label">Качество за период</div></div>
+        <div class="stat-card"><div class="number new" id="prChecked">0</div><div class="label">Прослушано звонков</div></div>
+        <div class="stat-card"><div class="number rejected" id="prPj">0</div><div class="label">Оценок по жалобам</div></div>
+        <div class="stat-card"><div class="number checked" id="prOps">0</div><div class="label">Операторов</div></div>
+      </div>
+      <div class="card">
+        <div class="filter-bar" style="margin-bottom:0;">
+          <span class="date-range">
+            <label>с</label><input type="date" id="prFrom" onchange="loadProduction()">
+            <label>по</label><input type="date" id="prTo" onchange="loadProduction()">
+          </span>
+          <select id="prGroup" onchange="loadProduction()"><option value="">Все группы</option></select>
+          <span style="color:var(--muted);font-size:13px;">качество считается только по плановой прослушке, оценки по жалобам — отдельно</span>
+          <button class="btn-filter" style="margin-left:auto;background:var(--good);" onclick="downloadReport('production')"><i class="fas fa-download"></i> Скачать</button>
+        </div>
+      </div>
+      <div class="card"><div id="productionTable"></div></div>
     </div>
 
     <!-- Жалобы -->
@@ -2467,7 +2492,8 @@
   function repTab(t) {
     navSet('repTab', t);
     const tabs = { weekly: ['repT1', 'repWeekly'], journal: ['repT2', 'repJournal'], kk: ['repT3', 'repKk'],
-                   criteria: ['repT4', 'repCriteria'], topics: ['repT5', 'repTopics'], complaints: ['repT6', 'repComplaints'] };
+                   criteria: ['repT4', 'repCriteria'], topics: ['repT5', 'repTopics'], complaints: ['repT6', 'repComplaints'],
+                   production: ['repT7', 'repProduction'] };
     Object.keys(tabs).forEach(function (k) {
       document.getElementById(tabs[k][0]).classList.toggle('active', k === t);
       document.getElementById(tabs[k][1]).classList.toggle('hidden', k !== t);
@@ -2487,6 +2513,15 @@
     if (t === 'criteria') loadCriteria();
     if (t === 'topics') loadTopics();
     if (t === 'complaints') loadComplaints();
+    if (t === 'production') {
+      const f = document.getElementById('prFrom'), to = document.getElementById('prTo');
+      if (!f.value && !to.value) {
+        const now = new Date();
+        f.value = new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString('sv');
+        to.value = now.toLocaleDateString('sv');
+      }
+      loadProduction();
+    }
   }
 
   function loadCriteria() {
@@ -2564,6 +2599,62 @@
     reload();
   }
   function cmpClearDates() { clearRange('cmp', loadComplaints); }
+
+  // Производственные показатели: строка на оператора, в ней все его оценки
+  // за период. Качество — среднее по плановой прослушке; оценки по жалобам
+  // стоят отдельными колонками и в среднее не входят.
+  function loadProduction() {
+    const box = document.getElementById('productionTable');
+    box.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Загрузка...</p></div>';
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
+      document.getElementById('prOverall').textContent = r.overall === null ? '—' : pct2(r.overall);
+      document.getElementById('prOverall').style.color = r.overall === null ? '' : scoreColorHex(r.overall);
+      document.getElementById('prChecked').textContent = r.checked;
+      document.getElementById('prPj').textContent = r.pjTotal;
+      document.getElementById('prOps').textContent = r.operators;
+
+      const gs = document.getElementById('prGroup');
+      if (gs.options.length <= 1) {
+        gs.innerHTML = '<option value="">Все группы</option>' +
+          r.groups.map(function (g) { return '<option>' + g.name + '</option>'; }).join('');
+      }
+      if (!r.groups.length) { box.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Нет данных</p></div>'; return; }
+
+      let head = '<tr><th>Группа</th><th>Оператор</th><th>Качество</th><th>Прослушано</th>';
+      for (let i = 0; i < r.maxScores; i++) head += '<th>Оценка ' + (i + 1) + '</th>';
+      for (let i = 0; i < r.maxPj; i++) head += '<th class="pj-col">ПЖ ' + (i + 1) + '</th>';
+      head += '</tr>';
+
+      let html = '<div class="table-wrapper"><table><thead>' + head + '</thead><tbody>';
+      r.groups.forEach(function (g) {
+        g.operators.forEach(function (o) {
+          html += '<tr><td>' + g.name + '</td><td>' + o.name + '</td>' +
+            '<td><strong style="color:' + (o.avg === null ? 'var(--muted)' : scoreColorHex(o.avg)) + '">' +
+            (o.avg === null ? '—' : pct2(o.avg)) + '</strong></td>' +
+            '<td>' + o.scores.length + '</td>';
+          for (let i = 0; i < r.maxScores; i++) {
+            const x = o.scores[i];
+            html += '<td' + (x ? ' title="' + x.id + ' · ' + x.date + '"' : '') + '>' +
+              (x ? '<span style="color:' + scoreColorHex(x.score) + '">' + pct2(x.score) + '</span>' : '') + '</td>';
+          }
+          for (let i = 0; i < r.maxPj; i++) {
+            const x = o.pj[i];
+            html += '<td class="pj-col"' + (x ? ' title="' + x.id + ' · ' + x.date + '"' : '') + '>' +
+              (x ? pct2(x.score) : '') + '</td>';
+          }
+          html += '</tr>';
+        });
+        html += '<tr class="pr-total"><td>' + g.name + '</td><td>Итого по группе</td>' +
+          '<td><strong>' + (g.avg === null ? '—' : pct2(g.avg)) + '</strong></td>' +
+          '<td>' + g.checked + '</td><td colspan="' + (r.maxScores + r.maxPj) + '"></td></tr>';
+      });
+      html += '</tbody></table></div>';
+      box.innerHTML = html;
+    }).getProductionReport(sessionStorage.getItem('token'),
+      document.getElementById('prFrom').value, document.getElementById('prTo').value,
+      document.getElementById('prGroup').value);
+  }
 
   function weekShift(d) { weekOffset += d; loadWeekly(); }
 
@@ -2715,6 +2806,8 @@
       from: document.getElementById('cFrom').value, to: document.getElementById('cTo').value };
     else if (kind === 'topics') params = { period: 'all',
       from: document.getElementById('tFrom').value, to: document.getElementById('tTo').value };
+    else if (kind === 'production') params = { from: document.getElementById('prFrom').value,
+      to: document.getElementById('prTo').value, group: document.getElementById('prGroup').value };
     else if (kind === 'complaints') params = { period: 'all',
       from: document.getElementById('cmpFrom').value, to: document.getElementById('cmpTo').value };
     else params = { period: 'month' };

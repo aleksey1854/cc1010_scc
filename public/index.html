@@ -191,6 +191,8 @@
   .btn-small:hover{ background:var(--accent); color:#fff; }
   .btn-small.btn-danger{ background:var(--bad-bg); color:var(--bad); }
   .btn-small.btn-danger:hover{ background:var(--bad); color:#fff; }
+  .chk{ display:flex; align-items:center; gap:6px; font-size:14px; color:var(--ink-2); }
+  .chk input{ width:16px; height:16px; }
   .date-range{ display:flex; align-items:center; gap:6px; }
   .date-range label{ margin:0; font-size:13px; color:var(--muted); }
   .date-range input{ width:auto; }
@@ -822,14 +824,17 @@
       <div class="card">
         <div class="filter-bar" style="margin-bottom:0;">
           <span class="date-range">
-            <label>с</label><input type="date" id="jFrom" onchange="loadJournal()">
-            <label>по</label><input type="date" id="jTo" onchange="loadJournal()">
+            <label>с</label><input type="date" id="jFrom" onkeydown="jKey(event)">
+            <label>по</label><input type="date" id="jTo" onkeydown="jKey(event)">
           </span>
-          <select id="jGroup" onchange="loadJournal()"><option value="">Все группы</option></select>
-          <input type="text" id="jOperator" placeholder="Оператор" oninput="loadJournal()">
-          <input type="text" id="jQc" placeholder="СКК" oninput="loadJournal()">
-          <label style="display:flex;align-items:center;gap:6px;font-size:14px;color:var(--ink-2);"><input type="checkbox" id="jErrors" onchange="loadJournal()" style="width:16px;height:16px;"> только с ошибками</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:14px;color:var(--ink-2);"><input type="checkbox" id="jKo" onchange="loadJournal()" style="width:16px;height:16px;"> только ПЖ/НС</label>
+          <select id="jGroup"><option value="">Все группы</option></select>
+          <input type="text" id="jOperator" placeholder="Оператор" onkeydown="jKey(event)">
+          <input type="text" id="jQc" placeholder="СКК" onkeydown="jKey(event)">
+          <label class="chk"><input type="checkbox" id="jErrors"> только с ошибками</label>
+          <label class="chk"><input type="checkbox" id="jPj"> только ПЖ</label>
+          <label class="chk"><input type="checkbox" id="jNs"> только НС</label>
+          <button class="btn-filter" style="background:var(--accent);" onclick="loadJournal()"><i class="fas fa-magnifying-glass"></i> Найти</button>
+          <button class="btn-filter" onclick="jReset()" title="Сбросить фильтры"><i class="fas fa-rotate-left"></i></button>
           <button class="btn-filter" style="margin-left:auto;background:var(--good);" onclick="downloadReport('journal')"><i class="fas fa-download"></i> Скачать журнал</button>
           <button class="btn-filter" style="background:var(--accent);" title="Все чек-листы, попавшие под фильтры, одним файлом" onclick="downloadReport('checklists')"><i class="fas fa-file-arrow-down"></i> Скачать чек-листы</button>
         </div>
@@ -2601,8 +2606,23 @@
       operator: document.getElementById('jOperator').value.trim(),
       qc: document.getElementById('jQc').value.trim(),
       onlyErrors: document.getElementById('jErrors').checked,
-      onlyKo: document.getElementById('jKo').checked
+      onlyComplaint: document.getElementById('jPj').checked,
+      onlyViolation: document.getElementById('jNs').checked
     };
+  }
+
+  // Фильтр срабатывал на каждую букву и дёргал список. Теперь ждём кнопку
+  // «Найти» или Enter.
+  function jKey(e) { if (e.key === 'Enter') loadJournal(); }
+
+  function jReset() {
+    ['jOperator', 'jQc'].forEach(function (id) { document.getElementById(id).value = ''; });
+    document.getElementById('jGroup').value = '';
+    ['jErrors', 'jPj', 'jNs'].forEach(function (id) { document.getElementById(id).checked = false; });
+    const now = new Date();
+    document.getElementById('jFrom').value = new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString('sv');
+    document.getElementById('jTo').value = now.toLocaleDateString('sv');
+    loadJournal();
   }
 
   function loadJournal() {
@@ -2620,7 +2640,7 @@
         gs.innerHTML = '<option value="">Все группы</option>' + groups.map(function (g) { return '<option>' + g + '</option>'; }).join('');
       }
       if (!r.rows.length) { box.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Оценок нет</p></div>'; return; }
-      let html = '<div class="table-wrapper"><table><thead><tr><th>Дата</th><th>Оператор</th><th>Группа</th><th>СКК</th><th>Телефон</th><th>Тематика</th><th>Подтематика</th><th>Качество</th><th>Ошибки</th><th></th></tr></thead><tbody>';
+      let html = '<div class="table-wrapper"><table><thead><tr><th>Дата звонка</th><th>Дата прослушки</th><th>Оператор</th><th>Группа</th><th>СКК</th><th>Телефон</th><th>Тематика</th><th>Подтематика</th><th>Качество</th><th>Ошибки</th><th></th></tr></thead><tbody>';
       r.rows.forEach(function (e) {
         const errs = e.failed.length
           ? e.failed.map(function (f) { return '<div style="margin:2px 0;"><span class="fail-tag' + (f.critical ? '' : ' minor') + '">' + f.text + '</span>' + (f.comment ? '<span style="color:var(--muted);font-size:12px;"> — ' + f.comment + '</span>' : '') + '</div>'; }).join('')
@@ -2630,7 +2650,9 @@
         const edit = canEditEval
           ? '<button class="btn-small btn-warn" title="Изменить оценку по апелляции" onclick="editEvaluation(\'' + e.id + '\')"><i class="fas fa-pen-to-square"></i> Правка</button> '
           : '';
-        html += '<tr><td>' + e.callDate + '</td><td>' + e.operator + '</td><td>' + e.group + '</td><td>' + e.qc + '</td>' +
+        html += '<tr><td style="white-space:nowrap;">' + e.callDate + '</td>' +
+          '<td style="white-space:nowrap;color:var(--muted);">' + (e.checkedDate || '—') + '</td>' +
+          '<td>' + e.operator + '</td><td>' + e.group + '</td><td>' + e.qc + '</td>' +
           '<td style="white-space:nowrap;">' + (e.phone || '—') + '</td>' +
           '<td>' + (e.topic || '—') + '</td><td>' + (e.sub || '—') + '</td>' +
           '<td><strong style="color:' + scoreColorHex(e.score) + '">' + pct2(e.score) + '</strong>' + flags + '</td>' +

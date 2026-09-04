@@ -288,6 +288,15 @@ const R = (fn, ...a) => api.call(fn, a);
     byOp.rows && byOp.rows.map(r => r.operator));
   chk('  несуществующее ФИО даёт пусто',
     (await R('getJournal', qcT, { period: 'all', operator: 'Такого Нет' })).rows.length === 0);
+  // «только ПЖ/НС» слал onlyKo, а сервер читал onlyFlags — фильтр был мёртвым
+  const pj = await R('getJournal', qcT, { period: 'all', onlyComplaint: true });
+  chk('фильтр «только ПЖ» работает',
+    pj.success === true && pj.rows.every(r => r.complaint), pj.rows && pj.rows.length);
+  const ns = await R('getJournal', qcT, { period: 'all', onlyViolation: true });
+  chk('фильтр «только НС» работает',
+    ns.success === true && ns.rows.every(r => r.violation), ns.rows && ns.rows.length);
+  chk('  ПЖ и НС — разные выборки', pj.rows.length !== jAll.rows.length || ns.rows.length !== jAll.rows.length);
+
   const cmpRange = await R('getComplaintsReport', qcT, 'all', '2000-01-01', '2000-01-02');
   chk('жалобы за пустой диапазон — ноль строк',
     cmpRange.success === true && cmpRange.rows.length === 0, cmpRange);

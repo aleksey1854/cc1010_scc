@@ -16,6 +16,7 @@ const R = (fn, ...a) => api.call(fn, a);
   const RGO = creds.find(x => x[2] === 'rgo' && x[1] === 'ИНВ-1');
   const SRGO = creds.find(x => x[2] === 'srgo');
   const MGR = creds.find(x => x[2] === 'manager');
+  const SQC = creds.find(x => x[2] === 'sqc');
 
   head('ВХОД');
   const lo = await R('login', OP[3], OP[4]);
@@ -27,6 +28,7 @@ const R = (fn, ...a) => api.call(fn, a);
   const rgoT = (await R('login', RGO[3], RGO[4])).token;
   const srgoT = (await R('login', SRGO[3], SRGO[4])).token;
   const mgrT = (await R('login', MGR[3], MGR[4])).token;
+  const sqcT = (await R('login', SQC[3], SQC[4])).token;
   chk('неверный пароль отклонён', (await R('login', OP[3], 'nepravilno')).success === false);
   chk('пароль как токен не работает', (await R('getOperatorStats', OP[4])).success === false);
 
@@ -169,6 +171,8 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('СРГО видит состав', (await R('getAllUsers', srgoT)).success === true);
   chk('руководитель видит состав', (await R('getAllUsers', mgrT)).success === true);
   chk('СКК к составу не пускают', (await R('getAllUsers', qcT)).success === false);
+  // блокировка учёток уволенных приходит на старшего СКК — ему состав открыт
+  chk('старший СКК видит состав', (await R('getAllUsers', sqcT)).success === true);
   chk('оператора к составу не пускают', (await R('getAllUsers', opT)).success === false);
 
   const NEW_NAME = 'Проверка Составом';

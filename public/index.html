@@ -1238,10 +1238,12 @@
       document.getElementById('qcUserGroup').textContent = user.group;
       const isSqc = user.role === 'sqc' || user.role === 'admin';
       document.getElementById('tabAnaBtn').classList.toggle('hidden', !isSqc);
-      document.getElementById('tabRepBtn').classList.toggle('hidden', !isSqc);
-      // состав ведут старший РГО, руководитель проекта и администратор
+      // Отчёты открыты всему КК: качество СКК ведёт по всему КЦ, а кнопка
+      // была видна только старшему — данные отдавались, а зайти было некуда
+      document.getElementById('tabRepBtn').classList.remove('hidden');
+      // состав ведут старший СКК, старший РГО, руководитель и администратор
       document.getElementById('tabStaffBtn').classList.toggle('hidden',
-        ['srgo', 'manager', 'admin'].indexOf(user.role) < 0);
+        ['sqc', 'srgo', 'manager', 'admin'].indexOf(user.role) < 0);
       qcTab('eval');
       loadEvalPage();
     } else {

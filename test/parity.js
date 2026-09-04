@@ -86,6 +86,45 @@ chk('коллизия логина разводится цифрой', core.sugg
 chk('слабый пароль опознан', core.isWeakPass('111111') && core.isWeakPass('qwerty') && !core.isWeakPass('Xk9mZq2rT'));
 chk('pct2 формат', core.pct2(91.11) === '91,11%' && core.pct2(undefined) === '—');
 
-console.log(`\nПРОВАЛЕНО: ${bad.length}`);
-bad.forEach(b => console.log('   ·', b));
-process.exit(bad.length ? 1 : 0);
+// ---------- макет чек-листа ----------
+// Проверяем не базу, а сам механизм: пункты ищутся по названию, значения
+// ложатся в колонку «Результат», карточка звонка — в шапку и подвал.
+(async () => {
+  const tpl = require('../lib/checklist-xlsx');
+  const items = [
+    { text: 'Приветствие', kind: 'score', result: 'Отрицательно', comment: 'не представился' },
+    { text: 'Прощание', kind: 'score', result: 'Не требуется' },
+    { text: 'Подтверждённая жалоба', kind: 'flag', result: 'Обнаружено' },   // в макете без «ё»
+    { text: 'Такого пункта нет', kind: 'score', result: 'Положительно' }
+  ];
+  const { wb, missed } = await tpl.evaluationWorkbook({
+    callDate: '04.09.2026', callTime: '11:20', criterion: 'Длит: средний (3-5 мин)',
+    topic: 'Анализы', sub: 'Запись', qc: 'Контролёр К.', checkedDate: '05.09.2026',
+    operator: 'Оператор О.', phone: '79161234567', city: 'Москва', agg: 'Москва',
+    complaintSource: 'Клиент'
+  }, items);
+  const ws = wb.worksheets[0];
+  const at = a => {
+    const v = ws.getCell(a).value;
+    return v && v.richText ? v.richText.map(t => t.text).join('') : v;
+  };
+
+  console.log('\n\u2501\u2501\u2501 МАКЕТ ЧЕК-ЛИСТА \u2501\u2501\u2501');
+  chk('не найден только несуществующий пункт',
+    missed.length === 1 && missed[0] === 'Такого пункта нет', missed);
+  chk('результат встал в строку пункта', at('F4') === 'отрицательно', at('F4'));
+  chk('комментарий рядом с пунктом', at('G4') === 'не представился', at('G4'));
+  chk('«не требуется» строчными', at('F5') === 'не требуется', at('F5'));
+  chk('«ё» не мешает сопоставлению', at('F32') === 'Обнаружено', at('F32'));
+  chk('дата звонка в шапке', at('E1') === 'Дата звонка: 04.09.2026', at('E1'));
+  chk('критерий в шапке', at('G1') === 'Длит: средний (3-5 мин)', at('G1'));
+  chk('контролёр в подвале', at('G39') === 'Контролёр К.', at('G39'));
+  chk('город в подвале', at('G43') === 'Москва', at('G43'));
+  chk('источник жалобы записан', String(at('G33') || '').includes('Клиент'), at('G33'));
+  chk('формулы на месте',
+    !!(ws.getCell('D4').value && ws.getCell('D4').value.formula), ws.getCell('D4').value);
+
+  console.log('\nПРОВАЛЕНО: ' + bad.length);
+  bad.forEach(b => console.log('   \u00b7', b));
+  process.exit(bad.length ? 1 : 0);
+})();

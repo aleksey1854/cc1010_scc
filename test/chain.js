@@ -253,11 +253,19 @@ const R = (fn, ...a) => api.call(fn, a);
     ['критерии', 'getCriteriaReport', [mgrT, 'all']],
     ['тематики', 'getTopicsReport', [mgrT, 'all']],
     ['жалобы', 'getComplaintsReport', [mgrT, 'all']],
-    ['экспорт CSV', 'exportReport', [mgrT, 'journal', {}]]
+    ['экспорт CSV', 'exportReport', [mgrT, 'journal', {}]],
+    ['чек-лист по макету', 'exportReport', [mgrT, 'evaluation', { id: ev.id }]]
   ]) {
     const r = await api.call(fn, args);
     chk(n, r.success === true, r.error);
   }
+  // чек-лист собирается на их же макете (сам макет проверяет parity.js:
+  // в тестовой базе чек-лист синтетический и с макетом не совпадает)
+  const sheet = await R('exportReport', mgrT, 'evaluation', { id: ev.id });
+  chk('  это настоящий xlsx',
+    Buffer.from(sheet.contentBase64, 'base64').slice(0, 2).toString() === 'PK');
+  chk('  файл назван номером оценки', sheet.filename === ev.id + '.xlsx', sheet.filename);
+
   const rgoRep = await R('getTopicsReport', rgoT, 'all');
   chk('РГО получил доступ к тематикам (было «Нет доступа»)', rgoRep.success === true, rgoRep.error);
   chk('оператору отчёты закрыты', (await R('getKkReport', opT, 'all')).success === false);

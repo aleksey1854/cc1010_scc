@@ -143,6 +143,10 @@
   .logout-btn:hover{ background:var(--bad-bg); border-color:var(--bad); color:var(--bad); }
 
   .container{ max-width:1200px; margin:0 auto; padding:24px 20px 40px; }
+  /* Отчёты шире кабинетов: в 1200px «Производственные показатели» с двумя
+     десятками колонок не влезали, и внизу висел горизонтальный бегунок,
+     хотя справа оставалось пустое место. */
+  #repPage .container{ max-width:min(1900px, 100%); }
 
   /* ===== СТАТ-КАРТЫ ===== */
   .stats-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:14px; margin-bottom:22px; }
@@ -216,6 +220,19 @@
 
   /* ===== ТАБЛИЦЫ ===== */
   .table-wrapper{ overflow-x:auto; margin:0 -4px; }
+  /* Широкие отчёты: колонки плотнее, а «Группа» и «Оператор» не уезжают
+     при горизонтальной прокрутке — иначе непонятно, чья это строка. */
+  .table-wide table{ font-size:13px; }
+  .table-wide th, .table-wide td{ padding:8px 10px; }
+  .table-wide th:nth-child(1), .table-wide td:nth-child(1),
+  .table-wide th:nth-child(2), .table-wide td:nth-child(2){
+    position:sticky; z-index:2; background:var(--surface);
+    box-shadow:1px 0 0 var(--border);
+  }
+  .table-wide th:nth-child(1), .table-wide td:nth-child(1){ left:0; min-width:88px; }
+  .table-wide th:nth-child(2), .table-wide td:nth-child(2){ left:88px; min-width:210px; }
+  .table-wide tr:hover td:nth-child(1), .table-wide tr:hover td:nth-child(2){ background:var(--surface-2); }
+  .table-wide .pr-total td:nth-child(1), .table-wide .pr-total td:nth-child(2){ background:var(--surface-2); }
   table{ width:100%; border-collapse:collapse; font-size:14px; }
   table th{ background:transparent; padding:10px 14px; text-align:left; font-weight:600; color:var(--muted); border-bottom:1.5px solid var(--border); white-space:nowrap; font-size:11px; text-transform:uppercase; letter-spacing:.5px; }
   table td{ padding:12px 14px; border-bottom:1px solid var(--border); color:var(--ink-2); font-variant-numeric:tabular-nums; }
@@ -2667,7 +2684,7 @@
       for (let i = 0; i < r.maxPj; i++) head += '<th class="pj-col">ПЖ ' + (i + 1) + '</th>';
       head += '</tr>';
 
-      let html = '<div class="table-wrapper"><table><thead>' + head + '</thead><tbody>';
+      let html = '<div class="table-wrapper table-wide"><table><thead>' + head + '</thead><tbody>';
       r.groups.forEach(function (g) {
         g.operators.forEach(function (o) {
           html += '<tr><td>' + g.name + '</td><td>' + o.name +

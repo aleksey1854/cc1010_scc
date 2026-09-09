@@ -2044,11 +2044,14 @@
           ? h.hired
           : '<span class="hired-set"><input type="date" id="hd_' + cssId(o.fullName) + '"' +
             (h && h.training ? ' title="обучение с ' + h.training + '"' : '') + '>' +
-            '<button class="btn-small" onclick="saveHired(' + Q + o.fullName.replace(/'/g, "") + Q + ')">Принят</button></span>';
+            '<button class="btn-small" data-hired="' + o.fullName.replace(/"/g, '&quot;') + '">Принят</button></span>';
         html += '<tr><td>' + o.fullName + '</td><td>' + o.group + '</td><td>' + o.checkedCount + '</td><td>' + scoreCell + '</td><td>' + o.failsCount + '</td><td>' + hiredCell + '</td></tr>';
       });
       html += '</tbody></table></div>';
       box.innerHTML = html;
+      box.querySelectorAll('button[data-hired]').forEach(function (b) {
+        b.onclick = function () { saveHired(b.getAttribute('data-hired')); };
+      });
     }).getRgoDashboard(sessionStorage.getItem('token'), 'all',
       document.getElementById('rgoFrom').value, document.getElementById('rgoTo').value);
   }

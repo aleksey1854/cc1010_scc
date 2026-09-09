@@ -327,6 +327,20 @@ const R = (fn, ...a) => api.call(fn, a);
     Buffer.from(sheet.contentBase64, 'base64').slice(0, 2).toString() === 'PK');
   chk('  файл назван номером оценки', sheet.filename === ev.id + '.xlsx', sheet.filename);
 
+  // РГО видит только свою группу — и в журнале, и в выгрузке одного чек-листа
+  const foreign = await db.one(
+    `SELECT public_id FROM evaluations WHERE team <> 'ИНВ-1' ORDER BY id DESC LIMIT 1`);
+  if (foreign) {
+    chk('РГО не скачает чек-лист чужой группы',
+      (await R('exportReport', rgoT, 'evaluation', { id: foreign.public_id })).success === false,
+      foreign.public_id);
+  }
+  const ownEv = await db.one(
+    `SELECT public_id FROM evaluations WHERE team = 'ИНВ-1' ORDER BY id DESC LIMIT 1`);
+  chk('  а свой — скачает',
+    (await R('exportReport', rgoT, 'evaluation', { id: ownEv.public_id })).success === true);
+  chk('оператору форма оценки не отдаётся', (await R('getQcBootstrap', opT)).success === false);
+
   const rgoRep = await R('getTopicsReport', rgoT, 'all');
   chk('РГО получил доступ к тематикам (было «Нет доступа»)', rgoRep.success === true, rgoRep.error);
   chk('оператору отчёты закрыты', (await R('getKkReport', opT, 'all')).success === false);

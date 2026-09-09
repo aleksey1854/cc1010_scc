@@ -220,19 +220,22 @@
 
   /* ===== ТАБЛИЦЫ ===== */
   .table-wrapper{ overflow-x:auto; margin:0 -4px; }
-  /* Широкие отчёты: колонки плотнее, а «Группа» и «Оператор» не уезжают
-     при горизонтальной прокрутке — иначе непонятно, чья это строка. */
-  .table-wide table{ font-size:13px; }
-  .table-wide th, .table-wide td{ padding:8px 10px; }
-  .table-wide th:nth-child(1), .table-wide td:nth-child(1),
-  .table-wide th:nth-child(2), .table-wide td:nth-child(2){
+  /* Многоколоночные отчёты набираем плотнее — иначе на ноутбуке они
+     не влезают и приходится возить таблицу вбок. */
+  .table-dense table{ font-size:13px; }
+  .table-dense th, .table-dense td{ padding:8px 10px; }
+  /* Там, где таблицу всё равно приходится прокручивать, «Группа» и
+     «Оператор» остаются на месте: иначе непонятно, чья это строка.
+     Ширины закреплённых колонок фиксированы — от них считается отступ. */
+  .table-pinned th:nth-child(1), .table-pinned td:nth-child(1),
+  .table-pinned th:nth-child(2), .table-pinned td:nth-child(2){
     position:sticky; z-index:2; background:var(--surface);
     box-shadow:1px 0 0 var(--border);
   }
-  .table-wide th:nth-child(1), .table-wide td:nth-child(1){ left:0; min-width:88px; }
-  .table-wide th:nth-child(2), .table-wide td:nth-child(2){ left:88px; min-width:210px; }
-  .table-wide tr:hover td:nth-child(1), .table-wide tr:hover td:nth-child(2){ background:var(--surface-2); }
-  .table-wide .pr-total td:nth-child(1), .table-wide .pr-total td:nth-child(2){ background:var(--surface-2); }
+  .table-pinned th:nth-child(1), .table-pinned td:nth-child(1){ left:0; width:88px; min-width:88px; }
+  .table-pinned th:nth-child(2), .table-pinned td:nth-child(2){ left:88px; width:210px; min-width:210px; }
+  .table-pinned tr:hover td:nth-child(1), .table-pinned tr:hover td:nth-child(2){ background:var(--surface-2); }
+  .table-pinned .pr-total td:nth-child(1), .table-pinned .pr-total td:nth-child(2){ background:var(--surface-2); }
   table{ width:100%; border-collapse:collapse; font-size:14px; }
   table th{ background:transparent; padding:10px 14px; text-align:left; font-weight:600; color:var(--muted); border-bottom:1.5px solid var(--border); white-space:nowrap; font-size:11px; text-transform:uppercase; letter-spacing:.5px; }
   table td{ padding:12px 14px; border-bottom:1px solid var(--border); color:var(--ink-2); font-variant-numeric:tabular-nums; }
@@ -2623,7 +2626,7 @@
       if (!r.rows.length) { box.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Жалоб нет</p></div>'; return; }
       // Колонки повторяют недельный блок отчёта ОБД: «Общий % жалоб» там
       // считается от всех жалоб недели, а не внутри тематики.
-      let html = '<div class="table-wrapper"><table><thead><tr>' +
+      let html = '<div class="table-wrapper table-dense"><table><thead><tr>' +
         '<th>Тематика</th><th>Неделя</th><th>Всего жалоб</th><th>Обоснованные</th>' +
         '<th>Обосн. от клиентов</th><th>Обосн. от заказчика</th>' +
         '<th>Необосн. от клиентов</th><th>Необосн. от заказчика</th>' +
@@ -2684,7 +2687,7 @@
       for (let i = 0; i < r.maxPj; i++) head += '<th class="pj-col">ПЖ ' + (i + 1) + '</th>';
       head += '</tr>';
 
-      let html = '<div class="table-wrapper table-wide"><table><thead>' + head + '</thead><tbody>';
+      let html = '<div class="table-wrapper table-dense table-pinned"><table><thead>' + head + '</thead><tbody>';
       r.groups.forEach(function (g) {
         g.operators.forEach(function (o) {
           html += '<tr><td>' + g.name + '</td><td>' + o.name +

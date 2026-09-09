@@ -1102,6 +1102,8 @@
     err.style.color = '#8fb3ff';
 
     function backToLogin(msg) {
+      // возвращаемся ко входу — запомненное место больше не наше
+      sessionStorage.removeItem('nav');
       sessionStorage.removeItem('token');
       sessionStorage.removeItem('user');
       form.style.display = '';
@@ -1329,7 +1331,7 @@
             '<td><span class="status-badge ' + r.status.replace(/ /g, '_') + '">' + r.status + '</span></td>' +
             '<td>' + (r.rating ? pct2(Number(r.rating)) : '-') + '</td>' +
             '<td>' + (r.comment || '-') + '</td>' +
-            '<td>' + (canEdit ? '<button class="btn-small" onclick="openEditModal(\'' + r.id + '\')"><i class="fas fa-edit"></i></button> ' : '') + '<button class="btn-small" style="background:var(--surface-2);color:var(--ink-2);" title="История заявки" onclick="openHistory(\'' + r.id + '\')"><i class="fas fa-clock-rotate-left"></i></button></td>' +
+            '<td>' + (canEdit ? '<button class="btn-small" title="Изменить заявку" onclick="openEditModal(\'' + r.id + '\')"><i class="fas fa-edit"></i></button> ' : '') + '<button class="btn-small" style="background:var(--surface-2);color:var(--ink-2);" title="История заявки" onclick="openHistory(\'' + r.id + '\')"><i class="fas fa-clock-rotate-left"></i></button></td>' +
           '</tr>';
         });
         html += '</tbody></table></div>';
@@ -1666,7 +1668,7 @@
         '<td>' + (u.hired || '—') + '</td>' +
         '<td>' +
           '<button class="btn-small" data-staff-edit type="button"><i class="fas fa-pen"></i> Изменить</button> ' +
-          '<button class="btn-small btn-danger" data-staff-del type="button"><i class="fas fa-user-minus"></i></button>' +
+          '<button class="btn-small btn-danger" data-staff-del type="button" title="Уволить: учётка выключится, логин освободится"><i class="fas fa-user-minus"></i> Уволить</button>' +
         '</td>' +
       '</tr>').join('');
 
@@ -1975,6 +1977,10 @@
   }
   function restoreView(user, want) {
     if (!want) return;
+    // Запомненное место принадлежит прошлому входу. Если в этой же вкладке
+    // сменился человек (истёк токен, зашёл другой), нельзя открывать ему
+    // чужую страницу: оператор оказывался на «Отчётах» без пути назад.
+    if (user.role === 'operator') return;
     if (want.page === 'rep') {
       openReports(want.repFrom || 'org');
       if (want.repTab && want.repTab !== 'weekly') repTab(want.repTab);
@@ -2755,7 +2761,7 @@
         '<td><strong style="color:' + (r.left ? 'var(--bad)' : 'var(--good)') + '">' + r.left + '</strong></td>' +
         '</tr></tbody></table></div>' +
         (r.left
-          ? '<div class="hint" style="margin-top:10px;">Осталось выгрузить: <strong>' + r.left + '</strong>. Заявку подайте ниже, на вкладке «Мои заявки».</div>'
+          ? '<div class="hint" style="margin-top:10px;">Осталось выгрузить: <strong>' + r.left + '</strong>. Заявку подайте ниже, в блоке «Сдать звонок на проверку».</div>'
           : '<div class="hint" style="margin-top:10px;color:var(--good);">За этот день всё выгружено.</div>');
     }).getMyUploadPlan(sessionStorage.getItem('token'), document.getElementById('upDate').value);
   }

@@ -181,6 +181,19 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('  и посчитана как необоснованная',
     grp && grp.pj === 1 && grp.pjConfirmed === 0, grp && [grp.pj, grp.pjConfirmed]);
   chk('оператору отчёт закрыт', (await R('getProductionReport', opT, DATE, DATE, '')).success === false);
+
+  // новичок со стажем меньше месяца в колонку «без стажа менее месяца» не идёт
+  await db.q(`UPDATE staff SET hired_at = $2 WHERE full_name = $1`,
+    [OP[0], core.isoDate(new Date(core.toDateObj(DATE).getTime() - 5 * 86400000))]);
+  const withNew = await R('getProductionReport', qcT, DATE, DATE, '');
+  const grpNew = withNew.groups.find(g => g.name === 'ИНВ-1');
+  const newbie = grpNew.operators.find(o => o.name === OP[0]);
+  chk('новичок помечен стажёром', newbie && newbie.trainee === true, newbie && newbie.hiredAt);
+  chk('  его оценки в общую по группе входят', grpNew.avg !== null, grpNew.avg);
+  chk('  а в колонку без стажёров — нет',
+    grpNew.checkedSenior < grpNew.checked, [grpNew.checkedSenior, grpNew.checked]);
+  chk('  стажёры посчитаны', grpNew.trainees === 1, grpNew.trainees);
+  await db.q(`UPDATE staff SET hired_at = '2024-01-01' WHERE full_name = $1`, [OP[0]]);
   chk('оператору не отдают весь состав КЦ', (await R('getOperatorsList', opT)).success === false);
   chk('  а СКК отдают', (await R('getOperatorsList', qcT)).success === true);
   chk('правка оценки закрыта тем, у кого нет формы',
@@ -280,6 +293,16 @@ const R = (fn, ...a) => api.call(fn, a);
   const pr = plan.rows.find(r => r.operator === OP[0]);
   chk('200 × 2% = 4', pr.plan === 4, pr);
   chk('прослушано 1, осталось 3', pr.done === 1 && pr.left === 3, pr);
+  // оператор видит свою строку выгрузки и только её
+  const myPlan = await R('getMyUploadPlan', opT, DATE);
+  chk('оператор видит свой план выгрузки', myPlan.success === true, myPlan.error);
+  chk('  и это именно он', myPlan.operator === OP[0], myPlan.operator);
+  chk('  план = процент от принятых',
+    myPlan.plan === Math.round(myPlan.accepted * myPlan.percent / 100),
+    [myPlan.accepted, myPlan.percent, myPlan.plan]);
+  chk('  общий план прослушки оператору закрыт',
+    (await R('getListeningPlan', opT, DATE)).success === false);
+
   chk('звонок с заявкой засчитан оператору', pr.fromOperator === 1 && pr.bySkk === 0, pr);
   chk('24 × 2% = 0', plan.rows.find(r => r.plan === 0) !== undefined);
 

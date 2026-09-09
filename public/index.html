@@ -191,6 +191,11 @@
   .btn-small:hover{ background:var(--accent); color:#fff; }
   .btn-small.btn-danger{ background:var(--bad-bg); color:var(--bad); }
   .btn-small.btn-danger:hover{ background:var(--bad); color:#fff; }
+  .memo{ margin-top:14px; border-top:1px solid var(--border); padding-top:12px; }
+  .memo summary{ cursor:pointer; font-weight:600; color:var(--accent-ink); font-size:14px; }
+  .memo summary:hover{ text-decoration:underline; }
+  .memo table{ margin-top:12px; }
+  .memo .mine td{ background:var(--accent-soft); font-weight:600; }
   .pr-total td{ background:var(--surface-2); font-weight:600; }
   .pj-col{ background:var(--bad-bg); }
   .chk{ display:flex; align-items:center; gap:6px; font-size:14px; color:var(--ink-2); }
@@ -451,6 +456,21 @@
       <div class="stat-card"><div class="number inprogress" id="opStatInProgress">0</div><div class="label">В работе</div></div>
       <div class="stat-card"><div class="number checked" id="opEvCount">0</div><div class="label">Оценок КК</div></div>
       <div class="stat-card"><div class="number rating" id="opEvAvg">—</div><div class="label">Среднее качество</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="fas fa-upload"></i> Выгрузка звонков</div>
+      <div class="filter-bar" style="margin-bottom:14px;">
+        <span class="date-range">
+          <label>Дата</label><input type="date" id="upDate" onchange="loadUploadPlan()">
+        </span>
+        <span style="color:var(--muted);font-size:13px;">сколько звонков за этот день нужно выгрузить лично вам</span>
+      </div>
+      <div id="upBox"></div>
+      <details class="memo">
+        <summary>Памятка: сколько выгружать и какой длительности</summary>
+        <div id="upMemo"></div>
+      </details>
     </div>
 
     <div class="card">
@@ -900,6 +920,7 @@
         <div class="stat-card"><div class="number new" id="prChecked">0</div><div class="label">Плановых прослушек</div></div>
         <div class="stat-card"><div class="number rejected" id="prPj">0</div><div class="label">Жалоб: подтв. / необосн.</div></div>
         <div class="stat-card"><div class="number checked" id="prOps">0</div><div class="label">Операторов</div></div>
+        <div class="stat-card"><div class="number" id="prSenior">—</div><div class="label">Без стажа менее месяца</div></div>
       </div>
       <div class="card">
         <div class="filter-bar" style="margin-bottom:0;">
@@ -1253,6 +1274,9 @@
       document.getElementById('opUserName').textContent = user.fullName;
       document.getElementById('opUserGroup').textContent = user.group;
       document.getElementById('callDate').value = new Date().toISOString().split('T')[0];
+      // статистику принятых звонков грузят за прошедший день
+      document.getElementById('upDate').value = yesterdayStr();
+      loadUploadPlan();
       loadOperatorAll();
     }
     restoreView(user, want);
@@ -2618,6 +2642,10 @@
       document.getElementById('prPj').textContent =
         r.pjConfirmedTotal + ' / ' + (r.pjTotal - r.pjConfirmedTotal);
       document.getElementById('prOps').textContent = r.operators;
+      const sen = document.getElementById('prSenior');
+      sen.textContent = r.overallSenior === null ? '—' : pct2(r.overallSenior);
+      sen.style.color = r.overallSenior === null ? '' : scoreColorHex(r.overallSenior);
+      sen.parentElement.title = 'Новичков в отчёте: ' + r.trainees + '; в расчёт вошло ' + r.checkedSenior + ' оценок';
 
       const gs = document.getElementById('prGroup');
       if (gs.options.length <= 1) {
@@ -2626,7 +2654,9 @@
       }
       if (!r.groups.length) { box.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Нет данных</p></div>'; return; }
 
-      let head = '<tr><th>Группа</th><th>Оператор</th><th>Качество</th><th>Прослушано</th>';
+      let head = '<tr><th>Группа</th><th>Оператор</th><th>Качество</th>' +
+        '<th title="плановые и подтверждённые жалобы по операторам со стажем больше месяца">% с учётом отзывов,<br>без стажа менее месяца</th>' +
+        '<th>Прослушано</th>';
       for (let i = 0; i < r.maxScores; i++) head += '<th>Оценка ' + (i + 1) + '</th>';
       for (let i = 0; i < r.maxPj; i++) head += '<th class="pj-col">ПЖ ' + (i + 1) + '</th>';
       head += '</tr>';
@@ -2634,9 +2664,11 @@
       let html = '<div class="table-wrapper"><table><thead>' + head + '</thead><tbody>';
       r.groups.forEach(function (g) {
         g.operators.forEach(function (o) {
-          html += '<tr><td>' + g.name + '</td><td>' + o.name + '</td>' +
+          html += '<tr><td>' + g.name + '</td><td>' + o.name +
+            (o.trainee ? ' <span class="fail-tag minor" title="стаж меньше месяца' + (o.hiredAt ? ', принят ' + o.hiredAt : '') + '">стажёр</span>' : '') + '</td>' +
             '<td><strong style="color:' + (o.avg === null ? 'var(--muted)' : scoreColorHex(o.avg)) + '">' +
             (o.avg === null ? '—' : pct2(o.avg)) + '</strong></td>' +
+            '<td style="color:var(--muted);">' + (o.trainee ? 'не в счёт' : '') + '</td>' +
             '<td>' + o.scores.length + '</td>';
           for (let i = 0; i < r.maxScores; i++) {
             const x = o.scores[i];
@@ -2656,6 +2688,8 @@
         html += '<tr class="pr-total"><td>' + g.name + '</td>' +
           '<td title="плановая прослушка плюс подтверждённые жалобы">Итого по группе</td>' +
           '<td><strong>' + (g.avg === null ? '—' : pct2(g.avg)) + '</strong></td>' +
+          '<td title="' + g.trainees + ' операторов со стажем меньше месяца не в счёт"><strong>' +
+          (g.avgSenior === null ? '—' : pct2(g.avgSenior)) + '</strong></td>' +
           '<td>' + g.checked + '</td><td colspan="' + (r.maxScores + r.maxPj) + '"></td></tr>';
       });
       html += '</tbody></table></div>';
@@ -2663,6 +2697,67 @@
     }).getProductionReport(sessionStorage.getItem('token'),
       document.getElementById('prFrom').value, document.getElementById('prTo').value,
       document.getElementById('prGroup').value);
+  }
+
+  // ---------- ВЫГРУЗКА У ОПЕРАТОРА ----------
+  // Оператор видит только свою строку: общий план прослушки ему не
+  // показываем, там весь КЦ.
+  const UPLOAD_MEMO = [
+    ['1-24',    0, 0, '—',                '—'],
+    ['25-74',   1, 0, '—',                'СР'],
+    ['75-124',  2, 1, 'СР',               'КР'],
+    ['125-174', 3, 2, 'СР, КР',           'ДЛ'],
+    ['175-224', 4, 3, 'СР, СР, КР',       'КР'],
+    ['225-274', 5, 4, 'СР, СР, КР, КР',   'ДЛ'],
+    ['275-324', 6, 5, 'СР, СР, КР, КР',   'КР, ЗКВ'],
+    ['325-374', 7, 6, 'СР, СР, КР, КР',   'ДЛ, ЗКВ, КР'],
+    ['375-424', 8, 7, 'СР, СР, КР, КР',   'ДЛ, ЗКВ, КР, СР']
+  ];
+
+  function memoRange(text) {
+    const m = String(text).match(/(\d+)-(\d+)/);
+    return m ? [+m[1], +m[2]] : null;
+  }
+
+  function renderUploadMemo(accepted) {
+    let html = '<div class="table-wrapper"><table><thead><tr>' +
+      '<th>Принято звонков</th><th>Звонков к прослушке</th>' +
+      '<th>Максимум самостоятельно от ОП</th>' +
+      '<th>Длительность звонка ОП</th><th>Длительность звонка СКК</th>' +
+      '</tr></thead><tbody>';
+    UPLOAD_MEMO.forEach(function (r) {
+      const rg = memoRange(r[0]);
+      const mine = rg && accepted >= rg[0] && accepted <= rg[1];
+      html += '<tr' + (mine ? ' class="mine"' : '') + '><td>' + r[0] + '</td><td>' + r[1] + '</td>' +
+        '<td>' + r[2] + '</td><td>' + r[3] + '</td><td>' + r[4] + '</td></tr>';
+    });
+    html += '</tbody></table></div>' +
+      '<div class="hint" style="margin-top:8px;">СР — средний, КР — короткий, ДЛ — длинный, ЗКВ — затянутый.</div>';
+    document.getElementById('upMemo').innerHTML = html;
+  }
+
+  function loadUploadPlan() {
+    const box = document.getElementById('upBox');
+    box.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Загрузка...</p></div>';
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
+      renderUploadMemo(r.accepted);
+      if (r.noStats) {
+        box.innerHTML = '<div class="empty-state"><i class="fas fa-hourglass-half"></i>' +
+          '<p>Статистику за ' + r.date + ' ещё не загрузили.<br>План появится, как только СКК её выгрузит.</p></div>';
+        return;
+      }
+      box.innerHTML = '<div class="table-wrapper"><table><thead><tr>' +
+        '<th>Оператор</th><th>Группа</th><th>Принято</th><th>План (' + r.percent + '%)</th>' +
+        '<th>Выгружено</th><th>Осталось</th></tr></thead><tbody>' +
+        '<tr><td>' + r.operator + '</td><td>' + r.group + '</td><td>' + r.accepted + '</td>' +
+        '<td><strong>' + r.plan + '</strong></td><td>' + r.submitted + '</td>' +
+        '<td><strong style="color:' + (r.left ? 'var(--bad)' : 'var(--good)') + '">' + r.left + '</strong></td>' +
+        '</tr></tbody></table></div>' +
+        (r.left
+          ? '<div class="hint" style="margin-top:10px;">Осталось выгрузить: <strong>' + r.left + '</strong>. Заявку подайте ниже, на вкладке «Мои заявки».</div>'
+          : '<div class="hint" style="margin-top:10px;color:var(--good);">За этот день всё выгружено.</div>');
+    }).getMyUploadPlan(sessionStorage.getItem('token'), document.getElementById('upDate').value);
   }
 
   function weekShift(d) { weekOffset += d; loadWeekly(); }

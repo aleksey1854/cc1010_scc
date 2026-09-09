@@ -209,7 +209,10 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('оператора к составу не пускают', (await R('getAllUsers', opT)).success === false);
 
   const NEW_NAME = 'Проверка Составом';
-  const added = await R('addUser', srgoT, NEW_NAME, 'ИНВ-3', 'operator', '', 'Sostav77x');
+  // оператора без даты начала обучения заводить нельзя
+  const noTrain = await R('addUser', srgoT, NEW_NAME, 'ИНВ-3', 'operator', '', 'Sostav77x');
+  chk('оператор без даты обучения не заводится', noTrain.success === false, noTrain.error);
+  const added = await R('addUser', srgoT, NEW_NAME, 'ИНВ-3', 'operator', '', 'Sostav77x', '', '2026-08-01');
   chk('СРГО заводит сотрудника', added.success === true, added.error);
   chk('  логин собрался из ФИО', /^proverka/.test(added.login || ''), added.login);
   chk('  и он входит', (await R('login', added.login, 'Sostav77x')).success === true);
@@ -221,6 +224,22 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('  новый работает', (await R('login', added.login, 'Drug0jPar')).role === 'qc');
   chk('СКК завести сотрудника не может',
     (await R('addUser', qcT, 'Никто Никакой', '', 'operator', '', 'Parol123x')).success === false);
+  // дата приёмки: РГО ставит её один раз, дальше только администратор
+  const hiredOp = creds.find(x => x[2] === 'operator' && x[1] === 'ИНВ-1' && x[0] !== OP[0] && x[0] !== OP2[0]);
+  await db.q(`UPDATE staff SET hired_at = NULL, training_at = '2026-07-01' WHERE full_name = $1`, [hiredOp[0]]);
+  chk('РГО вносит дату приёмки',
+    (await R('setHiredDate', rgoT, hiredOp[0], '2026-08-15')).success === true);
+  chk('  второй раз уже не может',
+    (await R('setHiredDate', rgoT, hiredOp[0], '2026-08-20')).success === false);
+  chk('  а администратор может', (await R('setHiredDate', srgoT, hiredOp[0], '2026-08-20')).success === true);
+  chk('приёмка раньше обучения отклонена',
+    (await R('setHiredDate', srgoT, hiredOp[0], '2026-06-01')).success === false);
+  chk('РГО не трогает чужую группу',
+    (await R('setHiredDate', rgoT, OP2[0], '2026-08-15')).success === false ||
+    creds.find(x => x[0] === OP2[0])[1] === 'ИНВ-1');
+  chk('оператору дата приёмки закрыта',
+    (await R('setHiredDate', opT, hiredOp[0], '2026-08-15')).success === false);
+
   chk('СРГО увольняет', (await R('deleteUser', srgoT, NEW_NAME)).success === true);
   chk('  уволенный не входит', (await R('login', added.login, 'Drug0jPar')).success === false);
   chk('себя удалить нельзя', (await R('deleteUser', srgoT, SRGO[0])).success === false);

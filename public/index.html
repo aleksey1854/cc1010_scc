@@ -204,6 +204,8 @@
   .pj-col{ background:var(--bad-bg); }
   .chk{ display:flex; align-items:center; gap:6px; font-size:14px; color:var(--ink-2); }
   .chk input{ width:16px; height:16px; }
+  .hired-set{ display:flex; align-items:center; gap:6px; }
+  .hired-set input{ width:auto; padding:5px 8px; font-size:13px; }
   .date-range{ display:flex; align-items:center; gap:6px; }
   .date-range label{ margin:0; font-size:13px; color:var(--muted); }
   .date-range input{ width:auto; }
@@ -478,7 +480,18 @@
       <div class="stat-card"><div class="number new" id="opStatNew">0</div><div class="label">Новые</div></div>
       <div class="stat-card"><div class="number inprogress" id="opStatInProgress">0</div><div class="label">В работе</div></div>
       <div class="stat-card"><div class="number checked" id="opEvCount">0</div><div class="label">Оценок КК</div></div>
-      <div class="stat-card"><div class="number rating" id="opEvAvg">—</div><div class="label">Среднее качество</div></div>
+      <div class="stat-card"><div class="number rating" id="opEvAvg">—</div><div class="label" id="opAvgLabel">Качество за неделю</div></div>
+    </div>
+
+    <div class="card" style="padding-top:14px;padding-bottom:14px;">
+      <div class="filter-bar" style="margin-bottom:0;">
+        <span class="date-range">
+          <label>Качество с</label><input type="date" id="qFrom" onchange="loadMyQuality()">
+          <label>по</label><input type="date" id="qTo" onchange="loadMyQuality()">
+        </span>
+        <button type="button" class="btn-filter" onclick="qWeek()"><i class="fas fa-rotate-left"></i> Текущая неделя</button>
+        <span id="qHint" style="color:var(--muted);font-size:13px;"></span>
+      </div>
     </div>
 
     <div class="card">
@@ -726,12 +739,13 @@
     <h1><i class="fas fa-users-gear"></i> Кабинет РГО</h1>
     <div class="user-info">
       <button class="logout-btn" onclick="openReports('rgo')"><i class="fas fa-table"></i> Отчёты</button>
-      <select id="rgoPeriod" onchange="loadRgoDashboard()" style="padding:7px 12px;border:1px solid var(--border-strong);border-radius:9px;font-size:13px;font-family:inherit;">
-        <option value="all">За всё время</option>
-        <option value="week">Эта неделя</option>
-        <option value="month">Этот месяц</option>
-        <option value="year">Этот год</option>
-      </select>
+      <span class="date-range">
+        <label>с</label><input type="date" id="rgoFrom" onchange="loadRgoDashboard()">
+        <label>по</label><input type="date" id="rgoTo" onchange="loadRgoDashboard()">
+      </span>
+      <button type="button" class="logout-btn" onclick="clearRange('rgo', loadRgoDashboard)" title="За всё время">
+        <i class="fas fa-rotate-left"></i>
+      </button>
       <span class="user-badge"><i class="fas fa-user"></i> <span id="rgoUserName"></span></span>
       <span class="user-badge"><i class="fas fa-users"></i> <span id="rgoUserGroup"></span></span>
       <button class="logout-btn" onclick="openPwModal(false)" title="Сменить пароль"><i class="fas fa-key"></i></button>
@@ -769,7 +783,11 @@
       <button class="logout-btn hidden" id="backToQc" onclick="backToQc()"><i class="fas fa-arrow-left"></i> К оценке</button>
       <button class="logout-btn" onclick="openReports('org')"><i class="fas fa-table"></i> Отчёты</button>
       <button class="logout-btn hidden" id="orgStaffBtn" onclick="openStaffPage()"><i class="fas fa-users"></i> Сотрудники</button>
-      <select id="orgPeriod" onchange="loadOrgDashboard(JSON.parse(sessionStorage.getItem('user')||'{}').role)" style="padding:7px 12px;border:1px solid var(--border-strong);border-radius:9px;font-size:13px;font-family:inherit;">
+      <span class="date-range">
+        <label>с</label><input type="date" id="orgFrom" onchange="loadOrgDashboard(JSON.parse(sessionStorage.getItem('user')||'{}').role)">
+        <label>по</label><input type="date" id="orgTo" onchange="loadOrgDashboard(JSON.parse(sessionStorage.getItem('user')||'{}').role)">
+      </span>
+      <select id="orgPeriod" class="hidden">
         <option value="all">За всё время</option>
         <option value="week">Эта неделя</option>
         <option value="month">Этот месяц</option>
@@ -804,7 +822,7 @@
     </div>
 
     <div class="card">
-      <div class="card-title"><i class="fas fa-chart-line"></i> Динамика и частые провалы</div>
+      <div class="card-title"><i class="fas fa-chart-line"></i> Динамика и топ ошибок</div>
       <div class="charts-2">
         <div class="chart-cell"><div class="chart-cap"></div><div class="chart-box"><canvas id="orgTrendChart"></canvas></div></div>
         <div class="chart-cell"><div class="chart-cap"></div><div class="chart-box"><canvas id="orgFailsChart"></canvas></div></div>
@@ -878,6 +896,7 @@
           <select id="jGroup"><option value="">Все группы</option></select>
           <input type="text" id="jOperator" placeholder="Оператор" onkeydown="jKey(event)">
           <input type="text" id="jQc" placeholder="СКК" onkeydown="jKey(event)">
+          <input type="text" id="jPhone" placeholder="Телефон" onkeydown="jKey(event)" style="max-width:150px;">
           <label class="chk"><input type="checkbox" id="jErrors"> только с ошибками</label>
           <label class="chk"><input type="checkbox" id="jPj"> только ПЖ</label>
           <label class="chk"><input type="checkbox" id="jNs"> только НС</label>
@@ -1031,7 +1050,16 @@
         <input type="text" id="stGroup" list="stGroups" placeholder="напр. ИНВ-1" autocomplete="off">
         <datalist id="stGroups"></datalist>
       </div>
-      <div class="form-group"><label>Роль *</label><select id="stRole"></select></div>
+      <div class="form-group"><label>Роль *</label><select id="stRole" onchange="stRoleChanged()"></select></div>
+      <div class="form-grid" id="stDates">
+        <div class="form-group"><label id="stTrainLabel">Начало обучения</label>
+          <input type="date" id="stTraining">
+        </div>
+        <div class="form-group"><label>Дата приёмки</label>
+          <input type="date" id="stHired">
+          <small class="hint">От неё считается стаж. Можно оставить пустой и внести позже.</small>
+        </div>
+      </div>
       <div class="form-group"><label>Логин</label>
         <input type="text" id="stLogin" placeholder="пусто — соберём из ФИО" autocomplete="off"
                autocapitalize="off" spellcheck="false">
@@ -1279,7 +1307,7 @@
       document.getElementById('rgoPage').classList.remove('hidden');
       document.getElementById('rgoUserName').textContent = user.fullName;
       document.getElementById('rgoUserGroup').textContent = user.group;
-      loadRgoDashboard();
+      loadHiredDates(loadRgoDashboard);
     } else if (user.role === 'qc' || user.role === 'sqc' || user.role === 'admin') {
       document.getElementById('qcPage').classList.remove('hidden');
       document.getElementById('qcUserName').textContent = user.fullName;
@@ -1302,6 +1330,7 @@
       // статистику принятых звонков грузят за прошедший день
       document.getElementById('upDate').value = yesterdayStr();
       loadUploadPlan();
+      qWeek();
       loadOperatorAll();
     }
     restoreView(user, want);
@@ -1419,7 +1448,7 @@
       if (!res.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + res.error + '</p></div>'; return; }
 
       document.getElementById('opEvCount').textContent = res.stats.count;
-      document.getElementById('opEvAvg').textContent = res.stats.count ? pct2(res.stats.avg) : '—';
+      // средний балл считает getMyQuality: он умеет период и не берёт жалобы
 
       drawLineChart('opTrendChart', 'Качество контакта, %', res.trend.map(function (t) { return t.label; }), res.trend.map(function (t) { return t.score; }));
       drawBarChart('opFailsChart', 'Мои частые ошибки', res.fails.map(function (f) { return f.text; }), res.fails.map(function (f) { return f.count; }));
@@ -1688,7 +1717,8 @@
         '<td><span class="role-badge">' + roleRu(u.role) + '</span></td>' +
         '<td>' + (u.login || '<span class="no-pass">нет логина</span>') + '</td>' +
         '<td>' + (u.hasPassword ? '✓' : '<span class="no-pass">нет пароля</span>') + '</td>' +
-        '<td>' + (u.hired || '—') + '</td>' +
+        '<td>' + (u.training || '—') + '</td>' +
+        '<td>' + (u.hired || '<span class="no-pass">не принят</span>') + '</td>' +
         '<td>' +
           '<button class="btn-small" data-staff-edit type="button"><i class="fas fa-pen"></i> Изменить</button> ' +
           '<button class="btn-small btn-danger" data-staff-del type="button" title="Уволить: учётка выключится, логин освободится"><i class="fas fa-user-minus"></i> Уволить</button>' +
@@ -1696,7 +1726,8 @@
       '</tr>').join('');
 
     box.innerHTML = '<div class="table-wrapper"><table><thead><tr>' +
-      '<th>ФИО</th><th>Группа</th><th>Роль</th><th>Логин</th><th>Пароль</th><th>Принят</th><th>Действия</th>' +
+      '<th>ФИО</th><th>Группа</th><th>Роль</th><th>Логин</th><th>Пароль</th>' +
+      '<th>Обучение</th><th>Принят</th><th>Действия</th>' +
       '</tr></thead><tbody>' + rows + '</tbody></table></div>';
 
     // имена подставляем через свойство, а не в разметку: кавычки в ФИО ничего не сломают
@@ -1715,6 +1746,9 @@
     document.getElementById('stGroup').value = u ? (u.group || '') : '';
     document.getElementById('stRole').value = u ? u.role : 'operator';
     document.getElementById('stLogin').value = u ? (u.login || '') : '';
+    document.getElementById('stTraining').value = u ? (u.trainingIso || '') : '';
+    document.getElementById('stHired').value = u ? (u.hiredIso || '') : '';
+    stRoleChanged();
     document.getElementById('stPass').value = '';
     document.getElementById('stPassLabel').textContent = u ? 'Новый пароль' : 'Пароль *';
     document.getElementById('stPassHint').textContent = u
@@ -1734,6 +1768,14 @@
     m.style.display = 'block';
   }
 
+  // Оператора заводят в день выхода на обучение — без этой даты потом
+  // не понять, с какого числа человек в КЦ. У остальных ролей обучения нет.
+  function stRoleChanged() {
+    const isOp = document.getElementById('stRole').value === 'operator';
+    document.getElementById('stDates').style.display = isOp ? '' : 'none';
+    document.getElementById('stTrainLabel').textContent = isOp ? 'Начало обучения *' : 'Начало обучения';
+  }
+
   function submitStaff(ev) {
     ev.preventDefault();
     const name = document.getElementById('stName').value.trim();
@@ -1741,7 +1783,17 @@
     const role = document.getElementById('stRole').value;
     const login = document.getElementById('stLogin').value.trim();
     const pass = document.getElementById('stPass').value.trim();
+    const training = document.getElementById('stTraining').value;
+    const hired = document.getElementById('stHired').value;
     if (!name) { staffMsg('Укажите ФИО', 'error'); return false; }
+    if (role === 'operator' && !training) {
+      staffMsg('Укажите дату начала обучения', 'error');
+      document.getElementById('stTraining').focus();
+      return false;
+    }
+    if (training && hired && hired < training) {
+      staffMsg('Приёмка раньше начала обучения', 'error'); return false;
+    }
 
     const t = sessionStorage.getItem('token');
     const btn = document.querySelector('#staffForm .btn-save');
@@ -1760,7 +1812,7 @@
       google.script.run
         .withSuccessHandler(r => r.success ? done('Добавлен, логин: ' + r.login) : failed(r.error))
         .withFailureHandler(e => failed(e))
-        .addUser(t, name, group, role, login, pass);
+        .addUser(t, name, group, role, login, pass, hired, training);
       return false;
     }
 
@@ -1786,7 +1838,7 @@
         });
       })
       .withFailureHandler(e => failed(e))
-      .updateUser(t, staffEditing, name, group, role);
+      .updateUser(t, staffEditing, name, group, role, hired, training);
     return false;
   }
 
@@ -1946,6 +1998,30 @@
   }
 
   // ---------- РГО ----------
+  // Дату приёмки РГО вносит один раз — от неё считается стаж оператора.
+  // Держим её отдельным запросом: дашборд про качество, а не про состав.
+  let rgoHired = {};
+  const cssId = n => 'x' + String(n).replace(/[^A-Za-zА-Яа-я0-9]/g, '');
+
+  function loadHiredDates(then) {
+    google.script.run.withSuccessHandler(function (r) {
+      rgoHired = {};
+      if (r.success) r.users.forEach(function (u) { rgoHired[u.fullName] = u; });
+      if (then) then();
+    }).withFailureHandler(function () { if (then) then(); })
+      .getMyTeamStaff(sessionStorage.getItem('token'));
+  }
+
+  function saveHired(fullName) {
+    const el = document.getElementById('hd_' + cssId(fullName));
+    if (!el || !el.value) { alert('Выберите дату приёмки'); return; }
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) { alert(r.error); return; }
+      loadHiredDates(loadRgoDashboard);
+    }).withFailureHandler(e => alert(e))
+      .setHiredDate(sessionStorage.getItem('token'), fullName, el.value);
+  }
+
   function loadRgoDashboard() {
     google.script.run.withSuccessHandler(function (res) {
       if (!res.success) { document.getElementById('rgoOperatorsList').innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + (res.error || 'Ошибка') + '</p></div>'; return; }
@@ -1955,18 +2031,26 @@
       document.getElementById('rgoAvg').textContent = res.summary.callsChecked ? pct2(res.summary.avgScore) : '—';
 
       drawLineChart('rgoTrendChart', 'Средний балл группы, %', res.groupTrend.map(function (t) { return t.label; }), res.groupTrend.map(function (t) { return t.score; }));
-      drawBarChart('rgoFailsChart', 'Частые провалы', res.topFails.map(function (f) { return f.text; }), res.topFails.map(function (f) { return f.count; }));
+      drawBarChart('rgoFailsChart', 'Топ ошибок', res.topFails.map(function (f) { return f.text; }), res.topFails.map(function (f) { return f.count; }));
 
       const box = document.getElementById('rgoOperatorsList');
       if (!res.operators.length) { box.innerHTML = '<div class="empty-state"><i class="fas fa-user-slash"></i><p>В группе нет операторов</p></div>'; return; }
-      let html = '<div class="table-wrapper"><table><thead><tr><th>Оператор</th><th>Группа</th><th>Проверок</th><th>Средний балл</th><th>Провалов</th></tr></thead><tbody>';
+      let html = '<div class="table-wrapper"><table><thead><tr><th>Оператор</th><th>Группа</th><th>Проверок</th><th>Средний балл</th><th title="сколько ошибок набралось по чек-листам: критичные плюс некритичные">Ошибок по ч/л</th><th title="от неё считается стаж оператора">Принят</th></tr></thead><tbody>';
       res.operators.forEach(function (o) {
         const scoreCell = o.avgScore === null ? '<span style="color:#bbb">нет проверок</span>' : '<strong style="color:' + scoreColorHex(o.avgScore) + '">' + pct2(o.avgScore) + '</strong>';
-        html += '<tr><td>' + o.fullName + '</td><td>' + o.group + '</td><td>' + o.checkedCount + '</td><td>' + scoreCell + '</td><td>' + o.failsCount + '</td></tr>';
+        const h = rgoHired[o.fullName];
+        // приёмку РГО ставит один раз: дальше поле только показывает дату
+        const hiredCell = (h && h.hired)
+          ? h.hired
+          : '<span class="hired-set"><input type="date" id="hd_' + cssId(o.fullName) + '"' +
+            (h && h.training ? ' title="обучение с ' + h.training + '"' : '') + '>' +
+            '<button class="btn-small" onclick="saveHired(' + Q + o.fullName.replace(/'/g, "") + Q + ')">Принят</button></span>';
+        html += '<tr><td>' + o.fullName + '</td><td>' + o.group + '</td><td>' + o.checkedCount + '</td><td>' + scoreCell + '</td><td>' + o.failsCount + '</td><td>' + hiredCell + '</td></tr>';
       });
       html += '</tbody></table></div>';
       box.innerHTML = html;
-    }).getRgoDashboard(sessionStorage.getItem('token'), document.getElementById('rgoPeriod').value);
+    }).getRgoDashboard(sessionStorage.getItem('token'), 'all',
+      document.getElementById('rgoFrom').value, document.getElementById('rgoTo').value);
   }
 
   // ---------- ЧЕК-ЛИСТ v2: ОЦЕНКА ЗВОНКА ----------
@@ -2728,6 +2812,38 @@
       document.getElementById('prGroup').value);
   }
 
+  // ---------- КАЧЕСТВО ОПЕРАТОРА ЗА ПЕРИОД ----------
+  // Раньше в карточке стояло среднее по заявкам оператора: оценки, которые
+  // СКК сделал сам, без заявки, туда не попадали. Считаем по оценкам.
+  function weekStart() {
+    const d = new Date();
+    const shift = (d.getDay() + 6) % 7;          // понедельник — начало недели
+    d.setDate(d.getDate() - shift);
+    return d.toLocaleDateString('sv');
+  }
+  function qWeek() {
+    document.getElementById('qFrom').value = weekStart();
+    document.getElementById('qTo').value = new Date().toLocaleDateString('sv');
+    loadMyQuality();
+  }
+  function loadMyQuality() {
+    const from = document.getElementById('qFrom').value;
+    const to = document.getElementById('qTo').value;
+    const hint = document.getElementById('qHint');
+    hint.textContent = 'считаю…';
+    google.script.run.withSuccessHandler(function (r) {
+      const el = document.getElementById('opEvAvg');
+      if (!r.success) { hint.textContent = r.error; return; }
+      el.textContent = r.count ? pct2(r.avg) : '—';
+      el.style.color = r.count ? scoreColorHex(r.avg) : '';
+      document.getElementById('opAvgLabel').textContent =
+        (from === weekStart() && to === new Date().toLocaleDateString('sv'))
+          ? 'Качество за неделю' : 'Качество за период';
+      hint.textContent = 'с ' + r.from + ' по ' + r.to + ': прослушано ' + r.count +
+        (r.pj ? ', плюс оценок по жалобам ' + r.pj + ' — они в средний балл не входят' : '');
+    }).getMyQuality(sessionStorage.getItem('token'), from, to);
+  }
+
   // ---------- ВЫГРУЗКА У ОПЕРАТОРА ----------
   // Оператор видит только свою строку: общий план прослушки ему не
   // показываем, там весь КЦ.
@@ -2761,7 +2877,7 @@
         '<td>' + r[2] + '</td><td>' + r[3] + '</td><td>' + r[4] + '</td></tr>';
     });
     html += '</tbody></table></div>' +
-      '<div class="hint" style="margin-top:8px;">СР — средний, КР — короткий, ДЛ — длинный, ЗКВ — затянутый.</div>';
+      '<div class="hint" style="margin-top:8px;">СР — средний, КР — короткий, ДЛ — длинный, ЗКВ — запись/консультация к врачу.</div>';
     document.getElementById('upMemo').innerHTML = html;
   }
 
@@ -2778,14 +2894,17 @@
       }
       box.innerHTML = '<div class="table-wrapper"><table><thead><tr>' +
         '<th>Оператор</th><th>Группа</th><th>Принято</th><th>План (' + r.percent + '%)</th>' +
-        '<th>Выгружено</th><th>Осталось</th></tr></thead><tbody>' +
+        '<th>Выгружаете вы</th><th>Выгружено</th><th>Осталось</th></tr></thead><tbody>' +
         '<tr><td>' + r.operator + '</td><td>' + r.group + '</td><td>' + r.accepted + '</td>' +
-        '<td><strong>' + r.plan + '</strong></td><td>' + r.submitted + '</td>' +
+        '<td>' + r.plan + '</td><td><strong>' + r.ownPlan + '</strong></td>' +
+        '<td>' + r.submitted + '</td>' +
         '<td><strong style="color:' + (r.left ? 'var(--bad)' : 'var(--good)') + '">' + r.left + '</strong></td>' +
         '</tr></tbody></table></div>' +
+        '<div class="hint" style="margin-top:10px;">Из плана в ' + r.plan + ' звонк' + (r.plan === 1 ? '' : 'а') +
+          ' один СКК берёт сам, поэтому от вас — <strong>' + r.ownPlan + '</strong>.' +
         (r.left
-          ? '<div class="hint" style="margin-top:10px;">Осталось выгрузить: <strong>' + r.left + '</strong>. Заявку подайте ниже, в блоке «Сдать звонок на проверку».</div>'
-          : '<div class="hint" style="margin-top:10px;color:var(--good);">За этот день всё выгружено.</div>');
+          ? ' Осталось выгрузить: <strong>' + r.left + '</strong> — заявку подайте ниже, в блоке «Сдать звонок на проверку».'
+          : ' <span style="color:var(--good);">За этот день всё выгружено.</span>') + '</div>';
     }).getMyUploadPlan(sessionStorage.getItem('token'), document.getElementById('upDate').value);
   }
 
@@ -2829,6 +2948,7 @@
       group: document.getElementById('jGroup').value,
       operator: document.getElementById('jOperator').value.trim(),
       qc: document.getElementById('jQc').value.trim(),
+      phone: document.getElementById('jPhone').value.trim(),
       onlyErrors: document.getElementById('jErrors').checked,
       onlyComplaint: document.getElementById('jPj').checked,
       onlyViolation: document.getElementById('jNs').checked
@@ -2840,7 +2960,7 @@
   function jKey(e) { if (e.key === 'Enter') loadJournal(); }
 
   function jReset() {
-    ['jOperator', 'jQc'].forEach(function (id) { document.getElementById(id).value = ''; });
+    ['jOperator', 'jQc', 'jPhone'].forEach(function (id) { document.getElementById(id).value = ''; });
     document.getElementById('jGroup').value = '';
     ['jErrors', 'jPj', 'jNs'].forEach(function (id) { document.getElementById(id).checked = false; });
     const now = new Date();
@@ -2978,7 +3098,7 @@
 
       // качество по группам
       drawBarChartV('orgGroupChart', 'Средний балл по группам, %', res.byGroup.map(function (g) { return g.group; }), res.byGroup.map(function (g) { return g.avgScore == null ? 0 : g.avgScore; }));
-      let gh = '<div class="table-wrapper"><table><thead><tr><th>Группа</th><th>Операторов</th><th>С проверками</th><th>Звонков</th><th>Средний балл</th><th>Провалов</th></tr></thead><tbody>';
+      let gh = '<div class="table-wrapper"><table><thead><tr><th>Группа</th><th>Операторов</th><th>С проверками</th><th>Звонков</th><th>Средний балл</th><th title="сколько ошибок набралось по чек-листам: критичные плюс некритичные">Ошибок по ч/л</th></tr></thead><tbody>';
       res.byGroup.forEach(function (g) {
         const sc = g.avgScore == null ? '<span style="color:#bbb">—</span>' : '<strong style="color:' + scoreColorHex(g.avgScore) + '">' + pct2(g.avgScore) + '</strong>';
         gh += '<tr><td><strong>' + g.group + '</strong></td><td>' + g.operators + '</td><td>' + g.checked + '</td><td>' + g.callsChecked + '</td><td>' + sc + '</td><td>' + g.fails + '</td></tr>';
@@ -2987,7 +3107,7 @@
       document.getElementById('orgGroupTable').innerHTML = gh;
 
       drawLineChart('orgTrendChart', 'Средний балл, %', res.groupTrend.map(function (t) { return t.label; }), res.groupTrend.map(function (t) { return t.score; }));
-      drawBarChart('orgFailsChart', 'Частые провалы', res.topFails.map(function (f) { return f.text; }), res.topFails.map(function (f) { return f.count; }));
+      drawBarChart('orgFailsChart', 'Топ ошибок', res.topFails.map(function (f) { return f.text; }), res.topFails.map(function (f) { return f.count; }));
 
       if (isMgr) {
         let qh = '<div class="table-wrapper"><table><thead><tr><th>Контролёр</th><th>Проверено звонков</th><th>Средний балл, который ставит</th></tr></thead><tbody>';
@@ -3005,7 +3125,8 @@
       groups.sort();
       gf.innerHTML = '<option value="">Все группы (по порядку)</option>' + groups.map(function (g) { return '<option value="' + g + '">' + g + '</option>'; }).join('');
       renderOrgOperators();
-    }).getOrgDashboard(sessionStorage.getItem('token'), document.getElementById('orgPeriod').value);
+    }).getOrgDashboard(sessionStorage.getItem('token'), 'all',
+      document.getElementById('orgFrom').value, document.getElementById('orgTo').value);
   }
 
   function renderOrgOperators() {
@@ -3023,7 +3144,7 @@
         return a.avgScore - b.avgScore;
       });
     } // 'score' — уже отсортированы бэком: слабые сверху
-    let oh = '<div class="table-wrapper"><table><thead><tr><th>Оператор</th><th>Группа</th><th>Проверок</th><th>Средний балл</th><th>Провалов</th></tr></thead><tbody>';
+    let oh = '<div class="table-wrapper"><table><thead><tr><th>Оператор</th><th>Группа</th><th>Проверок</th><th>Средний балл</th><th title="сколько ошибок набралось по чек-листам: критичные плюс некритичные">Ошибок по ч/л</th></tr></thead><tbody>';
     let prevG = null;
     list.forEach(function (o) {
       if (mode === 'group' && !gsel && o.group !== prevG) {

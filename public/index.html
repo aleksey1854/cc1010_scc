@@ -2131,6 +2131,16 @@
     box.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Загрузка...</p></div>';
     google.script.run.withSuccessHandler(function (r) {
       if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
+      // статистику грузят не каждый день: если за выбранный день её нет,
+      // один раз уходим на последний, по которому она есть
+      const dt = document.getElementById('planDate');
+      if (r.noData && r.latestStat && r.latestStat !== dt.value && !box.dataset.jumped) {
+        box.dataset.jumped = '1';
+        dt.value = r.latestStat;
+        loadPlan();
+        return;
+      }
+      box.dataset.jumped = '';
       document.getElementById('planOps').textContent = r.summary.operators;
       document.getElementById('planNeed').textContent = r.summary.plan;
       document.getElementById('planDone').textContent = r.summary.done;
@@ -2888,10 +2898,20 @@
       if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
       renderUploadMemo(r.accepted);
       if (r.noStats) {
+        // статистику грузят не каждый день — сами уходим на последний,
+        // по которому она есть, чтобы экран не был пустым
+        const el = document.getElementById('upDate');
+        if (r.latestStat && r.latestStat !== el.value && !box.dataset.jumped) {
+          box.dataset.jumped = '1';
+          el.value = r.latestStat;
+          loadUploadPlan();
+          return;
+        }
         box.innerHTML = '<div class="empty-state"><i class="fas fa-hourglass-half"></i>' +
           '<p>Статистику за ' + r.date + ' ещё не загрузили.<br>План появится, как только СКК её выгрузит.</p></div>';
         return;
       }
+      box.dataset.jumped = '';
       box.innerHTML = '<div class="table-wrapper"><table><thead><tr>' +
         '<th>Оператор</th><th>Группа</th><th>Принято</th><th>План (' + r.percent + '%)</th>' +
         '<th>Выгружаете вы</th><th>Выгружено</th><th>Осталось</th></tr></thead><tbody>' +

@@ -164,9 +164,13 @@ const R = (fn, ...a) => api.call(fn, a);
   const prod = await R('getProductionReport', qcT, DATE, DATE, '');
   chk('производственные показатели считаются', prod.success === true, prod.error);
   const find = n => [].concat(...prod.groups.map(g => g.operators)).find(o => o.name === n);
+  // неподтверждённая жалоба в производственные показатели не идёт вовсе:
+  // АУП она не нужна, в журнале остаётся
   const withPj = find(OP2[0]);
-  chk('  оценка по жалобе ушла в колонку ПЖ', withPj && withPj.pj.length === 1, withPj);
-  chk('  и в качество не попала', withPj && withPj.scores.length === 0 && withPj.avg === null, withPj);
+  chk('  неподтверждённая жалоба вне производственных',
+    withPj && withPj.pj.length === 0 && withPj.scores.length === 0 && withPj.avg === null, withPj);
+  chk('  но в журнале она есть',
+    (await R('getJournal', qcT, { period: 'all', onlyAnyComplaint: true })).rows.length >= 1);
   const plain = find(OP[0]);
   chk('  плановая прослушка попала в качество',
     plain && plain.scores.length > 0 && plain.avg !== null, plain);
@@ -178,8 +182,8 @@ const R = (fn, ...a) => api.call(fn, a);
   const grp = prod.groups.find(g => g.name === 'ИНВ-1');
   chk('  жалоба без подтверждения в среднюю по группе не попала',
     grp && grp.checked === grp.plan, grp && [grp.checked, grp.plan, grp.pjConfirmed]);
-  chk('  и посчитана как необоснованная',
-    grp && grp.pj === 1 && grp.pjConfirmed === 0, grp && [grp.pj, grp.pjConfirmed]);
+  chk('  необоснованных в отчёте нет',
+    grp && grp.pj === 0 && grp.pjConfirmed === 0, grp && [grp.pj, grp.pjConfirmed]);
   chk('оператору отчёт закрыт', (await R('getProductionReport', opT, DATE, DATE, '')).success === false);
 
   // новичок со стажем меньше месяца в колонку «без стажа менее месяца» не идёт
@@ -258,6 +262,49 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('чужую заявку оператору не отдаёт',
     (await R('getRequestHistory', (await R('login', creds.find(x => x[2] === 'operator' && x[0] !== OP[0])[3],
       creds.find(x => x[2] === 'operator' && x[0] !== OP[0])[4])).token, REQ_ID)).success === false);
+
+  head('ШАГ 3в1. КЗ, ДАТА ОТПРАВКИ, УДАЛЕНИЕ');
+  // контрольный звонок заказчика: обычная оценка с признаком
+  const kzMeta = { ...META, reqId: '', callTime: '15:05', phone: '79161112233', controlCall: true };
+  const kz = await R('saveEvaluation', { pin: qcT, meta: kzMeta, answers: ans, comments: {} });
+  chk('КЗ сохраняется', kz.success === true, kz.error);
+  const kzCard = await R('getEvaluationCard', qcT, kz.id);
+  chk('  признак КЗ вернулся', kzCard.meta.controlCall === true, kzCard.meta);
+  const kzJournal = await R('getJournal', qcT, { period: 'all', onlyControl: true });
+  chk('фильтр «КЗ» отбирает только их',
+    kzJournal.rows.length > 0 && kzJournal.rows.every(r => r.controlCall), kzJournal.rows.length);
+  const kzProd = await R('getProductionReport', qcT, DATE, DATE, '');
+  const kzOp = [].concat(...kzProd.groups.map(g => g.operators)).find(o => o.name === OP[0]);
+  chk('КЗ идёт в качество оператора', kzOp && kzOp.kz.length === 1 && kzOp.scores.length >= 1, kzOp && kzOp.kz);
+
+  // дата отправки — только у чек-листов по жалобе
+  chk('обычному чек-листу дату отправки не поставить',
+    (await R('setSentDate', qcT, kz.id, '2026-09-05')).success === false);
+  chk('жалобному — можно',
+    (await R('setSentDate', qcT, cEv.id, '2026-09-05')).success === true);
+  const sentJ = await R('getJournal', qcT, { period: 'all' });
+  const sentRow = sentJ.rows.find(r => r.id === cEv.id);
+  chk('  дата отправки видна в журнале', sentRow && sentRow.sentDate === '05.09.2026', sentRow && sentRow.sentDate);
+  chk('  и она же стала отчётной', sentRow && sentRow.repDate === '05.09.2026', sentRow && sentRow.repDate);
+  chk('фильтр «все жалобы» их находит',
+    (await R('getJournal', qcT, { period: 'all', onlyAnyComplaint: true })).rows.length >= 1);
+
+  // отметки в плане прослушки
+  chk('СКК берёт оператора в работу',
+    (await R('setListenMark', qcT, DATE, OP[0], 'in_progress')).success === true);
+  const planMarks = await R('getListeningPlan', qcT, DATE);
+  const marked = planMarks.rows.find(x => x.operator === OP[0]);
+  chk('  отметка видна остальным', marked && marked.mark === 'in_progress', marked && marked.mark);
+  chk('  и подписана именем', marked && !!marked.markBy, marked && marked.markBy);
+  chk('отметку можно снять', (await R('setListenMark', qcT, DATE, OP[0], '')).success === true);
+
+  // удаление оценки
+  chk('оператор оценку не удалит', (await R('deleteEvaluation', opT, kz.id)).success === false);
+  chk('РГО тоже не удалит', (await R('deleteEvaluation', rgoT, kz.id)).success === false);
+  chk('СКК удаляет чек-лист', (await R('deleteEvaluation', qcT, kz.id)).success === true);
+  chk('  и он пропал из журнала',
+    !(await R('getJournal', qcT, { period: 'all' })).rows.some(r => r.id === kz.id));
+  chk('  повторное удаление отклонено', (await R('deleteEvaluation', qcT, kz.id)).success === false);
 
   head('ШАГ 3г. АПЕЛЛЯЦИИ');
   // РГО не согласен с оценкой своего оператора

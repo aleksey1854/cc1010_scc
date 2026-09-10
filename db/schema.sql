@@ -164,6 +164,7 @@ CREATE TABLE evaluations (
   complaint_mark boolean     NOT NULL DEFAULT false,
   complaint_source text       NOT NULL DEFAULT '',   -- Клиент / Заказчик
   sent_at       date,                                 -- когда отправили чек-лист по жалобе
+  control_call  boolean     NOT NULL DEFAULT false,   -- контрольный звонок заказчика
 
   reply_date    date,
   reply_status  text        NOT NULL DEFAULT '',
@@ -254,3 +255,17 @@ CREATE TABLE appeals (
 CREATE INDEX appeals_team_idx   ON appeals (team, created_at DESC);
 CREATE INDEX appeals_status_idx ON appeals (status, created_at DESC);
 CREATE UNIQUE INDEX appeals_open_uq ON appeals (evaluation_id) WHERE status = 'new';
+
+-- ---------- КТО КОГО СЛУШАЕТ ----------
+-- Двое СКК могли одновременно взять одного оператора. Отметка «в работе»
+-- рядом с ним это снимает.
+CREATE TYPE listen_status AS ENUM ('in_progress', 'done');
+
+CREATE TABLE listening_marks (
+  stat_date   date          NOT NULL,
+  operator_id bigint        NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  status      listen_status NOT NULL,
+  qc_name     text          NOT NULL DEFAULT '',
+  updated_at  timestamptz   NOT NULL DEFAULT now(),
+  PRIMARY KEY (stat_date, operator_id)
+);

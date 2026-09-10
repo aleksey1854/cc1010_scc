@@ -204,8 +204,16 @@
   .memo .mine td{ background:var(--accent-soft); font-weight:600; }
   .pr-total td{ background:var(--surface-2); font-weight:600; }
   .pj-col{ background:var(--bad-bg); }
+  .kz-col{ background:var(--accent-soft); }
   .chk{ display:flex; align-items:center; gap:6px; font-size:14px; color:var(--ink-2); }
   .chk input{ width:16px; height:16px; }
+  .mark-sel{ width:auto; min-width:104px; padding:5px 8px; font-size:13px; }
+  .mark-in_progress{ border-color:var(--mid); background:var(--mid-bg); color:#8a5600; font-weight:600; }
+  .mark-done{ border-color:var(--good); background:var(--good-bg); color:#0a6e3d; font-weight:600; }
+  .mark-row td{ background:var(--mid-bg); }
+  .ev-kz{ padding:5px 10px; border:1px solid var(--border-strong); border-radius:8px;
+    background:var(--surface); white-space:nowrap; }
+  .ev-kz input:checked + span, .ev-kz:has(input:checked){ color:var(--accent-ink); border-color:var(--accent); background:var(--accent-soft); }
   .ap-badge{ display:inline-block; margin-left:7px; min-width:18px; padding:1px 6px; border-radius:9px;
     background:var(--bad); color:#fff; font-size:11px; font-weight:700; vertical-align:middle; }
   .ap-status{ display:inline-block; padding:3px 10px; border-radius:8px; font-size:12px; font-weight:600; white-space:nowrap; }
@@ -557,6 +565,14 @@
 
     <div class="card">
       <div class="card-title"><i class="fas fa-clipboard-check"></i> Мои оценки и ошибки</div>
+      <div class="filter-bar" style="margin-bottom:14px;">
+        <span class="date-range">
+          <label>с</label><input type="date" id="evFrom" onchange="loadMyEvaluations()">
+          <label>по</label><input type="date" id="evTo" onchange="loadMyEvaluations()">
+        </span>
+        <button type="button" class="btn-filter" onclick="clearRange('ev', loadMyEvaluations)"><i class="fas fa-rotate-left"></i> За всё время</button>
+        <span style="color:var(--muted);font-size:13px;">по дате прослушки</span>
+      </div>
       <div id="opEvalList"></div>
     </div>
 
@@ -604,6 +620,14 @@
 
     <div class="card">
       <div class="card-title"><i class="fas fa-list"></i> Мои заявки</div>
+      <div class="filter-bar" style="margin-bottom:14px;">
+        <span class="date-range">
+          <label>с</label><input type="date" id="rqFrom" onchange="renderMyRequests()">
+          <label>по</label><input type="date" id="rqTo" onchange="renderMyRequests()">
+        </span>
+        <button type="button" class="btn-filter" onclick="clearRange('rq', renderMyRequests)"><i class="fas fa-rotate-left"></i> За всё время</button>
+        <span style="color:var(--muted);font-size:13px;">по дате звонка</span>
+      </div>
       <div id="opRequestsList"></div>
     </div>
   </div>
@@ -692,6 +716,11 @@
           <span class="ev-chip bad" id="evCrit">критичных: 0</span>
           <span class="ev-chip mid" id="evMinor">некритичных: 0</span>
           <span class="ev-chip ko hidden" id="evKo">недопустимое событие</span>
+        </div>
+        <div class="ev-counts">
+          <label class="chk ev-kz" title="контрольный звонок заказчика: в бланк для почты этот признак не попадает">
+            <input type="checkbox" id="evControl"> КЗ от заказчика
+          </label>
         </div>
         <button class="btn-submit" style="width:auto;padding:12px 26px;" onclick="submitEvaluation()"><i class="fas fa-save"></i> Сохранить оценку</button>
       </div>
@@ -939,6 +968,8 @@
           <label class="chk"><input type="checkbox" id="jErrors"> только с ошибками</label>
           <label class="chk"><input type="checkbox" id="jPj"> только ПЖ</label>
           <label class="chk"><input type="checkbox" id="jNs"> только НС</label>
+          <label class="chk"><input type="checkbox" id="jAnyPj" title="и подтверждённые, и необоснованные"> все жалобы</label>
+          <label class="chk"><input type="checkbox" id="jKz"> КЗ</label>
           <button class="btn-filter" style="background:var(--accent);" onclick="loadJournal()"><i class="fas fa-magnifying-glass"></i> Найти</button>
           <button class="btn-filter" onclick="jReset()" title="Сбросить фильтры"><i class="fas fa-rotate-left"></i></button>
           <button class="btn-filter" style="margin-left:auto;background:var(--good);" onclick="downloadReport('journal')"><i class="fas fa-download"></i> Скачать журнал</button>
@@ -1016,7 +1047,8 @@
       <div class="stats-grid">
         <div class="stat-card"><div class="number" id="prOverall">—</div><div class="label">Качество за период</div></div>
         <div class="stat-card"><div class="number new" id="prChecked">0</div><div class="label">Плановых прослушек</div></div>
-        <div class="stat-card"><div class="number rejected" id="prPj">0</div><div class="label">Жалоб: подтв. / необосн.</div></div>
+        <div class="stat-card"><div class="number rejected" id="prPj">0</div><div class="label">Подтверждённых жалоб</div></div>
+        <div class="stat-card"><div class="number" id="prKz">0</div><div class="label">КЗ от заказчика</div></div>
         <div class="stat-card"><div class="number checked" id="prOps">0</div><div class="label">Операторов</div></div>
         <div class="stat-card"><div class="number" id="prSenior">—</div><div class="label">Без стажа менее месяца</div></div>
       </div>
@@ -1079,10 +1111,8 @@
           <option value="Отклонена">Отклонена</option>
         </select>
       </div>
-      <div class="form-group">
-        <label>Оценка, % (можно скорректировать вручную)</label>
-        <input type="number" id="reviewRating" min="0" max="100" step="0.01">
-      </div>
+      <!-- Балл руками не ставят: он приходит из чек-листа, когда СКК
+           оценит звонок кнопкой «Оценить». -->
       <div class="form-group">
         <label>Комментарий</label>
         <textarea id="reviewComment" rows="3" placeholder="Введите комментарий..."></textarea>
@@ -1431,31 +1461,51 @@
 
   let myRequests = [];        // список для окна правки: второй раз спрашивать незачем
 
+  // Заявки уже загружены целиком — фильтруем на месте, без похода
+  // на сервер: список короткий, ждать нечего.
+  function renderMyRequests() {
+    const from = document.getElementById('rqFrom').value;
+    const to = document.getElementById('rqTo').value;
+    const inRange = r => {
+      const d = String(r.callDate || '').slice(0, 10);
+      if (from && d < from) return false;
+      if (to && d > to) return false;
+      return true;
+    };
+    drawMyRequests({ success: true, requests: myRequests.filter(inRange) });
+  }
+
+  // Отрисовку держим снаружи: её зовёт и фильтр по датам.
+  function drawMyRequests(result) {
+    const container = document.getElementById('opRequestsList');
+    if (result.success && result.requests && result.requests.length > 0) {
+      let html = '<div class="table-wrapper"><table><thead><tr><th>ID</th><th>Дата</th><th>Время, МСК</th><th>Телефон</th><th>Статус</th><th>Оценка</th><th>Комментарий</th><th>Действия</th></tr></thead><tbody>';
+      result.requests.forEach(function (r) {
+        const canEdit = r.status === 'Новая';
+        html += '<tr>' +
+          '<td><strong>' + r.id + '</strong></td>' +
+          '<td>' + formatDate(r.callDate) + '</td>' +
+          '<td>' + formatTime(r.callTime) + '</td>' +
+          '<td>' + UiPhone.pretty(r.phone) + '</td>' +
+          '<td><span class="status-badge ' + r.status.replace(/ /g, '_') + '">' + r.status + '</span></td>' +
+          '<td>' + (r.rating ? pct2(Number(r.rating)) : '-') + '</td>' +
+          '<td>' + (r.comment || '-') + '</td>' +
+          '<td>' + (canEdit ? '<button class="btn-small" title="Изменить заявку" onclick="openEditModal(\'' + r.id + '\')"><i class="fas fa-edit"></i></button> ' : '') + '<button class="btn-small" style="background:var(--surface-2);color:var(--ink-2);" title="История заявки" onclick="openHistory(\'' + r.id + '\')"><i class="fas fa-clock-rotate-left"></i></button></td>' +
+        '</tr>';
+      });
+      html += '</tbody></table></div>';
+      container.innerHTML = html;
+    } else {
+      container.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>У вас пока нет заявок</p></div>';
+    }
+  }
+
   function loadOperatorRequests(pre) {
     const render = function (result) {
-      const container = document.getElementById('opRequestsList');
       myRequests = (result && result.requests) || [];
-      if (result.success && result.requests && result.requests.length > 0) {
-        let html = '<div class="table-wrapper"><table><thead><tr><th>ID</th><th>Дата</th><th>Время, МСК</th><th>Телефон</th><th>Статус</th><th>Оценка</th><th>Комментарий</th><th>Действия</th></tr></thead><tbody>';
-        result.requests.forEach(function (r) {
-          const canEdit = r.status === 'Новая';
-          html += '<tr>' +
-            '<td><strong>' + r.id + '</strong></td>' +
-            '<td>' + formatDate(r.callDate) + '</td>' +
-            '<td>' + formatTime(r.callTime) + '</td>' +
-            '<td>' + UiPhone.pretty(r.phone) + '</td>' +
-            '<td><span class="status-badge ' + r.status.replace(/ /g, '_') + '">' + r.status + '</span></td>' +
-            '<td>' + (r.rating ? pct2(Number(r.rating)) : '-') + '</td>' +
-            '<td>' + (r.comment || '-') + '</td>' +
-            '<td>' + (canEdit ? '<button class="btn-small" title="Изменить заявку" onclick="openEditModal(\'' + r.id + '\')"><i class="fas fa-edit"></i></button> ' : '') + '<button class="btn-small" style="background:var(--surface-2);color:var(--ink-2);" title="История заявки" onclick="openHistory(\'' + r.id + '\')"><i class="fas fa-clock-rotate-left"></i></button></td>' +
-          '</tr>';
-        });
-        html += '</tbody></table></div>';
-        container.innerHTML = html;
-      } else {
-        container.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>У вас пока нет заявок</p></div>';
-      }
+      renderMyRequests();
     };
+    // отрисовку держим снаружи: её зовёт и фильтр по датам
     if (pre) return render(pre);
     google.script.run.withSuccessHandler(render).getOperatorRequests(sessionStorage.getItem('token'));
   }
@@ -1526,7 +1576,8 @@
         const cls = e.score >= 90 ? 'ok' : (e.score >= 70 ? 'mid' : 'bad');
         html += '<div class="fail-call">' +
           '<div class="fc-head">' +
-            '<div><strong>' + e.callDate + '</strong>' + (e.phone ? ' · ' + e.phone : '') + ' · СКК: ' + (e.qc || '—') + '</div>' +
+            '<div><strong>' + e.callDate + '</strong>' + (e.phone ? ' · ' + e.phone : '') + ' · СКК: ' + (e.qc || '—') +
+              (e.controlCall ? ' <span class="fail-tag minor" title="контрольный звонок заказчика">КЗ от заказчика</span>' : '') + '</div>' +
             '<div class="fc-score ' + cls + '">' + pct2(e.score) + '</div>' +
           '</div>';
         if (e.gratitude) html += '<div class="all-pass"><i class="fas fa-star"></i> Благодарность от клиента</div>';
@@ -1550,7 +1601,8 @@
       box.innerHTML = html;
     };
     if (pre) return render(pre);
-    google.script.run.withSuccessHandler(render).getMyEvaluations(sessionStorage.getItem('token'));
+    google.script.run.withSuccessHandler(render).getMyEvaluations(sessionStorage.getItem('token'),
+      document.getElementById('evFrom').value, document.getElementById('evTo').value);
   }
 
   // ---------- РЕДАКТИРОВАНИЕ ----------
@@ -2038,7 +2090,7 @@
     event.preventDefault();
     const p = sessionStorage.getItem('token');
     const status = document.getElementById('reviewStatus').value;
-    const rating = document.getElementById('reviewRating').value || '';
+    const rating = '';   // балл проставит чек-лист, руками его не трогают
     const comment = document.getElementById('reviewComment').value.trim() || '';
     const btn = event.target.querySelector('.btn-save'); btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Сохранение...';
 
@@ -2215,14 +2267,35 @@
       document.getElementById('planLeft').textContent = r.summary.left;
       document.getElementById('planPct').textContent = 'выборка ' + r.percent + '% от принятых';
       if (r.noData) { box.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Нет статистики за ' + r.date + '. Нажмите «Загрузить статистику дня».</p></div>'; return; }
-      let html = '<div class="table-wrapper"><table><thead><tr><th>Оператор</th><th>Группа</th><th>Принято</th><th>План (' + r.percent + '%)</th><th>Прослушано</th><th>Осталось</th><th>Выгрузил оператор</th><th>СКК сам</th></tr></thead><tbody>';
+      // Отметка «в работе» слева: двое СКК не возьмут одного оператора.
+      let html = '<div class="table-wrapper"><table><thead><tr>' +
+        '<th title="кто уже взял оператора в работу">Разбор</th>' +
+        '<th>Оператор</th><th>Группа</th><th>Принято</th><th>План (' + r.percent + '%)</th>' +
+        '<th>Прослушано</th><th>Осталось</th><th>Выгрузил оператор</th><th>СКК сам</th>' +
+        '</tr></thead><tbody>';
       r.rows.forEach(function (x) {
         const leftCell = x.left === 0 ? '<span style="color:var(--good);font-weight:700;">готово</span>' : '<strong style="color:var(--bad);">' + x.left + '</strong>';
-        html += '<tr><td>' + x.operator + '</td><td>' + x.group + '</td><td>' + x.accepted + '</td><td><strong>' + x.plan + '</strong></td><td>' + x.done + '</td><td>' + leftCell + '</td>' +
+        const sel = '<select class="mark-sel mark-' + (x.mark || 'none') + '" data-mark="' + x.operator.replace(/"/g, '&quot;') + '">' +
+          '<option value=""' + (x.mark ? '' : ' selected') + '>—</option>' +
+          '<option value="in_progress"' + (x.mark === 'in_progress' ? ' selected' : '') + '>В работе</option>' +
+          '<option value="done"' + (x.mark === 'done' ? ' selected' : '') + '>Готово</option>' +
+          '</select>' + (x.markBy ? '<div class="hint">' + x.markBy + '</div>' : '');
+        html += '<tr' + (x.mark === 'in_progress' ? ' class="mark-row"' : '') + '><td>' + sel + '</td>' +
+          '<td>' + x.operator + '</td><td>' + x.group + '</td><td>' + x.accepted + '</td><td><strong>' + x.plan + '</strong></td><td>' + x.done + '</td><td>' + leftCell + '</td>' +
           '<td>' + x.fromOperator + (x.submitted > x.fromOperator ? ' <span style="color:var(--mid);font-size:12px;">(+' + (x.submitted - x.fromOperator) + ' ждут)</span>' : '') + '</td><td>' + x.bySkk + '</td></tr>';
       });
       html += '</tbody></table></div>';
       box.innerHTML = html;
+      box.querySelectorAll('select[data-mark]').forEach(function (sel) {
+        sel.onchange = function () {
+          google.script.run.withSuccessHandler(function (res) {
+            if (!res.success) { alert(res.error); return; }
+            loadPlan(false);
+          }).withFailureHandler(function (e) { alert(e); })
+            .setListenMark(sessionStorage.getItem('token'),
+              document.getElementById('planDate').value, sel.getAttribute('data-mark'), sel.value);
+        };
+      });
     }).getListeningPlan(sessionStorage.getItem('token'), document.getElementById('planDate').value);
   }
 
@@ -2515,6 +2588,7 @@
         agg: cityRow ? cityRow.agg : '',
         reqId: evLinkedReq,
         complaintSource: evComplaintSrc,
+        controlCall: document.getElementById('evControl').checked,
         evId: evEditing
       },
       answers: evAnswers,
@@ -2616,6 +2690,7 @@
   // уезжают в новую оценку.
   function resetEvalForm() {
     evAnswers = defaultAnswers(); evComments = {}; evCmtOpen = {}; evComplaintSrc = '';
+    document.getElementById('evControl').checked = false;
     ['evPhone', 'evTime', 'evCity'].forEach(function (id) { document.getElementById(id).value = ''; });
     const agg = document.getElementById('evAgg');
     agg.value = ''; agg.dataset.auto = '';
@@ -2670,6 +2745,7 @@
       evComments = r.comments || {};
       evCmtOpen = {};
       evComplaintSrc = r.meta.complaintSource || '';
+      document.getElementById('evControl').checked = r.meta.controlCall === true;
       renderChecklist(); recalcEval(); evSubmitReady();
       evMsg('Правка ' + r.id + ' · ' + r.meta.operator + ': измените, что нужно, и нажмите «Сохранить правку»', 'success');
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2798,18 +2874,22 @@
       // Колонки повторяют недельный блок отчёта ОБД: «Общий % жалоб» там
       // считается от всех жалоб недели, а не внутри тематики.
       let html = '<div class="table-wrapper table-dense"><table><thead><tr>' +
-        '<th>Тематика</th><th>Неделя</th><th>Всего жалоб</th><th>Обоснованные</th>' +
+        '<th>Тематика</th><th>Неделя</th><th>Всего жалоб</th><th>Обоснованные</th><th>Необоснованные</th>' +
         '<th>Обосн. от клиентов</th><th>Обосн. от заказчика</th>' +
         '<th>Необосн. от клиентов</th><th>Необосн. от заказчика</th>' +
+        '<th title="источник не выбрали при оценке">Источник не указан</th>' +
         '<th>Общий % жалоб</th></tr></thead><tbody>';
       r.rows.forEach(function (x) {
+        // источник выбирают в чек-листе; у старых записей его нет, и тогда
+        // жалоба видна только в «Всего» — отсюда и отдельная колонка
         const noSrc = x.total - x.confClient - x.confCustomer - x.unconfClient - x.unconfCustomer;
-        html += '<tr><td><strong>' + x.topic + '</strong>' +
-          (noSrc ? ' <span class="hint" title="Источник жалобы не указан">(' + noSrc + ' без источника)</span>' : '') +
-          '</td><td>' + x.week + '</td><td>' + x.total + '</td>' +
+        html += '<tr><td><strong>' + x.topic + '</strong></td>' +
+          '<td>' + x.week + '</td><td>' + x.total + '</td>' +
           '<td>' + (x.confirmed ? '<span class="fail-tag">' + x.confirmed + '</span>' : '0') + '</td>' +
+          '<td>' + x.unconfirmed + '</td>' +
           '<td>' + x.confClient + '</td><td>' + x.confCustomer + '</td>' +
           '<td>' + x.unconfClient + '</td><td>' + x.unconfCustomer + '</td>' +
+          '<td' + (noSrc ? ' style="color:var(--mid);font-weight:600;"' : ' style="color:var(--muted);"') + '>' + noSrc + '</td>' +
           '<td><strong>' + pct2(x.weekShare) + '</strong></td></tr>';
       });
       html += '</tbody></table></div>';
@@ -2836,8 +2916,8 @@
       document.getElementById('prOverall').textContent = r.overall === null ? '—' : pct2(r.overall);
       document.getElementById('prOverall').style.color = r.overall === null ? '' : scoreColorHex(r.overall);
       document.getElementById('prChecked').textContent = r.planTotal;
-      document.getElementById('prPj').textContent =
-        r.pjConfirmedTotal + ' / ' + (r.pjTotal - r.pjConfirmedTotal);
+      document.getElementById('prPj').textContent = r.pjConfirmedTotal;
+      document.getElementById('prKz').textContent = r.kzTotal;
       document.getElementById('prOps').textContent = r.operators;
       const sen = document.getElementById('prSenior');
       sen.textContent = r.overallSenior === null ? '—' : pct2(r.overallSenior);
@@ -2855,6 +2935,7 @@
         '<th title="плановые и подтверждённые жалобы по операторам со стажем больше месяца">% с учётом отзывов,<br>без стажа менее месяца</th>' +
         '<th>Прослушано</th>';
       for (let i = 0; i < r.maxScores; i++) head += '<th>Оценка ' + (i + 1) + '</th>';
+      for (let i = 0; i < r.maxKz; i++) head += '<th class="kz-col" title="контрольный звонок заказчика">КЗ ' + (i + 1) + '</th>';
       for (let i = 0; i < r.maxPj; i++) head += '<th class="pj-col">ПЖ ' + (i + 1) + '</th>';
       head += '</tr>';
 
@@ -2872,6 +2953,11 @@
             html += '<td' + (x ? ' title="' + x.id + ' · ' + x.date + '"' : '') + '>' +
               (x ? '<span style="color:' + scoreColorHex(x.score) + '">' + pct2(x.score) + '</span>' : '') + '</td>';
           }
+          for (let i = 0; i < r.maxKz; i++) {
+            const x = o.kz[i];
+            html += '<td class="kz-col"' + (x ? ' title="' + x.id + ' · ' + x.date + '"' : '') + '>' +
+              (x ? '<span style="color:' + scoreColorHex(x.score) + '">' + pct2(x.score) + '</span>' : '') + '</td>';
+          }
           for (let i = 0; i < r.maxPj; i++) {
             const x = o.pj[i];
             html += '<td class="pj-col"' +
@@ -2887,7 +2973,7 @@
           '<td><strong>' + (g.avg === null ? '—' : pct2(g.avg)) + '</strong></td>' +
           '<td title="' + g.trainees + ' операторов со стажем меньше месяца не в счёт"><strong>' +
           (g.avgSenior === null ? '—' : pct2(g.avgSenior)) + '</strong></td>' +
-          '<td>' + g.checked + '</td><td colspan="' + (r.maxScores + r.maxPj) + '"></td></tr>';
+          '<td>' + g.checked + '</td><td colspan="' + (r.maxScores + r.maxKz + r.maxPj) + '"></td></tr>';
       });
       html += '</tbody></table></div>';
       box.innerHTML = html;
@@ -2998,6 +3084,32 @@
           ? ' Осталось выгрузить: <strong>' + r.left + '</strong> — заявку подайте ниже, в блоке «Сдать звонок на проверку».'
           : ' <span style="color:var(--good);">За этот день всё выгружено.</span>') + '</div>';
     }).getMyUploadPlan(sessionStorage.getItem('token'), document.getElementById('upDate').value);
+  }
+
+  // Дата отправки: её вносят позже, чем оценивают, и с этого момента
+  // чек-лист попадает в отчёты за день отправки.
+  function askSentDate(evId, current) {
+    const was = current ? current.split('-').reverse().join('.') : '';
+    const ans = prompt('Дата отправки чек-листа ' + evId + ' (ДД.ММ.ГГГГ).\n' +
+      'Оставьте пустым, чтобы снять дату.', was);
+    if (ans === null) return;
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) { alert(r.error); return; }
+      loadJournal();
+    }).withFailureHandler(function (e) { alert(e); })
+      .setSentDate(sessionStorage.getItem('token'), evId, ans.trim());
+  }
+
+  // Удаление оценки: чек-лист исчезает отовсюду, заявка возвращается
+  // в работу. Спрашиваем прямо, что именно удаляем.
+  function removeEvaluation(evId, who, score) {
+    if (!confirm('Точно удалить чек-лист ' + who + ' ' + pct2(Number(score)) + '?\n\n' +
+      'Оценка ' + evId + ' пропадёт из журнала и всех отчётов. Отменить будет нельзя.')) return;
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) { alert(r.error); return; }
+      loadJournal();
+    }).withFailureHandler(function (e) { alert(e); })
+      .deleteEvaluation(sessionStorage.getItem('token'), evId);
   }
 
   // ---------- АПЕЛЛЯЦИИ ----------
@@ -3177,7 +3289,9 @@
       phone: document.getElementById('jPhone').value.trim(),
       onlyErrors: document.getElementById('jErrors').checked,
       onlyComplaint: document.getElementById('jPj').checked,
-      onlyViolation: document.getElementById('jNs').checked
+      onlyViolation: document.getElementById('jNs').checked,
+      onlyAnyComplaint: document.getElementById('jAnyPj').checked,
+      onlyControl: document.getElementById('jKz').checked
     };
   }
 
@@ -3188,7 +3302,7 @@
   function jReset() {
     ['jOperator', 'jQc', 'jPhone'].forEach(function (id) { document.getElementById(id).value = ''; });
     document.getElementById('jGroup').value = '';
-    ['jErrors', 'jPj', 'jNs'].forEach(function (id) { document.getElementById(id).checked = false; });
+    ['jErrors', 'jPj', 'jNs', 'jAnyPj', 'jKz'].forEach(function (id) { document.getElementById(id).checked = false; });
     const now = new Date();
     document.getElementById('jFrom').value = new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString('sv');
     document.getElementById('jTo').value = now.toLocaleDateString('sv');
@@ -3216,7 +3330,17 @@
         const errs = e.failed.length
           ? e.failed.map(function (f) { return '<div style="margin:2px 0;"><span class="fail-tag' + (f.critical ? '' : ' minor') + '">' + f.text + '</span>' + (f.comment ? '<span style="color:var(--muted);font-size:12px;"> — ' + f.comment + '</span>' : '') + '</div>'; }).join('')
           : '<span style="color:var(--good);font-weight:600;">без ошибок</span>';
-        const flags = (e.violation ? ' <span class="fail-tag">НС</span>' : '') + (e.complaint ? ' <span class="fail-tag">ПЖ</span>' : '') + (e.gratitude ? ' <span class="fail-tag minor">★</span>' : '');
+        const flags = (e.violation ? ' <span class="fail-tag">НС</span>' : '') + (e.complaint ? ' <span class="fail-tag">ПЖ</span>' : '') + (e.gratitude ? ' <span class="fail-tag minor">★</span>' : '') + (e.controlCall ? ' <span class="fail-tag minor" title="контрольный звонок заказчика">КЗ</span>' : '');
+        // дату отправки вносят только у чек-листов по жалобе — их
+        // оценивают одним днём, а отправляют другим
+        const sent = (canEditEval && e.isComplaint)
+          ? '<button class="btn-small" title="Внести дату отправки чек-листа" data-sent="' + e.id +
+            '" data-sent-cur="' + (e.sentIso || '') + '"><i class="fas fa-paper-plane"></i></button> '
+          : '';
+        const del = canEditEval
+          ? '<button class="btn-small btn-danger" title="Удалить чек-лист" data-del="' + e.id +
+            '" data-del-who="' + e.operator.replace(/"/g, '&quot;') + '" data-del-score="' + e.score + '"><i class="fas fa-trash"></i></button> '
+          : '';
         // РГО не согласен с оценкой своего оператора — подаёт апелляцию
         const appeal = canFileAppeal
           ? '<button class="btn-small btn-warn" title="Подать апелляцию на эту оценку" data-appeal="' +
@@ -3228,17 +3352,26 @@
           ? '<button class="btn-small btn-warn" title="Изменить оценку по апелляции" onclick="editEvaluation(\'' + e.id + '\')"><i class="fas fa-pen-to-square"></i> Правка</button> '
           : '';
         html += '<tr><td style="white-space:nowrap;">' + e.callDate + '</td>' +
-          '<td style="white-space:nowrap;color:var(--muted);">' + (e.checkedDate || '—') + '</td>' +
+          '<td style="white-space:nowrap;color:var(--muted);">' + (e.checkedDate || '—') +
+            (e.sentDate ? '<div class="hint">отправлен ' + e.sentDate + '</div>' : '') + '</td>' +
           '<td>' + e.operator + '</td><td>' + e.group + '</td><td>' + e.qc + '</td>' +
           '<td style="white-space:nowrap;">' + (e.phone || '—') + '</td>' +
           '<td>' + (e.topic || '—') + '</td><td>' + (e.sub || '—') + '</td>' +
           '<td><strong style="color:' + scoreColorHex(e.score) + '">' + pct2(e.score) + '</strong>' + flags + '</td>' +
           '<td style="max-width:420px;">' + errs + '</td>' +
-          '<td style="white-space:nowrap;">' + appeal + edit +
+          '<td style="white-space:nowrap;">' + appeal + edit + sent + del +
           '<button class="btn-small" title="Скачать чек-лист" onclick="downloadEval(\'' + e.id + '\')"><i class="fas fa-file-excel"></i></button></td></tr>';
       });
       html += '</tbody></table></div>';
       box.innerHTML = html;
+      box.querySelectorAll('button[data-sent]').forEach(function (b) {
+        b.onclick = function () { askSentDate(b.getAttribute('data-sent'), b.getAttribute('data-sent-cur')); };
+      });
+      box.querySelectorAll('button[data-del]').forEach(function (b) {
+        b.onclick = function () {
+          removeEvaluation(b.getAttribute('data-del'), b.getAttribute('data-del-who'), b.getAttribute('data-del-score'));
+        };
+      });
       box.querySelectorAll('button[data-appeal]').forEach(function (b) {
         b.onclick = function () {
           openAppeal(b.getAttribute('data-appeal'), b.getAttribute('data-appeal-who'),

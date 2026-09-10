@@ -187,7 +187,9 @@
   .btn-submit:hover{ background:var(--accent-ink); transform:translateY(-1px); box-shadow:0 8px 20px rgba(43,89,240,.28); }
   .btn-submit:disabled{ opacity:.55; cursor:not-allowed; transform:none; box-shadow:none; }
   .hint{ display:block; color:var(--muted); font-size:12px; margin-top:5px; }
-  .seg{ display:inline-flex; background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:4px; margin-bottom:16px; gap:4px; }
+  /* восемь вкладок отчётов в строку на узком экране не помещались и
+     распирали всю страницу — переносим их по словам */
+  .seg{ display:flex; flex-wrap:wrap; background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:4px; margin-bottom:16px; gap:4px; }
   .seg-btn{ border:none; background:transparent; color:var(--ink-2); font-family:var(--display); font-weight:600; font-size:14px; padding:9px 18px; border-radius:9px; cursor:pointer; transition:.15s; }
   .seg-btn.active{ background:var(--accent); color:#fff; box-shadow:0 2px 8px rgba(43,89,240,.28); }
   .status-badge.Без_звонка{ background:#eceff5; color:#6b7585; }

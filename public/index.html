@@ -1322,7 +1322,10 @@
     if (t) google.script.run.logoutSession(t);    // иначе токен живёт на сервере до истечения срока
     resetState();
     sessionStorage.removeItem('user'); sessionStorage.removeItem('token'); sessionStorage.removeItem('nav');
-    ['operatorPage', 'qcPage', 'rgoPage', 'orgPage'].forEach(function (id) { document.getElementById(id).classList.add('hidden'); });
+    // страницу отчётов тоже прячем: без этого выход из отчётов оставлял их
+    // на экране, и следующий вошедший — например оператор — видел чужой
+    // раздел с «Нет доступа» вместо своего кабинета
+    ['operatorPage', 'qcPage', 'rgoPage', 'orgPage', 'repPage'].forEach(function (id) { document.getElementById(id).classList.add('hidden'); });
     document.getElementById('loginPage').classList.remove('hidden');
     document.getElementById('pinInput').value = '';
     document.getElementById('loginInput').value = '';
@@ -1351,6 +1354,11 @@
     const want = navSnapshot();
     resetState();
     document.getElementById('loginPage').classList.add('hidden');
+    // начинаем с чистого экрана: иначе страница прошлого входа могла
+    // остаться поверх и человек видел не свой раздел
+    ['operatorPage', 'qcPage', 'rgoPage', 'orgPage', 'repPage'].forEach(function (id) {
+      document.getElementById(id).classList.add('hidden');
+    });
     if (user.role === 'manager' || user.role === 'srgo') {
       document.getElementById('orgPage').classList.remove('hidden');
       document.getElementById('orgUserName').textContent = user.fullName;

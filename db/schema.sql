@@ -27,7 +27,8 @@ CREATE TABLE staff (
   login         citext,                               -- регистронезависим
   password_hash text,                                 -- sha256$итераций$соль$хеш
   hired_at      date,
-  training_at   date,                                 -- начало обучения; приёмка — hired_at
+  training_at   date,
+  dismissed_at  date,                                 -- уволен: в списках держим ещё 3 месяца                                 -- начало обучения; приёмка — hired_at
   active        boolean     NOT NULL DEFAULT true,
   created_at    timestamptz NOT NULL DEFAULT now(),
   updated_at    timestamptz NOT NULL DEFAULT now()

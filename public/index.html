@@ -536,7 +536,7 @@
       <div class="card-title"><i class="fas fa-upload"></i> Выгрузка звонков</div>
       <div class="filter-bar" style="margin-bottom:14px;">
         <span class="date-range">
-          <label>Дата</label><input type="date" id="upDate" onchange="loadUploadPlan()">
+          <label>Дата</label><input type="date" id="upDate" onchange="loadUploadPlan(false)">
         </span>
         <span style="color:var(--muted);font-size:13px;">сколько звонков за этот день нужно выгрузить лично вам</span>
       </div>
@@ -709,7 +709,7 @@
       <div class="card">
         <div class="filter-bar" style="margin-bottom:0;">
           <label style="font-size:14px;color:var(--ink-2);">Дата статистики:</label>
-          <input type="date" id="planDate" onchange="loadPlan()">
+          <input type="date" id="planDate" onchange="loadPlan(false)">
           <span id="planPct" style="color:var(--muted);font-size:13px;"></span>
           <button class="btn-filter" style="margin-left:auto;" onclick="openImport()"><i class="fas fa-upload"></i> Загрузить статистику дня</button>
         </div>
@@ -1393,7 +1393,7 @@
       document.getElementById('callDate').value = new Date().toISOString().split('T')[0];
       // статистику принятых звонков грузят за прошедший день
       document.getElementById('upDate').value = yesterdayStr();
-      loadUploadPlan();
+      loadUploadPlan(true);
       qWeek();
       loadOperatorAll();
     }
@@ -2185,7 +2185,7 @@
     document.getElementById('qcStaffTab').classList.toggle('hidden', t !== 'staff');
     if (t === 'req' && !allRequests.length) loadAllRequests();
     if (t === 'staff' && !staffAll.length) loadStaff();
-    if (t === 'plan') { if (!document.getElementById('planDate').value) document.getElementById('planDate').value = yesterdayStr(); loadPlan(); }
+    if (t === 'plan') { if (!document.getElementById('planDate').value) document.getElementById('planDate').value = yesterdayStr(); loadPlan(true); }
   }
 
   function yesterdayStr() {
@@ -2193,7 +2193,10 @@
     return d.toISOString().split('T')[0];
   }
 
-  function loadPlan() {
+  // auto = true только при открытии вкладки. Если человек сам выбрал дату,
+  // на которой статистики нет, отбрасывать его назад нельзя — он именно
+  // туда и шёл.
+  function loadPlan(auto) {
     const box = document.getElementById('planTable');
     box.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Загрузка...</p></div>';
     google.script.run.withSuccessHandler(function (r) {
@@ -2201,13 +2204,11 @@
       // статистику грузят не каждый день: если за выбранный день её нет,
       // один раз уходим на последний, по которому она есть
       const dt = document.getElementById('planDate');
-      if (r.noData && r.latestStat && r.latestStat !== dt.value && !box.dataset.jumped) {
-        box.dataset.jumped = '1';
+      if (auto && r.noData && r.latestStat && r.latestStat !== dt.value) {
         dt.value = r.latestStat;
-        loadPlan();
+        loadPlan(false);
         return;
       }
-      box.dataset.jumped = '';
       document.getElementById('planOps').textContent = r.summary.operators;
       document.getElementById('planNeed').textContent = r.summary.plan;
       document.getElementById('planDone').textContent = r.summary.done;
@@ -2270,7 +2271,7 @@
       if (r.unknown.length) txt += '. Нет в составе (' + r.unknown.length + '): ' + r.unknown.join(', ');
       m.textContent = txt; m.className = r.unknown.length ? 'message error' : 'message success'; m.style.display = 'block';
       document.getElementById('planDate').value = r.date.split('.').reverse().join('-');
-      setTimeout(function () { document.getElementById('importModal').classList.remove('active'); loadPlan(); }, r.unknown.length ? 3500 : 1200);
+      setTimeout(function () { document.getElementById('importModal').classList.remove('active'); loadPlan(false); }, r.unknown.length ? 3500 : 1200);
     }).withFailureHandler(function (e) { m.textContent = '❌ ' + e; m.className = 'message error'; m.style.display = 'block'; })
       .importAcceptedCalls(sessionStorage.getItem('token'), date, text, base64);
   }
@@ -2964,7 +2965,7 @@
     document.getElementById('upMemo').innerHTML = html;
   }
 
-  function loadUploadPlan() {
+  function loadUploadPlan(auto) {
     const box = document.getElementById('upBox');
     box.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Загрузка...</p></div>';
     google.script.run.withSuccessHandler(function (r) {
@@ -2974,17 +2975,15 @@
         // статистику грузят не каждый день — сами уходим на последний,
         // по которому она есть, чтобы экран не был пустым
         const el = document.getElementById('upDate');
-        if (r.latestStat && r.latestStat !== el.value && !box.dataset.jumped) {
-          box.dataset.jumped = '1';
+        if (auto && r.latestStat && r.latestStat !== el.value) {
           el.value = r.latestStat;
-          loadUploadPlan();
+          loadUploadPlan(false);
           return;
         }
         box.innerHTML = '<div class="empty-state"><i class="fas fa-hourglass-half"></i>' +
           '<p>Статистику за ' + r.date + ' ещё не загрузили.<br>План появится, как только СКК её выгрузит.</p></div>';
         return;
       }
-      box.dataset.jumped = '';
       box.innerHTML = '<div class="table-wrapper"><table><thead><tr>' +
         '<th>Оператор</th><th>Группа</th><th>Принято</th><th>План (' + r.percent + '%)</th>' +
         '<th>Выгружаете вы</th><th>Выгружено</th><th>Осталось</th></tr></thead><tbody>' +

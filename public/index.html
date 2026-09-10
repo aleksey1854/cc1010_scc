@@ -223,7 +223,9 @@
   .btn-partial{ background:var(--mid); color:#fff; }
   .hired-set{ display:flex; align-items:center; gap:6px; }
   .hired-set input{ width:auto; padding:5px 8px; font-size:13px; }
-  .date-range{ display:flex; align-items:center; gap:6px; }
+  .date-range{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  /* поля дат на телефоне шире экрана — ужимаем */
+  @media (max-width:520px){ .date-range input[type=date]{ max-width:140px; } }
   .date-range label{ margin:0; font-size:13px; color:var(--muted); }
   .date-range input{ width:auto; }
   .btn-small.btn-mute{ background:var(--surface-2); color:var(--ink-2); }

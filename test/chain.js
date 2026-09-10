@@ -244,6 +244,24 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('оператору дата приёмки закрыта',
     (await R('setHiredDate', opT, hiredOp[0], '2026-08-15')).success === false);
 
+  // уволенного держим в списках три месяца: на его звонок может прийти жалоба
+  const fired = creds.find(x => x[2] === 'operator' && x[1] === 'ИНВ-3');
+  chk('СРГО увольняет оператора', (await R('deleteUser', srgoT, fired[0])).success === true);
+  chk('  войти он больше не может', (await R('login', fired[3], fired[4])).success === false);
+  chk('  дата увольнения проставлена',
+    !!(await db.one(`SELECT dismissed_at FROM staff WHERE full_name = $1`, [fired[0]])).dismissed_at);
+  const opsAfter = await R('getOperatorsList', qcT);
+  chk('  но оценить его звонок ещё можно',
+    opsAfter.operators.some(o => o.fullName === fired[0] && o.dismissed), fired[0]);
+  chk('  и в составе он виден как уволенный',
+    (await R('getAllUsers', srgoT)).users.some(u => u.fullName === fired[0] && u.active === false));
+  await db.q(`UPDATE staff SET dismissed_at = current_date - interval '4 months' WHERE full_name = $1`, [fired[0]]);
+  chk('через три месяца пропадает из списков',
+    !(await R('getOperatorsList', qcT)).operators.some(o => o.fullName === fired[0]));
+  // возвращаем его на место: дальше по цепочке считают состав целиком
+  await db.q(`UPDATE staff SET active = true, dismissed_at = NULL, login = $2 WHERE full_name = $1`,
+    [fired[0], fired[3]]);
+
   chk('СРГО увольняет', (await R('deleteUser', srgoT, NEW_NAME)).success === true);
   chk('  уволенный не входит', (await R('login', added.login, 'Drug0jPar')).success === false);
   chk('себя удалить нельзя', (await R('deleteUser', srgoT, SRGO[0])).success === false);

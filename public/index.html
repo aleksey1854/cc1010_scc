@@ -1828,7 +1828,9 @@
 
     const rows = list.map(u =>
       '<tr>' +
-        '<td><strong>' + u.fullName + '</strong></td>' +
+        '<td><strong>' + u.fullName + '</strong>' +
+          (u.active === false ? ' <span class="fail-tag" title="уволен ' + u.dismissed +
+            '; остаётся в списках три месяца — на случай жалобы">уволен ' + u.dismissed + '</span>' : '') + '</td>' +
         '<td>' + (u.group || '—') + '</td>' +
         '<td><span class="role-badge">' + roleRu(u.role) + '</span></td>' +
         '<td>' + (u.login || '<span class="no-pass">нет логина</span>') + '</td>' +
@@ -2392,7 +2394,8 @@
       let g = null;
       res.operators.forEach(function (o) {
         if (o.group !== g) { if (g !== null) html += '</optgroup>'; html += '<optgroup label="' + o.group + '">'; g = o.group; }
-        html += '<option value="' + o.fullName + '" data-group="' + o.group + '">' + o.fullName + '</option>';
+        html += '<option value="' + o.fullName + '" data-group="' + o.group + '">' + o.fullName +
+          (o.dismissed ? ' (уволен ' + o.dismissed + ')' : '') + '</option>';
       });
       if (g !== null) html += '</optgroup>';
       sel.innerHTML = html;

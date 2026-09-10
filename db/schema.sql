@@ -228,3 +228,27 @@ CREATE TABLE audit_log (
   details   text        NOT NULL DEFAULT ''
 );
 CREATE INDEX audit_log_at_idx ON audit_log (at DESC);
+
+-- ---------- АПЕЛЛЯЦИИ ----------
+-- РГО не согласен с оценкой своего оператора: подаёт апелляцию, старший
+-- СКК разбирает. Пока автор не открыл ответ, апелляция непрочитана.
+CREATE TYPE appeal_status AS ENUM ('new', 'fixed', 'rejected', 'partial');
+
+CREATE TABLE appeals (
+  id            bigserial   PRIMARY KEY,
+  public_id     text        NOT NULL UNIQUE,
+  evaluation_id bigint      NOT NULL REFERENCES evaluations(id) ON DELETE CASCADE,
+  author_id     bigint      NOT NULL REFERENCES staff(id),
+  author_name   text        NOT NULL DEFAULT '',
+  team          text        NOT NULL DEFAULT '',
+  reason        text        NOT NULL,
+  status        appeal_status NOT NULL DEFAULT 'new',
+  answer        text        NOT NULL DEFAULT '',
+  answered_by   text        NOT NULL DEFAULT '',
+  answered_at   timestamptz,
+  seen_by_author boolean    NOT NULL DEFAULT false,
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX appeals_team_idx   ON appeals (team, created_at DESC);
+CREATE INDEX appeals_status_idx ON appeals (status, created_at DESC);
+CREATE UNIQUE INDEX appeals_open_uq ON appeals (evaluation_id) WHERE status = 'new';

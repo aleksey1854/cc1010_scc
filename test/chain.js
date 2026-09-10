@@ -259,6 +259,48 @@ const R = (fn, ...a) => api.call(fn, a);
     (await R('getRequestHistory', (await R('login', creds.find(x => x[2] === 'operator' && x[0] !== OP[0])[3],
       creds.find(x => x[2] === 'operator' && x[0] !== OP[0])[4])).token, REQ_ID)).success === false);
 
+  head('ШАГ 3г. АПЕЛЛЯЦИИ');
+  // РГО не согласен с оценкой своего оператора
+  const noReason = await R('createAppeal', rgoT, ev.id, '  ');
+  chk('апелляция без причины не подаётся', noReason.success === false, noReason.error);
+  const ap = await R('createAppeal', rgoT, ev.id, 'скрипт поменяли, пункт снят несправедливо');
+  chk('РГО подал апелляцию', ap.success === true, ap.error);
+  chk('  вторую по той же оценке не принимает',
+    (await R('createAppeal', rgoT, ev.id, 'ещё раз')).success === false);
+  chk('СКК апелляции подавать не может',
+    (await R('createAppeal', qcT, ev.id, 'не согласен')).success === false);
+  chk('оператор тоже не может',
+    (await R('createAppeal', opT, ev.id, 'не согласен')).success === false);
+
+  const listRgo = await R('getAppeals', rgoT, {});
+  chk('РГО видит свою апелляцию', listRgo.success === true && listRgo.rows.length === 1, listRgo.error);
+  chk('  и ей нельзя отвечать', listRgo.canAnswer === false, listRgo.canAnswer);
+  chk('  статус «на рассмотрении»', listRgo.rows[0].status === 'new', listRgo.rows[0].status);
+
+  const listSqc = await R('getAppeals', sqcT, {});
+  chk('старший СКК видит все апелляции', listSqc.success === true && listSqc.rows.length >= 1);
+  chk('  и может отвечать', listSqc.canAnswer === true);
+  chk('оператору апелляции закрыты', (await R('getAppeals', opT, {})).success === false);
+
+  chk('отказ без объяснения не проходит',
+    (await R('answerAppeal', sqcT, ap.id, 'rejected', '')).success === false);
+  chk('чужое решение не принимается',
+    (await R('answerAppeal', sqcT, ap.id, 'непонятно', 'текст')).success === false);
+  chk('РГО сам себе решение не поставит',
+    (await R('answerAppeal', rgoT, ap.id, 'fixed', '')).success === false);
+
+  const apAns = await R('answerAppeal', sqcT, ap.id, 'partial', 'сняли половину, остальное по стандарту');
+  chk('старший СКК ответил «частично»', apAns.success === true, apAns.error);
+  const apAfter = await R('getAppeals', rgoT, {});
+  chk('  РГО видит решение', apAfter.rows[0].status === 'partial', apAfter.rows[0].status);
+  chk('  и ответ с автором',
+    /сняли половину/.test(apAfter.rows[0].answer) && !!apAfter.rows[0].answeredBy, apAfter.rows[0]);
+  chk('  ответ помечен непрочитанным', apAfter.unseen === 1, apAfter.unseen);
+  chk('РГО отмечает прочитанным', (await R('markAppealSeen', rgoT, ap.id)).success === true);
+  chk('  счётчик погас', (await R('getAppeals', rgoT, {})).unseen === 0);
+  chk('после решения можно подать новую',
+    (await R('createAppeal', rgoT, ev.id, 'появились новые обстоятельства')).success === true);
+
   head('ШАГ 4. ОПЕРАТОР ВИДИТ РЕЗУЛЬТАТ');
   const ob = await R('getOperatorBootstrap', opT);
   chk('оценка видна', ob.evals.evaluations.length === 1, ob.evals.evaluations.length);

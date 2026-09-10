@@ -204,6 +204,21 @@
   .pj-col{ background:var(--bad-bg); }
   .chk{ display:flex; align-items:center; gap:6px; font-size:14px; color:var(--ink-2); }
   .chk input{ width:16px; height:16px; }
+  .ap-badge{ display:inline-block; margin-left:7px; min-width:18px; padding:1px 6px; border-radius:9px;
+    background:var(--bad); color:#fff; font-size:11px; font-weight:700; vertical-align:middle; }
+  .ap-status{ display:inline-block; padding:3px 10px; border-radius:8px; font-size:12px; font-weight:600; white-space:nowrap; }
+  .ap-new{ background:var(--surface-2); color:var(--ink-2); }
+  .ap-fixed{ background:var(--good-bg); color:#0a6e3d; }
+  .ap-rejected{ background:var(--bad-bg); color:#a52020; }
+  .ap-partial{ background:var(--mid-bg); color:#8a5600; }
+  .ap-unseen td{ background:var(--accent-soft); }
+  .ap-actions{ display:flex; flex-direction:column; gap:6px; min-width:230px; }
+  .ap-actions .row{ display:flex; gap:6px; }
+  .ap-actions textarea{ width:100%; padding:7px 9px; border:1.5px solid var(--border-strong);
+    border-radius:8px; font-family:inherit; font-size:13px; outline:none; resize:vertical; }
+  .btn-fixed{ background:var(--good); color:#fff; }
+  .btn-rejected{ background:var(--bad); color:#fff; }
+  .btn-partial{ background:var(--mid); color:#fff; }
   .hired-set{ display:flex; align-items:center; gap:6px; }
   .hired-set input{ width:auto; padding:5px 8px; font-size:13px; }
   .date-range{ display:flex; align-items:center; gap:6px; }
@@ -446,6 +461,25 @@
       <button type="button" class="btn-save" onclick="submitImport()"><i class="fas fa-check"></i> Загрузить</button>
     </div>
     <div class="message" id="impMessage"></div>
+  </div>
+</div>
+
+<!-- АПЕЛЛЯЦИЯ -->
+<div class="review-modal" id="appealModal">
+  <div class="modal-content" style="max-width:560px;">
+    <div class="modal-title"><i class="fas fa-scale-balanced"></i> Апелляция на оценку</div>
+    <div id="appealWhat" class="hint" style="margin-bottom:12px;"></div>
+    <div class="form-group">
+      <label>Причина апелляции *</label>
+      <textarea id="appealReason" rows="5" placeholder="С чем именно не согласны и почему"
+        style="width:100%;padding:11px;border:1.5px solid var(--border-strong);border-radius:10px;font-family:inherit;font-size:14px;outline:none;"></textarea>
+      <small class="hint">Её увидит старший СКК: он разберёт и ответит решением.</small>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="btn-cancel" onclick="document.getElementById('appealModal').classList.remove('active')">Отмена</button>
+      <button type="button" class="btn-save" onclick="submitAppeal()"><i class="fas fa-paper-plane"></i> Отправить</button>
+    </div>
+    <div class="message" id="appealMessage"></div>
   </div>
 </div>
 
@@ -869,6 +903,7 @@
       <button type="button" class="seg-btn" id="repT5" onclick="repTab('topics')">Тематики</button>
       <button type="button" class="seg-btn" id="repT6" onclick="repTab('complaints')">Жалобы</button>
       <button type="button" class="seg-btn" id="repT7" onclick="repTab('production')">Производственные показатели</button>
+      <button type="button" class="seg-btn" id="repT8" onclick="repTab('appeals')">Апелляции<span id="apBadge" class="ap-badge hidden">0</span></button>
     </div>
 
     <!-- Оценки по неделям -->
@@ -953,6 +988,23 @@
         </div>
       </div>
       <div class="card"><div id="topicsTable"></div></div>
+    </div>
+
+    <!-- Апелляции -->
+    <div id="repAppeals" class="hidden">
+      <div class="stats-grid">
+        <div class="stat-card"><div class="number new" id="apOpen">0</div><div class="label">На рассмотрении</div></div>
+        <div class="stat-card"><div class="number checked" id="apFixed">0</div><div class="label">Исправлено</div></div>
+        <div class="stat-card"><div class="number rejected" id="apRejected">0</div><div class="label">Отказано</div></div>
+        <div class="stat-card"><div class="number" id="apPartial">0</div><div class="label">Частично</div></div>
+      </div>
+      <div class="card">
+        <div class="filter-bar" style="margin-bottom:0;">
+          <label class="chk"><input type="checkbox" id="apOnlyOpen" onchange="loadAppeals()"> только нерассмотренные</label>
+          <span id="apHint" style="color:var(--muted);font-size:13px;"></span>
+        </div>
+      </div>
+      <div class="card"><div id="appealsList"></div></div>
     </div>
 
     <!-- Производственные показатели -->
@@ -2635,6 +2687,11 @@
     document.getElementById('repPage').classList.remove('hidden');
     const u = JSON.parse(sessionStorage.getItem('user') || '{}');
     document.getElementById('repUserName').textContent = u.fullName || '';
+    // апелляции: подают РГО и выше, разбирает старший СКК; рядовому СКК
+    // и оператору вкладка ни к чему
+    document.getElementById('repT8').classList.toggle('hidden',
+      ['rgo', 'sqc', 'srgo', 'manager', 'admin'].indexOf(u.role) < 0);
+    refreshAppealBadge();
     weekOffset = 0;
     repTab('weekly');
   }
@@ -2647,7 +2704,7 @@
     navSet('repTab', t);
     const tabs = { weekly: ['repT1', 'repWeekly'], journal: ['repT2', 'repJournal'], kk: ['repT3', 'repKk'],
                    criteria: ['repT4', 'repCriteria'], topics: ['repT5', 'repTopics'], complaints: ['repT6', 'repComplaints'],
-                   production: ['repT7', 'repProduction'] };
+                   production: ['repT7', 'repProduction'], appeals: ['repT8', 'repAppeals'] };
     Object.keys(tabs).forEach(function (k) {
       document.getElementById(tabs[k][0]).classList.toggle('active', k === t);
       document.getElementById(tabs[k][1]).classList.toggle('hidden', k !== t);
@@ -2667,6 +2724,7 @@
     if (t === 'criteria') loadCriteria();
     if (t === 'topics') loadTopics();
     if (t === 'complaints') loadComplaints();
+    if (t === 'appeals') loadAppeals();
     if (t === 'production') {
       const f = document.getElementById('prFrom'), to = document.getElementById('prTo');
       if (!f.value && !to.value) {
@@ -2931,6 +2989,139 @@
     }).getMyUploadPlan(sessionStorage.getItem('token'), document.getElementById('upDate').value);
   }
 
+  // ---------- АПЕЛЛЯЦИИ ----------
+  // РГО не согласен с оценкой своего оператора — подаёт апелляцию из
+  // журнала. Старший СКК разбирает её на отдельной вкладке: решение
+  // подсвечено цветом, отказ и частичное требуют объяснения.
+  let appealEv = '';
+
+  function openAppeal(evId, who, date, score) {
+    appealEv = evId;
+    document.getElementById('appealWhat').innerHTML =
+      'Оценка <strong>' + evId + '</strong> · ' + who + ' · ' + date +
+      ' · <strong>' + pct2(Number(score)) + '</strong>';
+    document.getElementById('appealReason').value = '';
+    const m = document.getElementById('appealMessage');
+    m.style.display = 'none'; m.className = 'message';
+    document.getElementById('appealModal').classList.add('active');
+    setTimeout(function () { document.getElementById('appealReason').focus(); }, 150);
+  }
+
+  function submitAppeal() {
+    const reason = document.getElementById('appealReason').value.trim();
+    const m = document.getElementById('appealMessage');
+    if (!reason) { m.textContent = '❌ Укажите причину апелляции'; m.className = 'message error'; m.style.display = 'block'; return; }
+    const btn = document.querySelector('#appealModal .btn-save');
+    btn.disabled = true;
+    google.script.run.withSuccessHandler(function (r) {
+      btn.disabled = false;
+      if (!r.success) { m.textContent = '❌ ' + r.error; m.className = 'message error'; m.style.display = 'block'; return; }
+      m.textContent = '✅ ' + r.message + ' (' + r.id + ')'; m.className = 'message success'; m.style.display = 'block';
+      setTimeout(function () { document.getElementById('appealModal').classList.remove('active'); }, 1400);
+    }).withFailureHandler(function (e) {
+      btn.disabled = false;
+      m.textContent = '❌ ' + e; m.className = 'message error'; m.style.display = 'block';
+    }).createAppeal(sessionStorage.getItem('token'), appealEv, reason);
+  }
+
+  function loadAppeals() {
+    const box = document.getElementById('appealsList');
+    box.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Загрузка...</p></div>';
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
+      const by = function (st) { return r.rows.filter(function (x) { return x.status === st; }).length; };
+      document.getElementById('apOpen').textContent = by('new');
+      document.getElementById('apFixed').textContent = by('fixed');
+      document.getElementById('apRejected').textContent = by('rejected');
+      document.getElementById('apPartial').textContent = by('partial');
+      document.getElementById('apHint').textContent = r.canAnswer
+        ? 'Решение по апелляции: отказ и частичное удовлетворение нужно объяснить.'
+        : 'Здесь видно, что ответил старший СКК по вашим апелляциям.';
+      apBadge(r.canAnswer ? r.open : r.unseen);
+
+      if (!r.rows.length) {
+        box.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Апелляций нет</p></div>';
+        return;
+      }
+      let html = '<div class="table-wrapper table-dense"><table><thead><tr>' +
+        '<th>Апелляция</th><th>Оценка</th><th>Оператор</th><th>Группа</th><th>СКК</th>' +
+        '<th>Балл</th><th>Причина</th><th>Решение</th><th>' +
+        (r.canAnswer ? 'Разбор' : 'Ответ') + '</th></tr></thead><tbody>';
+
+      r.rows.forEach(function (a) {
+        const unseen = a.status !== 'new' && !a.seen && !r.canAnswer;
+        html += '<tr' + (unseen ? ' class="ap-unseen"' : '') + '>' +
+          '<td><strong>' + a.id + '</strong><div class="hint">' + a.createdAt + ' · ' + a.author + '</div></td>' +
+          '<td>' + a.evId + '<div class="hint">' + a.callDate + '</div></td>' +
+          '<td>' + a.operator + '</td><td>' + a.team + '</td><td>' + a.qc + '</td>' +
+          '<td><strong style="color:' + scoreColorHex(a.score) + '">' + pct2(a.score) + '</strong></td>' +
+          '<td style="max-width:280px;">' + a.reason + '</td>' +
+          '<td><span class="ap-status ap-' + a.status + '">' + a.statusRu + '</span></td>';
+
+        if (r.canAnswer) {
+          html += '<td>' + (a.status === 'new'
+            ? '<div class="ap-actions" data-ap="' + a.id + '">' +
+              '<textarea rows="2" placeholder="Комментарий: почему отказ или почему частично"></textarea>' +
+              '<div class="row">' +
+              '<button class="btn-small btn-fixed" data-st="fixed">Исправлено</button>' +
+              '<button class="btn-small btn-partial" data-st="partial">Частично</button>' +
+              '<button class="btn-small btn-rejected" data-st="rejected">Отказано</button>' +
+              '</div></div>'
+            : (a.answer || '—') + '<div class="hint">' + a.answeredBy + ' · ' + a.answeredAt + '</div>') + '</td>';
+        } else {
+          html += '<td>' + (a.status === 'new'
+            ? '<span class="hint">ждём решения</span>'
+            : (a.answer || '—') + '<div class="hint">' + a.answeredBy + ' · ' + a.answeredAt +
+              (unseen ? ' · <button class="btn-small" data-seen="' + a.id + '">Прочитано</button>' : '') + '</div>') + '</td>';
+        }
+        html += '</tr>';
+      });
+      html += '</tbody></table></div>';
+      box.innerHTML = html;
+
+      box.querySelectorAll('.ap-actions button[data-st]').forEach(function (b) {
+        b.onclick = function () {
+          const wrap = b.closest('.ap-actions');
+          answerAppeal(wrap.getAttribute('data-ap'), b.getAttribute('data-st'),
+            wrap.querySelector('textarea').value.trim(), b);
+        };
+      });
+      box.querySelectorAll('button[data-seen]').forEach(function (b) {
+        b.onclick = function () {
+          google.script.run.withSuccessHandler(function () { loadAppeals(); })
+            .markAppealSeen(sessionStorage.getItem('token'), b.getAttribute('data-seen'));
+        };
+      });
+    }).getAppeals(sessionStorage.getItem('token'),
+      { onlyOpen: document.getElementById('apOnlyOpen').checked });
+  }
+
+  function answerAppeal(id, status, answer, btn) {
+    btn.disabled = true;
+    google.script.run.withSuccessHandler(function (r) {
+      btn.disabled = false;
+      if (!r.success) { alert(r.error); return; }
+      loadAppeals();
+    }).withFailureHandler(function (e) { btn.disabled = false; alert(e); })
+      .answerAppeal(sessionStorage.getItem('token'), id, status, answer);
+  }
+
+  // счётчик на вкладке: у старшего СКК — сколько ждёт разбора,
+  // у РГО — сколько ответов он ещё не открывал
+  function apBadge(n) {
+    const el = document.getElementById('apBadge');
+    el.textContent = n;
+    el.classList.toggle('hidden', !n);
+  }
+
+  function refreshAppealBadge() {
+    const me = JSON.parse(sessionStorage.getItem('user') || '{}');
+    if (['rgo', 'sqc', 'srgo', 'manager', 'admin'].indexOf(me.role) < 0) return;
+    google.script.run.withSuccessHandler(function (r) {
+      if (r && r.success) apBadge(r.canAnswer ? r.open : r.unseen);
+    }).getAppeals(sessionStorage.getItem('token'), {});
+  }
+
   function weekShift(d) { weekOffset += d; loadWeekly(); }
 
   function loadWeekly() {
@@ -2997,6 +3188,7 @@
     const me = JSON.parse(sessionStorage.getItem('user') || '{}');
     // правим в той же форме оценки, а она есть только у КК и админа
     const canEditEval = ['qc', 'sqc', 'admin'].indexOf(me.role) >= 0;
+    const canFileAppeal = ['rgo', 'srgo', 'manager', 'admin'].indexOf(me.role) >= 0;
     google.script.run.withSuccessHandler(function (r) {
       if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
       const gs = document.getElementById('jGroup');
@@ -3013,6 +3205,12 @@
           ? e.failed.map(function (f) { return '<div style="margin:2px 0;"><span class="fail-tag' + (f.critical ? '' : ' minor') + '">' + f.text + '</span>' + (f.comment ? '<span style="color:var(--muted);font-size:12px;"> — ' + f.comment + '</span>' : '') + '</div>'; }).join('')
           : '<span style="color:var(--good);font-weight:600;">без ошибок</span>';
         const flags = (e.violation ? ' <span class="fail-tag">НС</span>' : '') + (e.complaint ? ' <span class="fail-tag">ПЖ</span>' : '') + (e.gratitude ? ' <span class="fail-tag minor">★</span>' : '');
+        // РГО не согласен с оценкой своего оператора — подаёт апелляцию
+        const appeal = canFileAppeal
+          ? '<button class="btn-small btn-warn" title="Подать апелляцию на эту оценку" data-appeal="' +
+            e.id + '" data-appeal-who="' + e.operator.replace(/"/g, '&quot;') + '" data-appeal-date="' +
+            e.callDate + '" data-appeal-score="' + e.score + '"><i class="fas fa-scale-balanced"></i> Апелляция</button> '
+          : '';
         // апелляции разбирает весь КК, поэтому правка доступна и СКК
         const edit = canEditEval
           ? '<button class="btn-small btn-warn" title="Изменить оценку по апелляции" onclick="editEvaluation(\'' + e.id + '\')"><i class="fas fa-pen-to-square"></i> Правка</button> '
@@ -3024,11 +3222,17 @@
           '<td>' + (e.topic || '—') + '</td><td>' + (e.sub || '—') + '</td>' +
           '<td><strong style="color:' + scoreColorHex(e.score) + '">' + pct2(e.score) + '</strong>' + flags + '</td>' +
           '<td style="max-width:420px;">' + errs + '</td>' +
-          '<td style="white-space:nowrap;">' + edit +
+          '<td style="white-space:nowrap;">' + appeal + edit +
           '<button class="btn-small" title="Скачать чек-лист" onclick="downloadEval(\'' + e.id + '\')"><i class="fas fa-file-excel"></i></button></td></tr>';
       });
       html += '</tbody></table></div>';
       box.innerHTML = html;
+      box.querySelectorAll('button[data-appeal]').forEach(function (b) {
+        b.onclick = function () {
+          openAppeal(b.getAttribute('data-appeal'), b.getAttribute('data-appeal-who'),
+            b.getAttribute('data-appeal-date'), b.getAttribute('data-appeal-score'));
+        };
+      });
     }).getJournal(sessionStorage.getItem('token'), jFilters());
   }
 

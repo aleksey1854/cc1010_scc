@@ -163,6 +163,7 @@ CREATE TABLE evaluations (
   gratitude     boolean      NOT NULL DEFAULT false,
   complaint_mark boolean     NOT NULL DEFAULT false,
   complaint_source text       NOT NULL DEFAULT '',   -- Клиент / Заказчик
+  sent_at       date,                                 -- когда отправили чек-лист по жалобе
 
   reply_date    date,
   reply_status  text        NOT NULL DEFAULT '',

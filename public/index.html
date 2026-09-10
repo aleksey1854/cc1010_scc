@@ -3049,7 +3049,7 @@
       }
       let html = '<div class="table-wrapper table-dense"><table><thead><tr>' +
         '<th>Апелляция</th><th>Оценка</th><th>Оператор</th><th>Группа</th><th>СКК</th>' +
-        '<th>Балл</th><th>Причина</th><th>Решение</th><th>' +
+        '<th>Балл</th><th>Телефон</th><th>Причина</th><th>Решение</th><th>' +
         (r.canAnswer ? 'Разбор' : 'Ответ') + '</th></tr></thead><tbody>';
 
       r.rows.forEach(function (a) {
@@ -3059,6 +3059,7 @@
           '<td>' + a.evId + '<div class="hint">' + a.callDate + '</div></td>' +
           '<td>' + a.operator + '</td><td>' + a.team + '</td><td>' + a.qc + '</td>' +
           '<td><strong style="color:' + scoreColorHex(a.score) + '">' + pct2(a.score) + '</strong></td>' +
+          '<td style="white-space:nowrap;">' + (a.phone || '—') + '</td>' +
           '<td style="max-width:280px;">' + a.reason + '</td>' +
           '<td><span class="ap-status ap-' + a.status + '">' + a.statusRu + '</span></td>';
 

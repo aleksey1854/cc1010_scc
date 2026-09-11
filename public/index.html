@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
   <base target="_top">
   <meta charset="UTF-8">
@@ -214,6 +214,15 @@
     .btn-submit:hover{ transform:translateY(-1px); }
   }
   .btn-submit:disabled{ opacity:.55; cursor:not-allowed; transform:none; box-shadow:none; }
+  /* Выключенное должно выглядеть выключенным. Отдельно про «Подтематику»:
+     она заперта, пока не выбрана тематика, и раньше ничем не отличалась
+     от рабочей — по ней кликали и не понимали, почему ничего нет. */
+  button:disabled, .btn-save:disabled, .btn-filter:disabled, .btn-small:disabled{
+    opacity:.55; cursor:not-allowed; transform:none; box-shadow:none;
+  }
+  select:disabled, input:disabled, textarea:disabled{
+    background:var(--surface-2); color:var(--muted); cursor:not-allowed; border-style:dashed;
+  }
   .hint{ display:block; color:var(--muted); font-size:12px; margin-top:5px; }
   /* восемь вкладок отчётов в строку на узком экране не помещались и
      распирали всю страницу — переносим их по словам */
@@ -253,7 +262,7 @@
   /* Плашка новых оценок: первое, что оператор видит после входа. */
   .new-evals{ border:1px solid var(--accent); background:var(--accent-soft);
     border-radius:var(--radius-sm); padding:14px 16px; margin-bottom:18px; }
-  .new-evals h3{ margin:0 0 10px; font-size:16px; color:var(--accent-ink);
+  .new-evals h2{ margin:0 0 10px; font-size:16px; color:var(--accent-ink);
     display:flex; align-items:center; gap:8px; }
   .new-evals .ne-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap;
     padding:7px 0; border-top:1px solid var(--border); font-size:14px; }
@@ -511,14 +520,14 @@
   <div class="modal-content" style="max-width:520px;">
     <div class="modal-title"><i class="fas fa-upload"></i> Статистика принятых звонков</div>
     <div class="form-group">
-      <label>Файл из веб-статистики</label>
+      <label for="impFile">Файл из веб-статистики</label>
       <input type="file" id="impFile" accept=".xlsx,.xls" onchange="impFilePicked()"
              style="width:100%;padding:10px;border:1.5px dashed var(--border-strong);border-radius:10px;font-size:13px;background:var(--surface-2);">
       <small class="hint">«ОтчетПринятыеЗвонкиПоЗадачам.xlsx» — как скачали, ничего не перекладывая. Дата возьмётся из отчёта.</small>
     </div>
-    <div class="form-group"><label>Дата</label><input type="date" id="impDate"></div>
+    <div class="form-group"><label for="impDate">Дата</label><input type="date" id="impDate"></div>
     <div class="form-group">
-      <label>…или вставьте вручную: ФИО и количество принятых звонков</label>
+      <label for="impText">…или вставьте вручную: ФИО и количество принятых звонков</label>
       <textarea id="impText" rows="10" placeholder="Иванов Иван Иванович; 58&#10;Петрова Мария Сергеевна; 101&#10;..." style="width:100%;padding:11px;border:1.5px solid var(--border-strong);border-radius:10px;font-family:monospace;font-size:13px;outline:none;"></textarea>
       <small class="hint">Одна строка = один оператор. Разделитель: точка с запятой, запятая или таб (можно копировать прямо из Excel). Префикс группы «ИНВ-1_» и «(У)» распознаются автоматически.</small>
     </div>
@@ -536,7 +545,7 @@
     <div class="modal-title"><i class="fas fa-scale-balanced"></i> Апелляция на оценку</div>
     <div id="appealWhat" class="hint" style="margin-bottom:12px;"></div>
     <div class="form-group">
-      <label>Причина апелляции *</label>
+      <label for="appealReason">Причина апелляции *</label>
       <textarea id="appealReason" rows="5" placeholder="С чем именно не согласны и почему"
         style="width:100%;padding:11px;border:1.5px solid var(--border-strong);border-radius:10px;font-family:inherit;font-size:14px;outline:none;"></textarea>
       <small class="hint">Её увидит старший СКК: он разберёт и ответит решением.</small>
@@ -553,9 +562,9 @@
 <div class="review-modal" id="pwModal">
   <div class="modal-content" style="max-width:420px;">
     <div class="modal-title"><i class="fas fa-key"></i> Смена пароля</div>
-    <div class="form-group"><label>Текущий пароль</label><input type="password" id="pwOld" autocomplete="current-password"></div>
-    <div class="form-group"><label>Новый пароль</label><input type="password" id="pwNew" autocomplete="new-password"><small class="hint">Минимум 6 символов</small></div>
-    <div class="form-group"><label>Повторите новый</label><input type="password" id="pwNew2" autocomplete="new-password"></div>
+    <div class="form-group"><label for="pwOld">Текущий пароль</label><input type="password" id="pwOld" autocomplete="current-password"></div>
+    <div class="form-group"><label for="pwNew">Новый пароль</label><input type="password" id="pwNew" autocomplete="new-password"><small class="hint">Минимум 6 символов</small></div>
+    <div class="form-group"><label for="pwNew2">Повторите новый</label><input type="password" id="pwNew2" autocomplete="new-password"></div>
     <div class="btn-row">
       <button type="button" class="btn-cancel" onclick="closePwModal()">Отмена</button>
       <button type="button" class="btn-save" onclick="submitPw()"><i class="fas fa-save"></i> Сохранить</button>
@@ -587,8 +596,8 @@
     <div class="card" style="padding-top:14px;padding-bottom:14px;">
       <div class="filter-bar" style="margin-bottom:0;">
         <span class="date-range">
-          <label>Качество с</label><input type="date" id="qFrom" onchange="loadMyQuality()">
-          <label>по</label><input type="date" id="qTo" onchange="loadMyQuality()">
+          <label for="qFrom">Качество с</label><input type="date" id="qFrom" onchange="loadMyQuality()">
+          <label for="qTo">по</label><input type="date" id="qTo" onchange="loadMyQuality()">
         </span>
         <button type="button" class="btn-filter" onclick="qWeek()"><i class="fas fa-rotate-left"></i> Текущая неделя</button>
         <span id="qHint" style="color:var(--muted);font-size:13px;"></span>
@@ -596,10 +605,10 @@
     </div>
 
     <div class="card">
-      <div class="card-title"><i class="fas fa-upload"></i> Выгрузка звонков</div>
+      <h2 class="card-title"><i class="fas fa-upload"></i> Выгрузка звонков</h2>
       <div class="filter-bar" style="margin-bottom:14px;">
         <span class="date-range">
-          <label>Дата</label><input type="date" id="upDate" onchange="loadUploadPlan(false)">
+          <label for="upDate">Дата</label><input type="date" id="upDate" onchange="loadUploadPlan(false)">
         </span>
         <span style="color:var(--muted);font-size:13px;">сколько звонков за этот день нужно выгрузить лично вам</span>
       </div>
@@ -611,7 +620,7 @@
     </div>
 
     <div class="card">
-      <div class="card-title"><i class="fas fa-chart-line"></i> Моё качество</div>
+      <h2 class="card-title"><i class="fas fa-chart-line"></i> Моё качество</h2>
       <div class="charts-2">
         <div class="chart-cell"><div class="chart-cap"></div><div class="chart-box"><canvas id="opTrendChart"></canvas></div></div>
         <div class="chart-cell"><div class="chart-cap"></div><div class="chart-box"><canvas id="opFailsChart"></canvas></div></div>
@@ -619,11 +628,11 @@
     </div>
 
     <div class="card">
-      <div class="card-title"><i class="fas fa-clipboard-check"></i> Мои оценки и ошибки</div>
+      <h2 class="card-title"><i class="fas fa-clipboard-check"></i> Мои оценки и ошибки</h2>
       <div class="filter-bar" style="margin-bottom:14px;">
         <span class="date-range">
-          <label>с</label><input type="date" id="evFrom" onchange="loadMyEvaluations()">
-          <label>по</label><input type="date" id="evTo" onchange="loadMyEvaluations()">
+          <label for="evFrom">с</label><input type="date" id="evFrom" onchange="loadMyEvaluations()">
+          <label for="evTo">по</label><input type="date" id="evTo" onchange="loadMyEvaluations()">
         </span>
         <button type="button" class="btn-filter" onclick="clearRange('ev', loadMyEvaluations)"><i class="fas fa-rotate-left"></i> За всё время</button>
         <span style="color:var(--muted);font-size:13px;">по дате прослушки</span>
@@ -632,7 +641,7 @@
     </div>
 
     <div class="card">
-      <div class="card-title"><i class="fas fa-plus-circle"></i> Сдать звонок на проверку</div>
+      <h2 class="card-title"><i class="fas fa-plus-circle"></i> Сдать звонок на проверку</h2>
       <form id="requestForm" onsubmit="submitRequest(event)">
         <div class="seg">
           <button type="button" class="seg-btn active" id="segYes" onclick="setHasCall('yes')">Звонок был</button>
@@ -641,7 +650,7 @@
 
         <div id="callFields" class="form-grid">
           <div class="form-group full-width">
-            <label><i class="fas fa-list-check"></i> Тип звонка *</label>
+            <label for="callType"><i class="fas fa-list-check"></i> Тип звонка *</label>
             <select id="callType">
               <option value="">Выберите тип</option>
               <option value="СР">СР</option>
@@ -649,19 +658,19 @@
             </select>
             <small class="hint">Согласно графику выгрузки</small>
           </div>
-          <div class="form-group"><label><i class="fas fa-calendar-day"></i> Дата звонка *</label><input type="date" id="callDate"></div>
-          <div class="form-group"><label>⏰ Время звонка (МСК) *</label><input type="time" id="callTime"></div>
+          <div class="form-group"><label for="callDate"><i class="fas fa-calendar-day"></i> Дата звонка *</label><input type="date" id="callDate"></div>
+          <div class="form-group"><label for="callTime"><i class="fas fa-clock"></i> Время звонка (МСК) *</label><input type="time" id="callTime"></div>
           <div class="form-group full-width">
-            <label><i class="fas fa-phone"></i> Номер телефона *</label>
+            <label for="phone"><i class="fas fa-phone"></i> Номер телефона *</label>
             <input type="tel" id="phone" placeholder="+7 (777) 777-77-77">
             <small class="hint">Только цифры, без + - ( ). 10 или 11 знаков — приведём к виду 7XXXXXXXXXX</small>
           </div>
-          <div class="form-group full-width"><label><i class="fas fa-comment"></i> Комментарий (необязательно)</label><input type="text" id="opComment" placeholder="Напр.: тип звонка, контекст"></div>
+          <div class="form-group full-width"><label for="opComment"><i class="fas fa-comment"></i> Комментарий (необязательно)</label><input type="text" id="opComment" placeholder="Напр.: тип звонка, контекст"></div>
         </div>
 
         <div id="noCallFields" class="hidden">
           <div class="form-group full-width">
-            <label><i class="fas fa-pen"></i> Причина отсутствия звонка *</label>
+            <label for="opReason"><i class="fas fa-pen"></i> Причина отсутствия звонка *</label>
             <input type="text" id="opReason" placeholder="Напр.: отпуск, больничный, не было подходящих звонков">
           </div>
         </div>
@@ -674,11 +683,11 @@
     </div>
 
     <div class="card">
-      <div class="card-title"><i class="fas fa-list"></i> Мои заявки</div>
+      <h2 class="card-title"><i class="fas fa-list"></i> Мои заявки</h2>
       <div class="filter-bar" style="margin-bottom:14px;">
         <span class="date-range">
-          <label>с</label><input type="date" id="rqFrom" onchange="renderMyRequests()">
-          <label>по</label><input type="date" id="rqTo" onchange="renderMyRequests()">
+          <label for="rqFrom">с</label><input type="date" id="rqFrom" onchange="renderMyRequests()">
+          <label for="rqTo">по</label><input type="date" id="rqTo" onchange="renderMyRequests()">
         </span>
         <button type="button" class="btn-filter" onclick="clearRange('rq', renderMyRequests)"><i class="fas fa-rotate-left"></i> За всё время</button>
         <span style="color:var(--muted);font-size:13px;">по дате звонка</span>
@@ -733,24 +742,24 @@
         </button>
       </div>
       <div class="card">
-        <div class="card-title"><i class="fas fa-headphones"></i> Данные звонка</div>
+        <h2 class="card-title"><i class="fas fa-headphones"></i> Данные звонка</h2>
         <div class="form-grid">
           <div class="form-group full-width">
-            <label><i class="fas fa-user"></i> Оператор *</label>
+            <label for="evOperator"><i class="fas fa-user"></i> Оператор *</label>
             <select id="evOperator" onchange="evOperatorChanged()"><option value="">Загрузка...</option></select>
             <small class="hint" id="evGroupHint">Группа подставится автоматически</small>
           </div>
-          <div class="form-group"><label><i class="fas fa-calendar-day"></i> Дата звонка *</label><input type="date" id="evDate"></div>
-          <div class="form-group"><label>⏰ Время звонка (МСК)</label><input type="time" id="evTime"></div>
-          <div class="form-group"><label><i class="fas fa-phone"></i> Телефон</label><input type="tel" id="evPhone" placeholder="+7 (777) 777-77-77"></div>
-          <div class="form-group"><label>⏱ Длительность звонка</label><select id="evCriterion"></select></div>
-          <div class="form-group"><label><i class="fas fa-tag"></i> Тематика</label><select id="evTopic" onchange="evTopicChanged()"></select></div>
-          <div class="form-group"><label><i class="fas fa-tag"></i> Подтематика</label><select id="evSub"></select></div>
-          <div class="form-group"><label><i class="fas fa-city"></i> Город</label>
+          <div class="form-group"><label for="evDate"><i class="fas fa-calendar-day"></i> Дата звонка *</label><input type="date" id="evDate"></div>
+          <div class="form-group"><label for="evTime"><i class="fas fa-clock"></i> Время звонка (МСК)</label><input type="time" id="evTime"></div>
+          <div class="form-group"><label for="evPhone"><i class="fas fa-phone"></i> Телефон</label><input type="tel" id="evPhone" placeholder="+7 (777) 777-77-77"></div>
+          <div class="form-group"><label for="evCriterion"><i class="fas fa-stopwatch"></i> Длительность звонка</label><select id="evCriterion"></select></div>
+          <div class="form-group"><label for="evTopic"><i class="fas fa-tag"></i> Тематика</label><select id="evTopic" onchange="evTopicChanged()"></select></div>
+          <div class="form-group"><label for="evSub"><i class="fas fa-tag"></i> Подтематика</label><select id="evSub"></select></div>
+          <div class="form-group"><label for="evCity"><i class="fas fa-city"></i> Город</label>
             <input type="text" id="evCity" list="evCityList" autocomplete="off" placeholder="напр. Москва" onchange="evCityChanged()">
             <datalist id="evCityList"></datalist>
           </div>
-          <div class="form-group"><label><i class="fas fa-map"></i> Агломерация</label>
+          <div class="form-group"><label for="evAgg"><i class="fas fa-map"></i> Агломерация</label>
             <input type="text" id="evAgg" list="evAggList" autocomplete="off" placeholder="напр. Москва">
             <datalist id="evAggList"></datalist>
           </div>
@@ -758,7 +767,7 @@
       </div>
 
       <div class="card">
-        <div class="card-title"><i class="fas fa-list-check"></i> Чек-лист</div>
+        <h2 class="card-title"><i class="fas fa-list-check"></i> Чек-лист</h2>
         <div id="evChecklist"><div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Загрузка чек-листа...</p></div></div>
       </div>
 
@@ -792,14 +801,14 @@
       </div>
       <div class="card">
         <div class="filter-bar" style="margin-bottom:0;">
-          <label style="font-size:14px;color:var(--ink-2);">Дата статистики:</label>
+          <label for="planDate" style="font-size:14px;color:var(--ink-2);">Дата статистики:</label>
           <input type="date" id="planDate" onchange="loadPlan(false)">
           <span id="planPct" style="color:var(--muted);font-size:13px;"></span>
           <button class="btn-filter" style="margin-left:auto;" onclick="openImport()"><i class="fas fa-upload"></i> Загрузить статистику дня</button>
         </div>
       </div>
       <div class="card">
-        <div class="card-title"><i class="fas fa-headphones"></i> Кого и сколько слушать</div>
+        <h2 class="card-title"><i class="fas fa-headphones"></i> Кого и сколько слушать</h2>
         <div id="planTable"></div>
       </div>
     </div>
@@ -808,11 +817,11 @@
     <!-- СОТРУДНИКИ: только администратор -->
     <div id="qcStaffTab" class="hidden">
       <div class="card">
-        <div class="card-title"><i class="fas fa-shield-halved"></i> Состояние учётных записей</div>
+        <h2 class="card-title"><i class="fas fa-shield-halved"></i> Состояние учётных записей</h2>
         <div id="staffAudit"></div>
       </div>
       <div class="card">
-        <div class="card-title"><i class="fas fa-address-book"></i> Состав</div>
+        <h2 class="card-title"><i class="fas fa-address-book"></i> Состав</h2>
         <div class="staff-note" style="margin:0 0 14px;">
           Пароль посмотреть нельзя ни одной ролью: в базе хранится необратимый хеш,
           исходного пароля нет нигде. Если сотрудник забыл — задайте новый в «Изменить»
@@ -830,7 +839,7 @@
 
     <div id="qcReqTab" class="hidden">
     <div class="card">
-      <div class="card-title"><i class="fas fa-filter"></i> Фильтры</div>
+      <h2 class="card-title"><i class="fas fa-filter"></i> Фильтры</h2>
       <div class="filter-bar">
         <select id="filterStatus">
           <option value="">Все статусы</option>
@@ -848,7 +857,7 @@
       </div>
     </div>
     <div class="card">
-      <div class="card-title"><i class="fas fa-list"></i> Все заявки</div>
+      <h2 class="card-title"><i class="fas fa-list"></i> Все заявки</h2>
       <div id="qcRequestsList"></div>
     </div>
     </div>
@@ -862,8 +871,8 @@
     <div class="user-info">
       <button class="logout-btn" onclick="openReports('rgo')"><i class="fas fa-table"></i> Отчёты</button>
       <span class="date-range">
-        <label>с</label><input type="date" id="rgoFrom" onchange="loadRgoDashboard()">
-        <label>по</label><input type="date" id="rgoTo" onchange="loadRgoDashboard()">
+        <label for="rgoFrom">с</label><input type="date" id="rgoFrom" onchange="loadRgoDashboard()">
+        <label for="rgoTo">по</label><input type="date" id="rgoTo" onchange="loadRgoDashboard()">
       </span>
       <button type="button" class="logout-btn" onclick="clearRange('rgo', loadRgoDashboard)" title="За всё время">
         <i class="fas fa-rotate-left"></i>
@@ -883,7 +892,7 @@
     </div>
 
     <div class="card">
-      <div class="card-title"><i class="fas fa-chart-line"></i> Качество группы</div>
+      <h2 class="card-title"><i class="fas fa-chart-line"></i> Качество группы</h2>
       <div class="charts-2">
         <div class="chart-cell"><div class="chart-cap"></div><div class="chart-box"><canvas id="rgoTrendChart"></canvas></div></div>
         <div class="chart-cell"><div class="chart-cap"></div><div class="chart-box"><canvas id="rgoFailsChart"></canvas></div></div>
@@ -891,7 +900,7 @@
     </div>
 
     <div class="card">
-      <div class="card-title"><i class="fas fa-user-group"></i> Мои операторы</div>
+      <h2 class="card-title"><i class="fas fa-user-group"></i> Мои операторы</h2>
       <div id="rgoOperatorsList"></div>
     </div>
   </div>
@@ -906,8 +915,8 @@
       <button class="logout-btn" onclick="openReports('org')"><i class="fas fa-table"></i> Отчёты</button>
       <button class="logout-btn hidden" id="orgStaffBtn" onclick="openStaffPage()"><i class="fas fa-users"></i> Сотрудники</button>
       <span class="date-range">
-        <label>с</label><input type="date" id="orgFrom" onchange="loadOrgDashboard(JSON.parse(sessionStorage.getItem('user')||'{}').role)">
-        <label>по</label><input type="date" id="orgTo" onchange="loadOrgDashboard(JSON.parse(sessionStorage.getItem('user')||'{}').role)">
+        <label for="orgFrom">с</label><input type="date" id="orgFrom" onchange="loadOrgDashboard(JSON.parse(sessionStorage.getItem('user')||'{}').role)">
+        <label for="orgTo">по</label><input type="date" id="orgTo" onchange="loadOrgDashboard(JSON.parse(sessionStorage.getItem('user')||'{}').role)">
       </span>
       <select id="orgPeriod" class="hidden">
         <option value="all">За всё время</option>
@@ -938,13 +947,13 @@
     </div>
 
     <div class="card">
-      <div class="card-title"><i class="fas fa-layer-group"></i> Качество по группам</div>
+      <h2 class="card-title"><i class="fas fa-layer-group"></i> Качество по группам</h2>
       <div class="chart-cell"><div class="chart-cap"></div><div class="chart-box"><canvas id="orgGroupChart"></canvas></div></div>
       <div id="orgGroupTable" style="margin-top:18px;"></div>
     </div>
 
     <div class="card">
-      <div class="card-title"><i class="fas fa-chart-line"></i> Динамика и топ ошибок</div>
+      <h2 class="card-title"><i class="fas fa-chart-line"></i> Динамика и топ ошибок</h2>
       <div class="charts-2">
         <div class="chart-cell"><div class="chart-cap"></div><div class="chart-box"><canvas id="orgTrendChart"></canvas></div></div>
         <div class="chart-cell"><div class="chart-cap"></div><div class="chart-box"><canvas id="orgFailsChart"></canvas></div></div>
@@ -952,12 +961,12 @@
     </div>
 
     <div id="managerQcCard" class="card hidden">
-      <div class="card-title"><i class="fas fa-clipboard-check"></i> Работа контроля качества</div>
+      <h2 class="card-title"><i class="fas fa-clipboard-check"></i> Работа контроля качества</h2>
       <div id="orgQcTable"></div>
     </div>
 
     <div class="card">
-      <div class="card-title"><i class="fas fa-user-group"></i> Операторы</div>
+      <h2 class="card-title"><i class="fas fa-user-group"></i> Операторы</h2>
       <div class="filter-bar">
         <select id="orgGroupFilter" onchange="renderOrgOperators()">
           <option value="">Все группы (по порядку)</option>
@@ -1013,8 +1022,8 @@
       <div class="card">
         <div class="filter-bar" style="margin-bottom:0;">
           <span class="date-range">
-            <label>с</label><input type="date" id="jFrom" onkeydown="jKey(event)">
-            <label>по</label><input type="date" id="jTo" onkeydown="jKey(event)">
+            <label for="jFrom">с</label><input type="date" id="jFrom" onkeydown="jKey(event)">
+            <label for="jTo">по</label><input type="date" id="jTo" onkeydown="jKey(event)">
           </span>
           <select id="jGroup"><option value="">Все группы</option></select>
           <input type="text" id="jOperator" placeholder="Оператор" onkeydown="jKey(event)">
@@ -1050,8 +1059,8 @@
       <div class="card">
         <div class="filter-bar" style="margin-bottom:0;">
           <span class="date-range">
-            <label>с</label><input type="date" id="cFrom" onchange="loadCriteria()">
-            <label>по</label><input type="date" id="cTo" onchange="loadCriteria()">
+            <label for="cFrom">с</label><input type="date" id="cFrom" onchange="loadCriteria()">
+            <label for="cTo">по</label><input type="date" id="cTo" onchange="loadCriteria()">
           </span>
           <button type="button" class="btn-filter" onclick="clearRange('c', loadCriteria)" title="Показать за всё время">
             <i class="fas fa-rotate-left"></i> За всё время
@@ -1068,8 +1077,8 @@
       <div class="card">
         <div class="filter-bar" style="margin-bottom:0;">
           <span class="date-range">
-            <label>с</label><input type="date" id="tFrom" onchange="loadTopics()">
-            <label>по</label><input type="date" id="tTo" onchange="loadTopics()">
+            <label for="tFrom">с</label><input type="date" id="tFrom" onchange="loadTopics()">
+            <label for="tTo">по</label><input type="date" id="tTo" onchange="loadTopics()">
           </span>
           <button type="button" class="btn-filter" onclick="clearRange('t', loadTopics)" title="Показать за всё время">
             <i class="fas fa-rotate-left"></i> За всё время
@@ -1110,8 +1119,8 @@
       <div class="card">
         <div class="filter-bar" style="margin-bottom:0;">
           <span class="date-range">
-            <label>с</label><input type="date" id="prFrom" onchange="loadProduction()">
-            <label>по</label><input type="date" id="prTo" onchange="loadProduction()">
+            <label for="prFrom">с</label><input type="date" id="prFrom" onchange="loadProduction()">
+            <label for="prTo">по</label><input type="date" id="prTo" onchange="loadProduction()">
           </span>
           <select id="prGroup" onchange="loadProduction()"><option value="">Все группы</option></select>
           <span style="color:var(--muted);font-size:13px;">качество оператора — только плановая прослушка; средняя по группе — плановая плюс подтверждённые жалобы</span>
@@ -1133,8 +1142,8 @@
       <div class="card">
         <div class="filter-bar" style="margin-bottom:0;">
           <span class="date-range">
-            <label>с</label><input type="date" id="cmpFrom" onchange="loadComplaints()">
-            <label>по</label><input type="date" id="cmpTo" onchange="loadComplaints()">
+            <label for="cmpFrom">с</label><input type="date" id="cmpFrom" onchange="loadComplaints()">
+            <label for="cmpTo">по</label><input type="date" id="cmpTo" onchange="loadComplaints()">
           </span>
           <button type="button" class="btn-filter" onclick="cmpClearDates()" title="Показать за всё время">
             <i class="fas fa-rotate-left"></i> За всё время
@@ -1159,7 +1168,7 @@
 
     <form id="reviewForm" onsubmit="submitReview(event)">
       <div class="form-group">
-        <label>Статус *</label>
+        <label for="reviewStatus">Статус *</label>
         <select id="reviewStatus" required>
           <option value="В работе">В работе</option>
           <option value="Проверена">Проверена</option>
@@ -1169,7 +1178,7 @@
       <!-- Балл руками не ставят: он приходит из чек-листа, когда СКК
            оценит звонок кнопкой «Оценить». -->
       <div class="form-group">
-        <label>Комментарий</label>
+        <label for="reviewComment">Комментарий</label>
         <textarea id="reviewComment" rows="3" placeholder="Введите комментарий..."></textarea>
       </div>
       <div class="btn-row">
@@ -1186,26 +1195,26 @@
   <div class="modal-content" style="max-width:540px;">
     <div class="modal-title"><i class="fas fa-user-pen"></i> <span id="staffModalTitle">Новый сотрудник</span></div>
     <form id="staffForm" onsubmit="return submitStaff(event)">
-      <div class="form-group"><label>ФИО *</label><input type="text" id="stName" required autocomplete="off"></div>
-      <div class="form-group"><label>Группа</label>
+      <div class="form-group"><label for="stName">ФИО *</label><input type="text" id="stName" required autocomplete="off"></div>
+      <div class="form-group"><label for="stGroup">Группа</label>
         <input type="text" id="stGroup" list="stGroups" placeholder="напр. ИНВ-1" autocomplete="off">
         <datalist id="stGroups"></datalist>
       </div>
-      <div class="form-group"><label>Роль *</label><select id="stRole" onchange="stRoleChanged()"></select></div>
+      <div class="form-group"><label for="stRole">Роль *</label><select id="stRole" onchange="stRoleChanged()"></select></div>
       <div class="form-grid" id="stDates">
-        <div class="form-group"><label id="stTrainLabel">Начало обучения</label>
+        <div class="form-group"><label for="stTraining" id="stTrainLabel">Начало обучения</label>
           <input type="date" id="stTraining">
         </div>
-        <div class="form-group"><label>Дата приёмки</label>
+        <div class="form-group"><label for="stHired">Дата приёмки</label>
           <input type="date" id="stHired">
           <small class="hint">От неё считается стаж. Можно оставить пустой и внести позже.</small>
         </div>
       </div>
-      <div class="form-group"><label>Логин</label>
+      <div class="form-group"><label for="stLogin">Логин</label>
         <input type="text" id="stLogin" placeholder="пусто — соберём из ФИО" autocomplete="off"
                autocapitalize="off" spellcheck="false">
       </div>
-      <div class="form-group"><label id="stPassLabel">Пароль *</label>
+      <div class="form-group"><label for="stPass" id="stPassLabel">Пароль *</label>
         <input type="text" id="stPass" placeholder="минимум 6 символов" autocomplete="off">
         <small class="hint" id="stPassHint">Виден вам целиком — передайте сотруднику и попросите сменить.</small>
       </div>
@@ -1235,9 +1244,9 @@
     <div class="modal-title"><i class="fas fa-edit"></i> Редактирование заявки</div>
     <div id="editRequestDetail"></div>
     <form id="editForm" onsubmit="submitEdit(event)">
-      <div class="form-group"><label><i class="fas fa-calendar-day"></i> Дата звонка *</label><input type="date" id="editCallDate" required></div>
-      <div class="form-group"><label>⏰ Время звонка (МСК) *</label><input type="time" id="editCallTime" required></div>
-      <div class="form-group"><label><i class="fas fa-phone"></i> Номер телефона *</label><input type="tel" id="editPhone" placeholder="+7 (777) 777-77-77" required></div>
+      <div class="form-group"><label for="editCallDate"><i class="fas fa-calendar-day"></i> Дата звонка *</label><input type="date" id="editCallDate" required></div>
+      <div class="form-group"><label for="editCallTime"><i class="fas fa-clock"></i> Время звонка (МСК) *</label><input type="time" id="editCallTime" required></div>
+      <div class="form-group"><label for="editPhone"><i class="fas fa-phone"></i> Номер телефона *</label><input type="tel" id="editPhone" placeholder="+7 (777) 777-77-77" required></div>
       <div class="btn-row">
         <button type="button" class="btn-cancel" onclick="closeEditModal()">Отмена</button>
         <button type="submit" class="btn-save"><i class="fas fa-save"></i> Сохранить</button>
@@ -1619,9 +1628,9 @@
     const box = document.getElementById('opNewBox');
     if (!list.length) { box.classList.add('hidden'); box.innerHTML = ''; return; }
     const kz = list.filter(function (e) { return e.controlCall; }).length;
-    let html = '<h3><i class="fas fa-bell"></i> ' +
+    let html = '<h2><i class="fas fa-bell"></i> ' +
       (list.length === 1 ? 'Новая оценка' : 'Новых оценок: ' + list.length) +
-      (kz ? ' · из них КЗ от заказчика: ' + kz : '') + '</h3>';
+      (kz ? ' · из них КЗ от заказчика: ' + kz : '') + '</h2>';
     list.forEach(function (e) {
       const cls = e.score >= 90 ? 'ok' : (e.score >= 70 ? 'mid' : 'bad');
       html += '<div class="ne-row">' +

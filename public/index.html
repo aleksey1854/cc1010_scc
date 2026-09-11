@@ -22,6 +22,7 @@
     --mid:#DE9109;  --mid-bg:#FAF0DA;
     --bad:#E23A3A;  --bad-bg:#FBE7E7;
     --new:#2B59F0;  --new-bg:#E9EFFF;
+    --kz:#6D34D6;   --kz-bg:#F1E9FF;   /* контрольные звонки заказчика */
     --radius:14px; --radius-sm:10px;
     --shadow:0 1px 2px rgba(18,23,34,.05), 0 2px 8px rgba(18,23,34,.04);
     --shadow-lg:0 12px 40px rgba(18,23,34,.18);
@@ -204,7 +205,8 @@
   .memo .mine td{ background:var(--accent-soft); font-weight:600; }
   .pr-total td{ background:var(--surface-2); font-weight:600; }
   .pj-col{ background:var(--bad-bg); }
-  .kz-col{ background:var(--accent-soft); }
+  .kz-col{ background:var(--kz-bg); color:var(--kz); }
+  th.kz-col{ color:var(--kz); }
   .chk{ display:flex; align-items:center; gap:6px; font-size:14px; color:var(--ink-2); }
   .chk input{ width:16px; height:16px; }
   .mark-sel{ width:auto; min-width:104px; padding:5px 8px; font-size:13px; }
@@ -222,7 +224,8 @@
   .new-evals .ne-score{ font-weight:700; }
   .new-evals .ne-actions{ margin-top:12px; }
   .kz-badge{ display:inline-block; padding:2px 8px; border-radius:6px; font-size:12px;
-    font-weight:700; background:var(--accent); color:#fff; white-space:nowrap; }
+    font-weight:700; background:var(--kz); color:#fff; white-space:nowrap; }
+  .kz-tag{ background:var(--kz-bg); color:var(--kz); border:1px solid var(--kz); }
   .new-chip{ display:inline-block; padding:1px 7px; border-radius:6px; font-size:11px;
     font-weight:700; background:var(--accent); color:#fff; margin-left:6px; vertical-align:middle; }
   .ev-kz{ padding:5px 10px; border:1px solid var(--border-strong); border-radius:8px;
@@ -1063,7 +1066,7 @@
         <div class="stat-card"><div class="number" id="prOverall">—</div><div class="label">Качество за период</div></div>
         <div class="stat-card"><div class="number new" id="prChecked">0</div><div class="label">Плановых прослушек</div></div>
         <div class="stat-card"><div class="number rejected" id="prPj">0</div><div class="label">Подтверждённых жалоб</div></div>
-        <div class="stat-card"><div class="number" id="prKz">0</div><div class="label">КЗ от заказчика</div></div>
+        <div class="stat-card"><div class="number" id="prKz" style="color:var(--kz);">0</div><div class="label">КЗ от заказчика</div></div>
         <div class="stat-card"><div class="number checked" id="prOps">0</div><div class="label">Операторов</div></div>
         <div class="stat-card"><div class="number" id="prSenior">—</div><div class="label">Без стажа менее месяца</div></div>
       </div>
@@ -1633,7 +1636,7 @@
             '<div><strong>' + e.callDate + '</strong>' +
               (e.isNew ? '<span class="new-chip">новая</span>' : '') +
               (e.phone ? ' · ' + e.phone : '') + ' · СКК: ' + (e.qc || '—') +
-              (e.controlCall ? ' <span class="fail-tag minor" title="контрольный звонок заказчика">КЗ от заказчика</span>' : '') + '</div>' +
+              (e.controlCall ? ' <span class="fail-tag kz-tag" title="контрольный звонок заказчика">КЗ от заказчика</span>' : '') + '</div>' +
             '<div class="fc-score ' + cls + '">' + pct2(e.score) + '</div>' +
           '</div>';
         if (e.gratitude) html += '<div class="all-pass"><i class="fas fa-star"></i> Благодарность от клиента</div>';
@@ -3389,7 +3392,7 @@
         const errs = e.failed.length
           ? e.failed.map(function (f) { return '<div style="margin:2px 0;"><span class="fail-tag' + (f.critical ? '' : ' minor') + '">' + f.text + '</span>' + (f.comment ? '<span style="color:var(--muted);font-size:12px;"> — ' + f.comment + '</span>' : '') + '</div>'; }).join('')
           : '<span style="color:var(--good);font-weight:600;">без ошибок</span>';
-        const flags = (e.violation ? ' <span class="fail-tag">НС</span>' : '') + (e.complaint ? ' <span class="fail-tag">ПЖ</span>' : '') + (e.gratitude ? ' <span class="fail-tag minor">★</span>' : '') + (e.controlCall ? ' <span class="fail-tag minor" title="контрольный звонок заказчика">КЗ</span>' : '');
+        const flags = (e.violation ? ' <span class="fail-tag">НС</span>' : '') + (e.complaint ? ' <span class="fail-tag">ПЖ</span>' : '') + (e.gratitude ? ' <span class="fail-tag minor">★</span>' : '') + (e.controlCall ? ' <span class="fail-tag kz-tag" title="контрольный звонок заказчика">КЗ</span>' : '');
         // дату отправки вносят только у чек-листов по жалобе — их
         // оценивают одним днём, а отправляют другим
         const sent = (canEditEval && e.isComplaint)

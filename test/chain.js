@@ -294,6 +294,20 @@ const R = (fn, ...a) => api.call(fn, a);
   const kzProd = await R('getProductionReport', qcT, DATE, DATE, '');
   const kzOp = [].concat(...kzProd.groups.map(g => g.operators)).find(o => o.name === OP[0]);
   chk('КЗ идёт в качество оператора', kzOp && kzOp.kz.length === 1 && kzOp.scores.length >= 1, kzOp && kzOp.kz);
+  chk('  колонка КЗ есть в отчёте всегда', kzProd.maxKz >= 1, kzProd.maxKz);
+
+  // КЗ новичка: в его собственное качество и в общий показатель идёт,
+  // а в «без стажа менее месяца» — нет
+  await db.q(`UPDATE staff SET hired_at = $2 WHERE full_name = $1`,
+    [OP[0], core.isoDate(new Date(core.toDateObj(DATE).getTime() - 5 * 86400000))]);
+  const kzTr = await R('getProductionReport', qcT, DATE, DATE, '');
+  const kzNb = [].concat(...kzTr.groups.map(g => g.operators)).find(o => o.name === OP[0]);
+  chk('КЗ новичка идёт в его качество',
+    kzNb && kzNb.trainee === true && kzNb.avg !== null && kzNb.kz.length === 1, kzNb && kzNb.kz);
+  chk('  и в общий показатель', kzTr.overall !== null && kzTr.checked > 0, kzTr.checked);
+  chk('  но не в «без стажа менее месяца»',
+    kzTr.checkedSenior < kzTr.checked, [kzTr.checkedSenior, kzTr.checked]);
+  await db.q(`UPDATE staff SET hired_at = '2024-01-01' WHERE full_name = $1`, [OP[0]]);
 
   // дата отправки — только у чек-листов по жалобе
   chk('обычному чек-листу дату отправки не поставить',

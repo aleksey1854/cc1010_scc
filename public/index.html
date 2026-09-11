@@ -16,14 +16,17 @@
   :root{
     --paper:#EEF1F6; --surface:#FFFFFF; --surface-2:#F7F9FC;
     --border:#E4E8F0; --border-strong:#D3DAE6;
-    --ink:#121722; --ink-2:#414b5c; --muted:#8b94a5;
+    --ink:#121722; --ink-2:#414b5c; --muted:#636D80;
     --accent:#2B59F0; --accent-ink:#1B3AC2; --accent-soft:#E9EFFF;
-    --good:#0FA45A; --good-bg:#E4F6EC;
-    --mid:#DE9109;  --mid-bg:#FAF0DA;
-    --bad:#E23A3A;  --bad-bg:#FBE7E7;
+    --good:#0FA45A; --good-bg:#E4F6EC; --good-ink:#0C7F45;
+    --mid:#DE9109;  --mid-bg:#FAF0DA;  --mid-ink:#976306;
+    --bad:#E23A3A;  --bad-bg:#FBE7E7;  --bad-ink:#D01F1F;
+    /* -ink — те же цвета, опущенные до читаемого контраста: заливки и
+       графики остаются яркими, а текст и цифры перестают выцветать */
     --new:#2B59F0;  --new-bg:#E9EFFF;
     --kz:#6D34D6;   --kz-bg:#F1E9FF;   /* контрольные звонки заказчика */
     --radius:14px; --radius-sm:10px;
+    --ease-out:cubic-bezier(.23,1,.32,1);   /* резче стандартного ease-out */
     --shadow:0 1px 2px rgba(18,23,34,.05), 0 2px 8px rgba(18,23,34,.04);
     --shadow-lg:0 12px 40px rgba(18,23,34,.18);
     --font:'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -37,6 +40,16 @@
   body { font-family:var(--font); background:var(--paper); color:var(--ink); min-height:100vh; -webkit-font-smoothing:antialiased; }
   .hidden { display:none !important; }
   ::selection { background:var(--accent); color:#fff; }
+  /* Кнопки и ссылки не показывали фокус: с клавиатуры было не понять,
+     где ты находишься. Только :focus-visible — мышью рамка не мигает. */
+  button:focus-visible, a:focus-visible, select:focus-visible,
+  input:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
+    outline:2px solid var(--accent); outline-offset:2px; border-radius:6px;
+  }
+  /* На тач-экранах мелкие кнопки в таблицах не попадались пальцем */
+  @media (pointer:coarse){
+    .btn-small, .logout-btn, .seg-btn{ min-height:40px; }
+  }
 
   /* ===== ВХОД (консоль) ===== */
   .login-wrapper{
@@ -77,8 +90,14 @@
     width:100%; padding:15px; background:var(--accent); color:#fff; border:none; border-radius:12px;
     font-family:var(--display); font-size:16px; font-weight:600; cursor:pointer; transition:transform .15s, background .2s, box-shadow .2s;
   }
-  .login-btn:hover{ background:var(--accent-ink); transform:translateY(-1px); box-shadow:0 10px 26px rgba(43,89,240,.4); }
+  .login-btn:hover{ background:var(--accent-ink); box-shadow:0 10px 26px rgba(43,89,240,.4); }
+  @media (hover:hover) and (pointer:fine){
+    .login-btn:hover{ transform:translateY(-1px); }
+  }
   .login-btn:active{ transform:translateY(0); }
+  /* Нажатие должно чувствоваться: кнопка проседает и сразу возвращается */
+  .btn-small:active, .btn-filter:active, .seg-btn:active, .logout-btn:active,
+  .btn-submit:active, .ci-toggle:active, .ev-opt:active{ transform:scale(.97); }
   .login-btn[disabled]{ opacity:.6; cursor:default; transform:none; box-shadow:none; }
   #loginForm{ margin-top:4px; }
   #loginForm .pin-input-container{ margin-bottom:14px; }
@@ -140,8 +159,8 @@
   .user-info{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
   .user-badge{ background:var(--surface-2); border:1px solid var(--border); color:var(--ink-2); padding:7px 13px; border-radius:9px; font-size:13px; font-weight:500; }
   .user-badge i{ margin-right:6px; color:var(--muted); }
-  .logout-btn{ background:transparent; border:1px solid var(--border-strong); color:var(--ink-2); padding:7px 15px; border-radius:9px; cursor:pointer; font-size:13px; font-weight:500; transition:.2s; }
-  .logout-btn:hover{ background:var(--bad-bg); border-color:var(--bad); color:var(--bad); }
+  .logout-btn{ background:transparent; border:1px solid var(--border-strong); color:var(--ink-2); padding:7px 15px; border-radius:9px; cursor:pointer; font-size:13px; font-weight:500; transition:background .18s var(--ease-out), border-color .18s var(--ease-out), color .18s var(--ease-out), transform .16s var(--ease-out); }
+  .logout-btn:hover{ background:var(--bad-bg); border-color:var(--bad-ink); color:var(--bad-ink); }
 
   .container{ max-width:1200px; margin:0 auto; padding:24px 20px 40px; }
   /* Отчёты шире кабинетов: в 1200px «Производственные показатели» с двумя
@@ -159,9 +178,9 @@
   .stat-card .number{ font-family:var(--display); font-size:30px; font-weight:700; line-height:1; color:var(--ink); font-variant-numeric:tabular-nums; letter-spacing:-.5px; }
   .stat-card .label{ font-size:11px; color:var(--muted); margin-top:8px; text-transform:uppercase; letter-spacing:.6px; font-weight:600; }
   .stat-card .number.new{ color:var(--new); }
-  .stat-card .number.inprogress{ color:var(--mid); }
-  .stat-card .number.checked{ color:var(--good); }
-  .stat-card .number.rejected{ color:var(--bad); }
+  .stat-card .number.inprogress{ color:var(--mid-ink); }
+  .stat-card .number.checked{ color:var(--good-ink); }
+  .stat-card .number.rejected{ color:var(--bad-ink); }
   .stat-card .number.rating{ color:var(--accent); }
   .stat-card:has(.number.new)::before{ background:var(--new); }
   .stat-card:has(.number.inprogress)::before{ background:var(--mid); }
@@ -185,18 +204,21 @@
   .form-group input:focus, .form-group select:focus, .form-group textarea:focus{ border-color:var(--accent); box-shadow:0 0 0 3px rgba(43,89,240,.14); }
 
   .btn-submit{ padding:13px 30px; background:var(--accent); color:#fff; border:none; border-radius:var(--radius-sm); font-family:var(--display); font-size:15px; font-weight:600; cursor:pointer; transition:transform .15s, background .2s, box-shadow .2s; width:100%; }
-  .btn-submit:hover{ background:var(--accent-ink); transform:translateY(-1px); box-shadow:0 8px 20px rgba(43,89,240,.28); }
+  .btn-submit:hover{ background:var(--accent-ink); box-shadow:0 8px 20px rgba(43,89,240,.28); }
+  @media (hover:hover) and (pointer:fine){
+    .btn-submit:hover{ transform:translateY(-1px); }
+  }
   .btn-submit:disabled{ opacity:.55; cursor:not-allowed; transform:none; box-shadow:none; }
   .hint{ display:block; color:var(--muted); font-size:12px; margin-top:5px; }
   /* восемь вкладок отчётов в строку на узком экране не помещались и
      распирали всю страницу — переносим их по словам */
   .seg{ display:flex; flex-wrap:wrap; background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:4px; margin-bottom:16px; gap:4px; }
-  .seg-btn{ border:none; background:transparent; color:var(--ink-2); font-family:var(--display); font-weight:600; font-size:14px; padding:9px 18px; border-radius:9px; cursor:pointer; transition:.15s; }
+  .seg-btn{ border:none; background:transparent; color:var(--ink-2); font-family:var(--display); font-weight:600; font-size:14px; padding:9px 18px; border-radius:9px; cursor:pointer; transition:background .18s var(--ease-out), color .18s var(--ease-out), transform .16s var(--ease-out); }
   .seg-btn.active{ background:var(--accent); color:#fff; box-shadow:0 2px 8px rgba(43,89,240,.28); }
   .status-badge.Без_звонка{ background:#eceff5; color:#6b7585; }
-  .btn-small{ padding:6px 12px; background:var(--accent-soft); color:var(--accent); border:none; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; transition:.15s; margin:0 2px; }
+  .btn-small{ padding:6px 12px; background:var(--accent-soft); color:var(--accent); border:none; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; transition:background .18s var(--ease-out), color .18s var(--ease-out), transform .16s var(--ease-out); margin:0 2px; }
   .btn-small:hover{ background:var(--accent); color:#fff; }
-  .btn-small.btn-danger{ background:var(--bad-bg); color:var(--bad); }
+  .btn-small.btn-danger{ background:var(--bad-bg); color:var(--bad-ink); }
   .btn-small.btn-danger:hover{ background:var(--bad); color:#fff; }
   .memo{ margin-top:14px; border-top:1px solid var(--border); padding-top:12px; }
   .memo summary{ cursor:pointer; font-weight:600; color:var(--accent-ink); font-size:14px; }
@@ -210,12 +232,12 @@
   .chk{ display:flex; align-items:center; gap:6px; font-size:14px; color:var(--ink-2); }
   .chk input{ width:16px; height:16px; }
   .mark-sel{ width:auto; min-width:104px; padding:5px 8px; font-size:13px; }
-  .mark-in_progress{ border-color:var(--mid); background:var(--mid-bg); color:#8a5600; font-weight:600; }
-  .mark-done{ border-color:var(--good); background:var(--good-bg); color:#0a6e3d; font-weight:600; }
+  .mark-in_progress{ border-color:var(--mid-ink); background:var(--mid-bg); color:#8a5600; font-weight:600; }
+  .mark-done{ border-color:var(--good-ink); background:var(--good-bg); color:#0a6e3d; font-weight:600; }
   .mark-row td{ background:var(--mid-bg); }
   /* Плашка новых оценок: первое, что оператор видит после входа. */
-  .new-evals{ border:1px solid var(--accent); border-left:4px solid var(--accent);
-    background:var(--accent-soft); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+  .new-evals{ border:1px solid var(--accent); background:var(--accent-soft);
+    border-radius:var(--radius-sm); padding:14px 16px; margin-bottom:18px; }
   .new-evals h3{ margin:0 0 10px; font-size:16px; color:var(--accent-ink);
     display:flex; align-items:center; gap:8px; }
   .new-evals .ne-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap;
@@ -312,13 +334,13 @@
   .staff-chip{ border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px 14px; background:var(--surface-2); }
   .staff-chip .n{ font-family:var(--display); font-size:22px; font-weight:600; }
   .staff-chip .t{ color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.4px; margin-top:2px; }
-  .staff-chip.bad .n{ color:var(--bad); }
-  .staff-chip.ok  .n{ color:var(--good); }
+  .staff-chip.bad .n{ color:var(--bad-ink); }
+  .staff-chip.ok  .n{ color:var(--good-ink); }
   .staff-note{ margin-top:12px; font-size:13px; color:var(--ink-2); }
-  .staff-note b{ color:var(--bad); }
+  .staff-note b{ color:var(--bad-ink); }
   .role-badge{ display:inline-block; padding:3px 9px; border-radius:20px; font-size:12px;
     background:var(--accent-soft); color:var(--accent-ink); white-space:nowrap; }
-  .no-pass{ color:var(--bad); font-size:12px; }
+  .no-pass{ color:var(--bad-ink); font-size:12px; }
   .hist-line{ display:flex; gap:12px; padding:11px 0; border-bottom:1px solid var(--border); }
   .hist-line:last-child{ border-bottom:none; }
   .hist-dot{ flex:0 0 auto; width:9px; height:9px; border-radius:50%; background:var(--accent); margin-top:6px; }
@@ -348,7 +370,7 @@
   .review-modal .form-group select, .review-modal .form-group input, .review-modal .form-group textarea{ width:100%; padding:11px 13px; border:1.5px solid var(--border-strong); border-radius:var(--radius-sm); font-size:14px; outline:none; font-family:inherit; color:var(--ink); transition:border-color .2s, box-shadow .2s; }
   .review-modal .form-group select:focus, .review-modal .form-group input:focus, .review-modal .form-group textarea:focus{ border-color:var(--accent); box-shadow:0 0 0 3px rgba(43,89,240,.14); }
   .review-modal .btn-row{ display:flex; gap:10px; margin-top:20px; }
-  .review-modal .btn-row button{ flex:1; padding:12px; border:none; border-radius:var(--radius-sm); font-family:var(--display); font-weight:600; cursor:pointer; transition:.15s; }
+  .review-modal .btn-row button{ flex:1; padding:12px; border:none; border-radius:var(--radius-sm); font-family:var(--display); font-weight:600; cursor:pointer; transition:background .18s var(--ease-out), transform .16s var(--ease-out); }
   .review-modal .btn-save{ background:var(--accent); color:#fff; }
   .review-modal .btn-save:hover{ background:var(--accent-ink); }
   .review-modal .btn-cancel{ background:var(--surface-2); color:var(--ink-2); border:1px solid var(--border); }
@@ -363,7 +385,7 @@
   .checklist-block{ margin-bottom:16px; }
   .checklist-item{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius-sm); margin-bottom:8px; background:var(--surface); }
   .checklist-item .ci-text{ font-size:14px; color:var(--ink); }
-  .ci-toggle{ border:none; border-radius:20px; padding:6px 14px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; min-width:120px; transition:.15s; }
+  .ci-toggle{ border:none; border-radius:20px; padding:6px 14px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; min-width:120px; transition:background .18s var(--ease-out), color .18s var(--ease-out), transform .16s var(--ease-out); }
   .ci-toggle.pass{ background:var(--good-bg); color:#0a6e3d; }
   .ci-toggle.pass:hover{ box-shadow:inset 0 0 0 1.5px var(--good); }
   .ci-toggle.fail{ background:var(--bad-bg); color:#a52020; }
@@ -377,12 +399,12 @@
   .fail-call .fc-head{ display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:11px; }
   .fail-call .fc-head strong{ color:var(--ink); font-family:var(--display); }
   .fail-call .fc-score{ font-family:var(--display); font-weight:700; font-size:19px; font-variant-numeric:tabular-nums; padding:2px 10px; border-radius:8px; }
-  .fail-call .fc-score.ok{ color:var(--good); background:var(--good-bg); }
+  .fail-call .fc-score.ok{ color:var(--good-ink); background:var(--good-bg); }
   .fail-call .fc-score.mid{ color:#9a6206; background:var(--mid-bg); }
-  .fail-call .fc-score.bad{ color:var(--bad); background:var(--bad-bg); }
+  .fail-call .fc-score.bad{ color:var(--bad-ink); background:var(--bad-bg); }
   .fail-tag{ display:inline-block; background:var(--bad-bg); color:#a52020; border-radius:8px; padding:4px 10px; font-size:12px; font-weight:500; margin:3px 4px 3px 0; }
   .fail-tag.minor{ background:var(--mid-bg); color:#9a6206; }
-  .all-pass{ color:var(--good); font-weight:600; font-size:13px; }
+  .all-pass{ color:var(--good-ink); font-weight:600; font-size:13px; }
 
   /* ===== ЧЕК-ЛИСТ v2 (единый белый блок) ===== */
   .ev-block{ margin-bottom:26px; }
@@ -393,16 +415,16 @@
   .ev-row{ display:flex; align-items:center; justify-content:space-between; gap:16px; padding:11px 0; border-bottom:1px solid var(--border); }
   .ev-row:last-child{ border-bottom:none; }
   .ev-text{ font-size:14px; color:var(--ink); flex:1; min-width:0; }
-  .ev-minus{ display:block; font-size:11px; color:var(--bad); margin-top:3px; font-weight:600; min-height:14px; }
+  .ev-minus{ display:block; font-size:11px; color:var(--bad-ink); margin-top:3px; font-weight:600; min-height:14px; }
   .ev-opts{ display:flex; gap:5px; flex-wrap:wrap; justify-content:flex-end; }
-  .ev-opt{ border:1.5px solid var(--border-strong); background:var(--surface); color:var(--ink-2); border-radius:8px; padding:6px 11px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; transition:.12s; }
+  .ev-opt{ border:1.5px solid var(--border-strong); background:var(--surface); color:var(--ink-2); border-radius:8px; padding:6px 11px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; transition:background .15s var(--ease-out), border-color .15s var(--ease-out), color .15s var(--ease-out), transform .14s var(--ease-out); }
   .ev-opt:hover{ border-color:var(--muted); }
-  .ev-opt.on-pos{ background:var(--good-bg); border-color:var(--good); color:#0a6e3d; }
-  .ev-opt.on-dbt{ background:var(--mid-bg); border-color:var(--mid); color:#9a6206; }
-  .ev-opt.on-neg{ background:var(--bad-bg); border-color:var(--bad); color:#a52020; }
+  .ev-opt.on-pos{ background:var(--good-bg); border-color:var(--good-ink); color:#0a6e3d; }
+  .ev-opt.on-dbt{ background:var(--mid-bg); border-color:var(--mid-ink); color:#9a6206; }
+  .ev-opt.on-neg{ background:var(--bad-bg); border-color:var(--bad-ink); color:#a52020; }
   /* «Не требуется» серым не читалось: выбрано или нет — не разобрать */
   .ev-opt.on-na{ background:var(--accent-soft); border-color:var(--accent); color:var(--accent-ink); font-weight:600; }
-  .ev-opt.on-yes{ background:var(--bad-bg); border-color:var(--bad); color:#a52020; }
+  .ev-opt.on-yes{ background:var(--bad-bg); border-color:var(--bad-ink); color:#a52020; }
   .ev-opt.on-no{ background:#eceff5; border-color:var(--border-strong); color:#6b7585; }
   .ev-cmt{ width:100%; margin-top:8px; padding:8px 11px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; font-family:inherit; outline:none; }
   .ev-cmt:focus{ border-color:var(--accent); }
@@ -411,7 +433,7 @@
     background:var(--surface); border:1px solid var(--border-strong); border-radius:var(--radius); box-shadow:0 6px 26px rgba(18,23,34,.14); padding:14px 20px; margin-bottom:16px; }
   .ev-score{ display:flex; align-items:baseline; gap:9px; }
   .ev-num{ font-family:var(--display); font-size:32px; font-weight:700; color:var(--accent); font-variant-numeric:tabular-nums; letter-spacing:-.5px; }
-  .ev-num.bad{ color:var(--bad); } .ev-num.mid{ color:var(--mid); } .ev-num.ok{ color:var(--good); }
+  .ev-num.bad{ color:var(--bad-ink); } .ev-num.mid{ color:var(--mid-ink); } .ev-num.ok{ color:var(--good-ink); }
   .ev-lbl{ font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; font-weight:600; }
   .ev-counts{ display:flex; gap:7px; flex-wrap:wrap; flex:1; }
   .ev-chip{ border-radius:8px; padding:5px 11px; font-size:12px; font-weight:600; }
@@ -1640,8 +1662,8 @@
             '<div class="fc-score ' + cls + '">' + pct2(e.score) + '</div>' +
           '</div>';
         if (e.gratitude) html += '<div class="all-pass"><i class="fas fa-star"></i> Благодарность от клиента</div>';
-        if (e.complaint) html += '<div style="color:var(--bad);font-weight:600;font-size:13px;"><i class="fas fa-triangle-exclamation"></i> Подтверждённая жалоба</div>';
-        if (e.violation) html += '<div style="color:var(--bad);font-weight:600;font-size:13px;"><i class="fas fa-ban"></i> Недопустимое событие</div>';
+        if (e.complaint) html += '<div style="color:var(--bad-ink);font-weight:600;font-size:13px;"><i class="fas fa-triangle-exclamation"></i> Подтверждённая жалоба</div>';
+        if (e.violation) html += '<div style="color:var(--bad-ink);font-weight:600;font-size:13px;"><i class="fas fa-ban"></i> Недопустимое событие</div>';
         if (e.failed.length) {
           html += '<div style="margin-top:8px;">';
           e.failed.forEach(function (f) {
@@ -2335,7 +2357,7 @@
         '<th>Прослушано</th><th>Осталось</th><th>Выгрузил оператор</th><th>СКК сам</th>' +
         '</tr></thead><tbody>';
       r.rows.forEach(function (x) {
-        const leftCell = x.left === 0 ? '<span style="color:var(--good);font-weight:700;">готово</span>' : '<strong style="color:var(--bad);">' + x.left + '</strong>';
+        const leftCell = x.left === 0 ? '<span style="color:var(--good-ink);font-weight:700;">готово</span>' : '<strong style="color:var(--bad-ink);">' + x.left + '</strong>';
         const sel = '<select class="mark-sel mark-' + (x.mark || 'none') + '" data-mark="' + x.operator.replace(/"/g, '&quot;') + '">' +
           '<option value=""' + (x.mark ? '' : ' selected') + '>—</option>' +
           '<option value="in_progress"' + (x.mark === 'in_progress' ? ' selected' : '') + '>В работе</option>' +
@@ -2343,7 +2365,7 @@
           '</select>' + (x.markBy ? '<div class="hint">' + x.markBy + '</div>' : '');
         html += '<tr' + (x.mark === 'in_progress' ? ' class="mark-row"' : '') + '><td>' + sel + '</td>' +
           '<td>' + x.operator + '</td><td>' + x.group + '</td><td>' + x.accepted + '</td><td><strong>' + x.plan + '</strong></td><td>' + x.done + '</td><td>' + leftCell + '</td>' +
-          '<td>' + x.fromOperator + (x.submitted > x.fromOperator ? ' <span style="color:var(--mid);font-size:12px;">(+' + (x.submitted - x.fromOperator) + ' ждут)</span>' : '') + '</td><td>' + x.bySkk + '</td></tr>';
+          '<td>' + x.fromOperator + (x.submitted > x.fromOperator ? ' <span style="color:var(--mid-ink);font-size:12px;">(+' + (x.submitted - x.fromOperator) + ' ждут)</span>' : '') + '</td><td>' + x.bySkk + '</td></tr>';
       });
       html += '</tbody></table></div>';
       box.innerHTML = html;
@@ -2951,7 +2973,7 @@
           '<td>' + x.unconfirmed + '</td>' +
           '<td>' + x.confClient + '</td><td>' + x.confCustomer + '</td>' +
           '<td>' + x.unconfClient + '</td><td>' + x.unconfCustomer + '</td>' +
-          '<td' + (noSrc ? ' style="color:var(--mid);font-weight:600;"' : ' style="color:var(--muted);"') + '>' + noSrc + '</td>' +
+          '<td' + (noSrc ? ' style="color:var(--mid-ink);font-weight:600;"' : ' style="color:var(--muted);"') + '>' + noSrc + '</td>' +
           '<td><strong>' + pct2(x.weekShare) + '</strong></td></tr>';
       });
       html += '</tbody></table></div>';
@@ -3025,7 +3047,7 @@
             html += '<td class="pj-col"' +
               (x ? ' title="' + x.id + ' · ' + x.date + ' · ' + (x.confirmed ? 'подтверждённая, входит в среднюю по группе' : 'необоснованная, никуда не входит') + '"' : '') + '>' +
               (x ? (x.confirmed
-                    ? '<strong style="color:var(--bad);">' + pct2(x.score) + '</strong>'
+                    ? '<strong style="color:var(--bad-ink);">' + pct2(x.score) + '</strong>'
                     : '<span style="color:var(--muted);">' + pct2(x.score) + '</span>') : '') + '</td>';
           }
           html += '</tr>';
@@ -3144,7 +3166,7 @@
           ' один СКК берёт сам, поэтому от вас — <strong>' + r.ownPlan + '</strong>.' +
         (r.left
           ? ' Осталось выгрузить: <strong>' + r.left + '</strong> — заявку подайте ниже, в блоке «Сдать звонок на проверку».'
-          : ' <span style="color:var(--good);">За этот день всё выгружено.</span>') + '</div>';
+          : ' <span style="color:var(--good-ink);">За этот день всё выгружено.</span>') + '</div>';
     }).getMyUploadPlan(sessionStorage.getItem('token'), document.getElementById('upDate').value);
   }
 
@@ -3391,7 +3413,7 @@
       r.rows.forEach(function (e) {
         const errs = e.failed.length
           ? e.failed.map(function (f) { return '<div style="margin:2px 0;"><span class="fail-tag' + (f.critical ? '' : ' minor') + '">' + f.text + '</span>' + (f.comment ? '<span style="color:var(--muted);font-size:12px;"> — ' + f.comment + '</span>' : '') + '</div>'; }).join('')
-          : '<span style="color:var(--good);font-weight:600;">без ошибок</span>';
+          : '<span style="color:var(--good-ink);font-weight:600;">без ошибок</span>';
         const flags = (e.violation ? ' <span class="fail-tag">НС</span>' : '') + (e.complaint ? ' <span class="fail-tag">ПЖ</span>' : '') + (e.gratitude ? ' <span class="fail-tag minor">★</span>' : '') + (e.controlCall ? ' <span class="fail-tag kz-tag" title="контрольный звонок заказчика">КЗ</span>' : '');
         // дату отправки вносят только у чек-листов по жалобе — их
         // оценивают одним днём, а отправляют другим
@@ -3511,7 +3533,8 @@
   }
 
   // ---------- ДИВИЗИОН (СРГО / МЕНЕДЖЕР) ----------
-  function scoreColorHex(s) { return s >= 90 ? '#0FA45A' : (s >= 70 ? '#DE9109' : '#E23A3A'); }
+  // те же три цвета, но в читаемой яркости: цифры в плотных таблицах
+  function scoreColorHex(s) { return s >= 90 ? '#0C7F45' : (s >= 70 ? '#976306' : '#D01F1F'); }
 
   function loadOrgDashboard(role) {
     const isMgr = (role === 'manager' || role === 'admin');

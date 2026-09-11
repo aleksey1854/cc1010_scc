@@ -174,7 +174,7 @@
     background:var(--surface); padding:18px 20px; border-radius:var(--radius); border:1px solid var(--border);
     box-shadow:var(--shadow); position:relative; overflow:hidden;
   }
-  .stat-card::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--muted); }
+  /* Цветную полоску слева убрал: цвет цифры и так говорит, о чём карточка */
   .stat-card .number{ font-family:var(--display); font-size:30px; font-weight:700; line-height:1; color:var(--ink); font-variant-numeric:tabular-nums; letter-spacing:-.5px; }
   .stat-card .label{ font-size:11px; color:var(--muted); margin-top:8px; text-transform:uppercase; letter-spacing:.6px; font-weight:600; }
   .stat-card .number.new{ color:var(--new); }
@@ -182,11 +182,6 @@
   .stat-card .number.checked{ color:var(--good-ink); }
   .stat-card .number.rejected{ color:var(--bad-ink); }
   .stat-card .number.rating{ color:var(--accent); }
-  .stat-card:has(.number.new)::before{ background:var(--new); }
-  .stat-card:has(.number.inprogress)::before{ background:var(--mid); }
-  .stat-card:has(.number.checked)::before{ background:var(--good); }
-  .stat-card:has(.number.rejected)::before{ background:var(--bad); }
-  .stat-card:has(.number.rating)::before{ background:var(--accent); }
 
   /* ===== КАРТОЧКИ ===== */
   .card{ background:var(--surface); border-radius:var(--radius); border:1px solid var(--border); box-shadow:var(--shadow); padding:22px 24px; margin-bottom:22px; }
@@ -356,8 +351,8 @@
   .filter-bar{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
   .filter-bar select, .filter-bar input{ padding:10px 13px; border:1.5px solid var(--border-strong); border-radius:var(--radius-sm); font-size:14px; outline:none; color:var(--ink); background:var(--surface); transition:border-color .2s, box-shadow .2s; }
   .filter-bar select:focus, .filter-bar input:focus{ border-color:var(--accent); box-shadow:0 0 0 3px rgba(43,89,240,.14); }
-  .filter-bar .btn-filter{ padding:10px 18px; background:var(--accent); color:#fff; border:none; border-radius:var(--radius-sm); cursor:pointer; font-weight:600; font-size:14px; transition:background .2s; }
-  .filter-bar .btn-filter:hover{ background:var(--accent-ink); }
+  .btn-filter{ padding:10px 18px; background:var(--accent); color:#fff; border:none; border-radius:var(--radius-sm); cursor:pointer; font-weight:600; font-size:14px; transition:background .18s var(--ease-out), transform .16s var(--ease-out); }
+  .btn-filter:hover{ background:var(--accent-ink); }
 
   /* ===== МОДАЛКИ ===== */
   .review-modal{ display:none; position:fixed; inset:0; background:rgba(11,16,25,.55); backdrop-filter:blur(3px); z-index:1000; justify-content:center; align-items:center; padding:16px; }

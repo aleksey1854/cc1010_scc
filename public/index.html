@@ -2383,7 +2383,11 @@
     }
   }
 
+  // Считаем сразу: обычно к этому моменту вкладка уже на своём месте.
+  // Второй заход кадром позже — на случай, когда страницу только что
+  // показали и размеры ещё не посчитаны.
   function segSyncAll() {
+    document.querySelectorAll('.seg').forEach(segSync);
     requestAnimationFrame(function () {
       document.querySelectorAll('.seg').forEach(segSync);
     });

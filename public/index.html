@@ -211,6 +211,20 @@
   .mark-in_progress{ border-color:var(--mid); background:var(--mid-bg); color:#8a5600; font-weight:600; }
   .mark-done{ border-color:var(--good); background:var(--good-bg); color:#0a6e3d; font-weight:600; }
   .mark-row td{ background:var(--mid-bg); }
+  /* Плашка новых оценок: первое, что оператор видит после входа. */
+  .new-evals{ border:1px solid var(--accent); border-left:4px solid var(--accent);
+    background:var(--accent-soft); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+  .new-evals h3{ margin:0 0 10px; font-size:16px; color:var(--accent-ink);
+    display:flex; align-items:center; gap:8px; }
+  .new-evals .ne-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    padding:7px 0; border-top:1px solid var(--border); font-size:14px; }
+  .new-evals .ne-row:first-of-type{ border-top:0; }
+  .new-evals .ne-score{ font-weight:700; }
+  .new-evals .ne-actions{ margin-top:12px; }
+  .kz-badge{ display:inline-block; padding:2px 8px; border-radius:6px; font-size:12px;
+    font-weight:700; background:var(--accent); color:#fff; white-space:nowrap; }
+  .new-chip{ display:inline-block; padding:1px 7px; border-radius:6px; font-size:11px;
+    font-weight:700; background:var(--accent); color:#fff; margin-left:6px; vertical-align:middle; }
   .ev-kz{ padding:5px 10px; border:1px solid var(--border-strong); border-radius:8px;
     background:var(--surface); white-space:nowrap; }
   .ev-kz input:checked + span, .ev-kz:has(input:checked){ color:var(--accent-ink); border-color:var(--accent); background:var(--accent-soft); }
@@ -522,6 +536,7 @@
     </div>
   </div>
   <div class="container">
+    <div id="opNewBox" class="new-evals hidden"></div>
     <div class="stats-grid">
       <div class="stat-card"><div class="number new" id="opStatNew">0</div><div class="label">Новые</div></div>
       <div class="stat-card"><div class="number inprogress" id="opStatInProgress">0</div><div class="label">В работе</div></div>
@@ -1556,12 +1571,51 @@
   function showOpMessage(text, type) { const el = document.getElementById('opFormMessage'); el.textContent = text; el.className = 'message ' + type; el.style.display = 'block'; setTimeout(function () { el.style.display = 'none'; }, 5000); }
 
   // ---------- ОПЕРАТОР: оценки КК (чек-лист v2) ----------
+  // Оценка появилась — оператор должен это заметить, а не наткнуться
+  // на неё случайно. Контрольный звонок заказчика подписываем отдельно:
+  // по таким разбор строже, и человеку важно понимать, что это был КЗ.
+  function drawNewEvals(list) {
+    const box = document.getElementById('opNewBox');
+    if (!list.length) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+    const kz = list.filter(function (e) { return e.controlCall; }).length;
+    let html = '<h3><i class="fas fa-bell"></i> ' +
+      (list.length === 1 ? 'Новая оценка' : 'Новых оценок: ' + list.length) +
+      (kz ? ' · из них КЗ от заказчика: ' + kz : '') + '</h3>';
+    list.forEach(function (e) {
+      const cls = e.score >= 90 ? 'ok' : (e.score >= 70 ? 'mid' : 'bad');
+      html += '<div class="ne-row">' +
+        '<span class="ne-score ' + cls + '" style="color:' + scoreColorHex(e.score) + '">' + pct2(e.score) + '</span>' +
+        '<span>звонок ' + e.callDate + '</span>' +
+        '<span style="color:var(--muted);">СКК: ' + (e.qc || '—') + '</span>' +
+        (e.controlCall ? '<span class="kz-badge" title="контрольный звонок заказчика">КЗ от заказчика</span>' : '') +
+        (e.complaint ? '<span class="fail-tag">подтверждённая жалоба</span>' : '') +
+        (e.violation ? '<span class="fail-tag">недопустимое событие</span>' : '') +
+        (e.gratitude ? '<span class="fail-tag minor">★ благодарность</span>' : '') +
+        '</div>';
+    });
+    html += '<div class="ne-actions">' +
+      '<button type="button" class="btn-filter" onclick="markEvalsSeen()">' +
+      '<i class="fas fa-check"></i> Понятно</button>' +
+      '<span style="color:var(--muted);font-size:13px;margin-left:10px;">разбор — ниже, в «Мои оценки и ошибки»</span></div>';
+    box.innerHTML = html;
+    box.classList.remove('hidden');
+  }
+
+  function markEvalsSeen() {
+    google.script.run.withSuccessHandler(function () {
+      drawNewEvals([]);
+      loadMyEvaluations();
+    }).withFailureHandler(function (e) { alert(e); })
+      .markEvaluationsSeen(sessionStorage.getItem('token'));
+  }
+
   function loadMyEvaluations(pre) {
     const render = function (res) {
       const box = document.getElementById('opEvalList');
       if (!res.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + res.error + '</p></div>'; return; }
 
       document.getElementById('opEvCount').textContent = res.stats.count;
+      drawNewEvals(res.unseen || []);
       // средний балл считает getMyQuality: он умеет период и не берёт жалобы
 
       drawLineChart('opTrendChart', 'Качество контакта, %', res.trend.map(function (t) { return t.label; }), res.trend.map(function (t) { return t.score; }));
@@ -1576,7 +1630,9 @@
         const cls = e.score >= 90 ? 'ok' : (e.score >= 70 ? 'mid' : 'bad');
         html += '<div class="fail-call">' +
           '<div class="fc-head">' +
-            '<div><strong>' + e.callDate + '</strong>' + (e.phone ? ' · ' + e.phone : '') + ' · СКК: ' + (e.qc || '—') +
+            '<div><strong>' + e.callDate + '</strong>' +
+              (e.isNew ? '<span class="new-chip">новая</span>' : '') +
+              (e.phone ? ' · ' + e.phone : '') + ' · СКК: ' + (e.qc || '—') +
               (e.controlCall ? ' <span class="fail-tag minor" title="контрольный звонок заказчика">КЗ от заказчика</span>' : '') + '</div>' +
             '<div class="fc-score ' + cls + '">' + pct2(e.score) + '</div>' +
           '</div>';

@@ -510,6 +510,44 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('жалобы за пустой диапазон — ноль строк',
     cmpRange.success === true && cmpRange.rows.length === 0, cmpRange);
 
+  head('ШАГ 9б. ОПЕРАТОР УЗНАЁТ О НОВОЙ ОЦЕНКЕ');
+  // тот КЗ выше уже удалён шагом 3в1 — заводим свежий, иначе проверять нечего
+  const kzNew = await R('saveEvaluation', { pin: qcT,
+    meta: { ...META, reqId: '', callTime: '20:15', phone: '79165550011', controlCall: true },
+    answers: ans, comments: {} });
+  chk('КЗ для уведомления создан', kzNew.success === true, kzNew.error);
+  // всё, что оценили за прогон, оператор ещё не открывал
+  const nev1 = await R('getMyEvaluations', opT);
+  chk('плашка новых оценок наполнена', nev1.success === true && nev1.unseen.length > 0,
+    nev1.unseen && nev1.unseen.length);
+  chk('  КЗ в уведомлении подписан', nev1.unseen.some(e => e.controlCall === true),
+    nev1.unseen.map(e => e.controlCall));
+  // метку КЗ теряли по дороге: db её отдавал, api не перекладывал
+  chk('  КЗ виден и в списке оценок', nev1.evaluations.some(e => e.controlCall === true),
+    nev1.evaluations.map(e => e.controlCall));
+  chk('  новые оценки помечены в списке', nev1.evaluations.some(e => e.isNew === true));
+
+  const seen = await R('markEvaluationsSeen', opT);
+  chk('«Понятно» гасит уведомление', seen.success === true && seen.marked === nev1.unseen.length,
+    seen);
+  const nev2 = await R('getMyEvaluations', opT);
+  chk('  после этого новых нет', nev2.unseen.length === 0, nev2.unseen);
+  chk('  и метки «новая» пропали', nev2.evaluations.every(e => e.isNew === false));
+
+  // следующая оценка снова поднимает плашку
+  const later = await R('saveEvaluation', { pin: qcT,
+    meta: { ...META, reqId: '', callTime: '19:40', phone: '79167778899' },
+    answers: ans, comments: {} });
+  chk('новая оценка снова уведомляет', later.success === true &&
+    (await R('getMyEvaluations', opT)).unseen.length === 1, later.error);
+
+  // чужие оценки в чужую плашку не попадают
+  const otherOp = creds.find(x => x[2] === 'operator' && x[0] !== OP[0]);
+  const otherT = (await R('login', otherOp[3], otherOp[4])).token;
+  const nevOther = await R('getMyEvaluations', otherT);
+  chk('оператор не видит чужих новых оценок',
+    nevOther.unseen.every(e => e.id !== later.id), nevOther.unseen);
+
   head('ШАГ 10. СЕССИИ');
   await R('logoutSession', opT);
   chk('после выхода токен не работает', (await R('getOperatorStats', opT)).success === false);

@@ -2307,13 +2307,14 @@
       loadOrgDashboard(u.role);
       return;
     }
-    document.getElementById('tabEvalBtn').classList.toggle('active', t === 'eval');
-    document.getElementById('tabPlanBtn').classList.toggle('active', t === 'plan');
-    document.getElementById('tabReqBtn').classList.toggle('active', t === 'req');
-    document.getElementById('qcEvalTab').classList.toggle('hidden', t !== 'eval');
-    document.getElementById('qcPlanTab').classList.toggle('hidden', t !== 'plan');
-    document.getElementById('qcReqTab').classList.toggle('hidden', t !== 'req');
-    document.getElementById('qcStaffTab').classList.toggle('hidden', t !== 'staff');
+    // Кнопка и её вкладка в одной строке: раньше «Сотрудники» показывались,
+    // но подсветку им никто не ставил — наверху не горело ничего.
+    const tabs = { eval: ['tabEvalBtn', 'qcEvalTab'], plan: ['tabPlanBtn', 'qcPlanTab'],
+                   req: ['tabReqBtn', 'qcReqTab'], staff: ['tabStaffBtn', 'qcStaffTab'] };
+    Object.keys(tabs).forEach(function (k) {
+      document.getElementById(tabs[k][0]).classList.toggle('active', k === t);
+      document.getElementById(tabs[k][1]).classList.toggle('hidden', k !== t);
+    });
     if (t === 'req' && !allRequests.length) loadAllRequests();
     if (t === 'staff' && !staffAll.length) loadStaff();
     if (t === 'plan') { if (!document.getElementById('planDate').value) document.getElementById('planDate').value = yesterdayStr(); loadPlan(true); }

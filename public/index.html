@@ -183,6 +183,15 @@
   .stat-card .number.rejected{ color:var(--bad-ink); }
   .stat-card .number.rating{ color:var(--accent); }
 
+  /* Каркас на время загрузки. Крутилка сообщает «идёт работа», каркас —
+     ещё и «сейчас тут будет таблица», поэтому глазу спокойнее. */
+  .skel{ padding:2px 0; }
+  .skel-row{ display:flex; gap:14px; align-items:center; padding:13px 4px; border-bottom:1px solid var(--border); }
+  .skel-bar{ height:11px; border-radius:6px;
+    background:linear-gradient(90deg, var(--surface-2) 25%, var(--border) 37%, var(--surface-2) 63%);
+    background-size:400% 100%; animation:skel 1.3s ease-in-out infinite; }
+  @keyframes skel{ from{ background-position:100% 0; } to{ background-position:0 0; } }
+
   /* ===== КАРТОЧКИ ===== */
   .card{ background:var(--surface); border-radius:var(--radius); border:1px solid var(--border); box-shadow:var(--shadow); padding:22px 24px; margin-bottom:22px; }
   .card-title{ font-family:var(--display); font-size:16px; font-weight:600; color:var(--ink); margin-bottom:18px; padding-bottom:14px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:11px; letter-spacing:-.1px; }
@@ -208,9 +217,19 @@
   .hint{ display:block; color:var(--muted); font-size:12px; margin-top:5px; }
   /* восемь вкладок отчётов в строку на узком экране не помещались и
      распирали всю страницу — переносим их по словам */
-  .seg{ display:flex; flex-wrap:wrap; background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:4px; margin-bottom:16px; gap:4px; }
-  .seg-btn{ border:none; background:transparent; color:var(--ink-2); font-family:var(--display); font-weight:600; font-size:14px; padding:9px 18px; border-radius:9px; cursor:pointer; transition:background .18s var(--ease-out), color .18s var(--ease-out), transform .16s var(--ease-out); }
+  .seg{ display:flex; flex-wrap:wrap; background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:4px; margin-bottom:16px; gap:4px; position:relative; }
+  /* Подсветка вкладки переезжает, а не гаснет и зажигается в другом месте:
+     видно, откуда и куда ушёл фокус. Едет только подложка — сами кнопки
+     стоят на месте, ширину меняет один элемент вне потока. */
+  .seg-ind{ position:absolute; left:0; top:0; border-radius:9px; background:var(--accent);
+    box-shadow:0 2px 8px rgba(43,89,240,.28); opacity:0; pointer-events:none; z-index:0;
+    transition:transform .2s var(--ease-out), width .2s var(--ease-out), opacity .15s linear; }
+  .seg-ind.seg-jump{ transition:none; }
+  .seg-btn{ position:relative; z-index:1; border:none; background:transparent; color:var(--ink-2); font-family:var(--display); font-weight:600; font-size:14px; padding:9px 18px; border-radius:9px; cursor:pointer; transition:background .18s var(--ease-out), color .18s var(--ease-out), transform .16s var(--ease-out); }
   .seg-btn.active{ background:var(--accent); color:#fff; box-shadow:0 2px 8px rgba(43,89,240,.28); }
+  /* has-ind ставит скрипт, когда подложка встала на место: не встанет —
+     вкладка просто останется закрашенной, как раньше */
+  .seg.has-ind .seg-btn.active{ background:transparent; box-shadow:none; }
   .status-badge.Без_звонка{ background:#eceff5; color:#6b7585; }
   .btn-small{ padding:6px 12px; background:var(--accent-soft); color:var(--accent); border:none; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; transition:background .18s var(--ease-out), color .18s var(--ease-out), transform .16s var(--ease-out); margin:0 2px; }
   .btn-small:hover{ background:var(--accent); color:#fff; }
@@ -1553,6 +1572,7 @@
     document.getElementById('segNo').classList.toggle('active', v === 'no');
     document.getElementById('callFields').classList.toggle('hidden', v !== 'yes');
     document.getElementById('noCallFields').classList.toggle('hidden', v !== 'no');
+    segSyncAll();
   }
 
   function submitRequest(event) {
@@ -1721,6 +1741,7 @@
 
   // ---------- QC: список ----------
   function loadAllRequests() {
+    document.getElementById('qcRequestsList').innerHTML = loadingRows();
     google.script.run.withSuccessHandler(function (result) {
       if (result.success) { allRequests = result.requests; renderRequests(allRequests); }
     }).getAllRequests(sessionStorage.getItem('token'));
@@ -1812,7 +1833,7 @@
 
   function loadStaff() {
     const box = document.getElementById('staffList');
-    box.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Загрузка…</p></div>';
+    box.innerHTML = loadingRows();
     const t = sessionStorage.getItem('token');
     google.script.run.withSuccessHandler(function (r) {
       if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
@@ -2100,7 +2121,7 @@
   function openHistory(requestId) {
     document.getElementById('histId').textContent = requestId;
     document.getElementById('histBody').innerHTML =
-      '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Загрузка…</p></div>';
+      loadingRows();
     document.getElementById('histModal').classList.add('active');
     google.script.run
       .withSuccessHandler(function (r) { document.getElementById('histBody').innerHTML = histHtml(r); })
@@ -2315,10 +2336,60 @@
       document.getElementById(tabs[k][0]).classList.toggle('active', k === t);
       document.getElementById(tabs[k][1]).classList.toggle('hidden', k !== t);
     });
+    segSyncAll();
     if (t === 'req' && !allRequests.length) loadAllRequests();
     if (t === 'staff' && !staffAll.length) loadStaff();
     if (t === 'plan') { if (!document.getElementById('planDate').value) document.getElementById('planDate').value = yesterdayStr(); loadPlan(true); }
   }
+
+  function loadingRows(n) {
+    const w = ['22%', '34%', '13%', '17%'];
+    let h = '<div class="skel">';
+    for (let i = 0; i < (n || 6); i++) {
+      h += '<div class="skel-row">';
+      w.forEach(function (x) { h += '<span class="skel-bar" style="width:' + x + '"></span>'; });
+      h += '</div>';
+    }
+    return h + '</div>';
+  }
+
+  // Переезд подсветки. Между строками (вкладки переносятся на узком
+  // экране) не летим по диагонали — там просто перескок.
+  function segSync(seg) {
+    const btn = seg.querySelector('.seg-btn.active');
+    let ind = seg.querySelector('.seg-ind');
+    if (!btn || !btn.offsetWidth) {
+      if (ind) ind.style.opacity = '0';
+      seg.classList.remove('has-ind');
+      return;
+    }
+    if (!ind) {
+      ind = document.createElement('span');
+      ind.className = 'seg-ind seg-jump';
+      seg.insertBefore(ind, seg.firstChild);
+    }
+    const jump = ind.dataset.top !== String(btn.offsetTop);
+    if (jump) ind.classList.add('seg-jump');
+    ind.style.width = btn.offsetWidth + 'px';
+    ind.style.height = btn.offsetHeight + 'px';
+    ind.style.transform = 'translate(' + btn.offsetLeft + 'px,' + btn.offsetTop + 'px)';
+    ind.style.opacity = '1';
+    ind.dataset.top = btn.offsetTop;
+    seg.classList.add('has-ind');
+    if (jump) {
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () { ind.classList.remove('seg-jump'); });
+      });
+    }
+  }
+
+  function segSyncAll() {
+    requestAnimationFrame(function () {
+      document.querySelectorAll('.seg').forEach(segSync);
+    });
+  }
+
+  window.addEventListener('resize', segSyncAll);
 
   function yesterdayStr() {
     const d = new Date(); d.setDate(d.getDate() - 1);
@@ -2330,7 +2401,7 @@
   // туда и шёл.
   function loadPlan(auto) {
     const box = document.getElementById('planTable');
-    box.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Загрузка...</p></div>';
+    box.innerHTML = loadingRows();
     google.script.run.withSuccessHandler(function (r) {
       if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
       // статистику грузят не каждый день: если за выбранный день её нет,
@@ -2879,6 +2950,7 @@
       document.getElementById(tabs[k][0]).classList.toggle('active', k === t);
       document.getElementById(tabs[k][1]).classList.toggle('hidden', k !== t);
     });
+    segSyncAll();
     if (t === 'weekly') loadWeekly();
     if (t === 'journal') {
       // по умолчанию — текущий месяц, дальше диапазон правят руками
@@ -2908,7 +2980,7 @@
 
   function loadCriteria() {
     const box = document.getElementById('criteriaTable');
-    box.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Загрузка...</p></div>';
+    box.innerHTML = loadingRows();
     google.script.run.withSuccessHandler(function (r) {
       if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
       if (!r.weeks.length) { box.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Нет данных за период</p></div>'; return; }
@@ -2927,6 +2999,7 @@
 
   function loadTopics() {
     const box = document.getElementById('topicsTable');
+    box.innerHTML = loadingRows();
     google.script.run.withSuccessHandler(function (r) {
       if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
       if (!r.rows.length) { box.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Нет данных</p></div>'; return; }
@@ -2944,6 +3017,7 @@
 
   function loadComplaints() {
     const box = document.getElementById('complaintsTable');
+    box.innerHTML = loadingRows();
     google.script.run.withSuccessHandler(function (r) {
       if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
       document.getElementById('cmpTotal').textContent = r.summary.total;
@@ -2991,7 +3065,7 @@
   // стоят отдельными колонками и в среднее не входят.
   function loadProduction() {
     const box = document.getElementById('productionTable');
-    box.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Загрузка...</p></div>';
+    box.innerHTML = loadingRows();
     google.script.run.withSuccessHandler(function (r) {
       if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
       document.getElementById('prOverall').textContent = r.overall === null ? '—' : pct2(r.overall);
@@ -3134,7 +3208,7 @@
 
   function loadUploadPlan(auto) {
     const box = document.getElementById('upBox');
-    box.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Загрузка...</p></div>';
+    box.innerHTML = loadingRows();
     google.script.run.withSuccessHandler(function (r) {
       if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
       renderUploadMemo(r.accepted);
@@ -3230,7 +3304,7 @@
 
   function loadAppeals() {
     const box = document.getElementById('appealsList');
-    box.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Загрузка...</p></div>';
+    box.innerHTML = loadingRows();
     google.script.run.withSuccessHandler(function (r) {
       if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
       const by = function (st) { return r.rows.filter(function (x) { return x.status === st; }).length; };
@@ -3331,7 +3405,7 @@
 
   function loadWeekly() {
     const box = document.getElementById('weeklyGrid');
-    box.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Загрузка...</p></div>';
+    box.innerHTML = loadingRows();
     google.script.run.withSuccessHandler(function (r) {
       if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
       document.getElementById('weekLabel').textContent = r.week.label;
@@ -3392,6 +3466,7 @@
 
   function loadJournal() {
     const box = document.getElementById('journalList');
+    box.innerHTML = loadingRows();
     const me = JSON.parse(sessionStorage.getItem('user') || '{}');
     // правим в той же форме оценки, а она есть только у КК и админа
     const canEditEval = ['qc', 'sqc', 'admin'].indexOf(me.role) >= 0;
@@ -3464,6 +3539,7 @@
 
   function loadKk() {
     const box = document.getElementById('kkTable');
+    box.innerHTML = loadingRows();
     google.script.run.withSuccessHandler(function (r) {
       if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
       let html = '<div class="table-wrapper"><table><thead><tr><th>Оператор</th><th>Группа</th><th>Стаж, мес</th><th>Оценок (нед)</th><th>% без КО (нед)</th><th>Оценок (мес)</th><th>% без КО (мес)</th><th>Недоп. событий</th><th>Подтв. жалоб</th></tr></thead><tbody>';

@@ -937,6 +937,12 @@
         <label for="orgFrom">с</label><input type="date" id="orgFrom" onchange="loadOrgDashboard(JSON.parse(sessionStorage.getItem('user')||'{}').role)">
         <label for="orgTo">по</label><input type="date" id="orgTo" onchange="loadOrgDashboard(JSON.parse(sessionStorage.getItem('user')||'{}').role)">
       </span>
+      <!-- Такой же сброс диапазона, как у РГО: одинаковые вещи должны
+           выглядеть и работать одинаково в обоих кабинетах. -->
+      <button type="button" class="logout-btn" title="За всё время"
+        onclick="clearRange('org', function () { loadOrgDashboard(JSON.parse(sessionStorage.getItem('user')||'{}').role); })">
+        <i class="fas fa-rotate-left"></i>
+      </button>
       <span class="user-badge"><i class="fas fa-user"></i> <span id="orgUserName"></span></span>
       <span class="user-badge"><i class="fas fa-diagram-project"></i> <span id="orgUserGroup"></span></span>
       <button class="logout-btn" onclick="openPwModal(false)" title="Сменить пароль"><i class="fas fa-key"></i></button>

@@ -540,6 +540,24 @@
 </div>
 
 <!-- АПЕЛЛЯЦИЯ -->
+<div class="review-modal" id="sentModal">
+  <div class="modal-content" style="max-width:460px;">
+    <div class="modal-title"><i class="fas fa-paper-plane"></i> Дата отправки чек-листа</div>
+    <div id="sentWhat" class="hint" style="margin-bottom:12px;"></div>
+    <div class="form-group">
+      <label for="sentDate"><i class="fas fa-calendar-day"></i> Когда чек-лист ушёл заказчику</label>
+      <input type="date" id="sentDate">
+      <small class="hint">С этого дня оценка попадает в отчёты — по дате отправки, а не прослушки.</small>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="btn-cancel" onclick="document.getElementById('sentModal').classList.remove('active')">Отмена</button>
+      <button type="button" class="btn-save" style="background:var(--bad);" onclick="saveSentDate(true)">Снять дату</button>
+      <button type="button" class="btn-save" onclick="saveSentDate(false)"><i class="fas fa-check"></i> Сохранить</button>
+    </div>
+    <div class="message" id="sentMessage"></div>
+  </div>
+</div>
+
 <div class="review-modal" id="appealModal">
   <div class="modal-content" style="max-width:560px;">
     <div class="modal-title"><i class="fas fa-scale-balanced"></i> Апелляция на оценку</div>
@@ -3256,16 +3274,37 @@
 
   // Дата отправки: её вносят позже, чем оценивают, и с этого момента
   // чек-лист попадает в отчёты за день отправки.
+  // Дату всюду в системе выбирают календариком — и здесь тоже.
+  // Системное окно браузера требовало набрать ДД.ММ.ГГГГ руками.
+  let sentEv = '';
   function askSentDate(evId, current) {
-    const was = current ? current.split('-').reverse().join('.') : '';
-    const ans = prompt('Дата отправки чек-листа ' + evId + ' (ДД.ММ.ГГГГ).\n' +
-      'Оставьте пустым, чтобы снять дату.', was);
-    if (ans === null) return;
+    sentEv = evId;
+    document.getElementById('sentWhat').innerHTML = 'Оценка <strong>' + evId + '</strong>';
+    document.getElementById('sentDate').value = current || '';
+    const m = document.getElementById('sentMessage');
+    m.style.display = 'none'; m.className = 'message';
+    document.getElementById('sentModal').classList.add('active');
+    setTimeout(function () { document.getElementById('sentDate').focus(); }, 150);
+  }
+
+  function saveSentDate(clear) {
+    const m = document.getElementById('sentMessage');
+    const val = clear ? '' : document.getElementById('sentDate').value;
+    if (!clear && !val) {
+      m.textContent = 'Выберите дату или нажмите «Снять дату»';
+      m.className = 'message error'; m.style.display = 'block';
+      return;
+    }
     google.script.run.withSuccessHandler(function (r) {
-      if (!r.success) { alert(r.error); return; }
+      if (!r.success) {
+        m.textContent = r.error; m.className = 'message error'; m.style.display = 'block';
+        return;
+      }
+      document.getElementById('sentModal').classList.remove('active');
       loadJournal();
-    }).withFailureHandler(function (e) { alert(e); })
-      .setSentDate(sessionStorage.getItem('token'), evId, ans.trim());
+    }).withFailureHandler(function (e) {
+      m.textContent = String(e); m.className = 'message error'; m.style.display = 'block';
+    }).setSentDate(sessionStorage.getItem('token'), sentEv, val);
   }
 
   // Удаление оценки: чек-лист исчезает отовсюду, заявка возвращается

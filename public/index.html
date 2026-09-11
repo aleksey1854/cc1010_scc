@@ -192,6 +192,7 @@
   .form-grid{ display:grid; grid-template-columns:1fr 1fr; gap:15px; }
   .form-group{ display:flex; flex-direction:column; }
   .form-group.full-width{ grid-column:1/-1; }
+  .form-group label i{ color:var(--muted); width:14px; text-align:center; }
   .form-group label{ font-size:13px; font-weight:600; color:var(--ink-2); margin-bottom:6px; }
   .form-group input, .form-group select, .form-group textarea{
     padding:11px 14px; border:1.5px solid var(--border-strong); border-radius:var(--radius-sm); font-size:15px; outline:none; font-family:inherit; color:var(--ink); background:var(--surface); transition:border-color .2s, box-shadow .2s;
@@ -621,7 +622,7 @@
 
         <div id="callFields" class="form-grid">
           <div class="form-group full-width">
-            <label>📋 Тип звонка *</label>
+            <label><i class="fas fa-list-check"></i> Тип звонка *</label>
             <select id="callType">
               <option value="">Выберите тип</option>
               <option value="СР">СР</option>
@@ -629,19 +630,19 @@
             </select>
             <small class="hint">Согласно графику выгрузки</small>
           </div>
-          <div class="form-group"><label>📅 Дата звонка *</label><input type="date" id="callDate"></div>
+          <div class="form-group"><label><i class="fas fa-calendar-day"></i> Дата звонка *</label><input type="date" id="callDate"></div>
           <div class="form-group"><label>⏰ Время звонка (МСК) *</label><input type="time" id="callTime"></div>
           <div class="form-group full-width">
-            <label>📞 Номер телефона *</label>
+            <label><i class="fas fa-phone"></i> Номер телефона *</label>
             <input type="tel" id="phone" placeholder="+7 (777) 777-77-77">
             <small class="hint">Только цифры, без + - ( ). 10 или 11 знаков — приведём к виду 7XXXXXXXXXX</small>
           </div>
-          <div class="form-group full-width"><label>💬 Комментарий (необязательно)</label><input type="text" id="opComment" placeholder="Напр.: тип звонка, контекст"></div>
+          <div class="form-group full-width"><label><i class="fas fa-comment"></i> Комментарий (необязательно)</label><input type="text" id="opComment" placeholder="Напр.: тип звонка, контекст"></div>
         </div>
 
         <div id="noCallFields" class="hidden">
           <div class="form-group full-width">
-            <label>📝 Причина отсутствия звонка *</label>
+            <label><i class="fas fa-pen"></i> Причина отсутствия звонка *</label>
             <input type="text" id="opReason" placeholder="Напр.: отпуск, больничный, не было подходящих звонков">
           </div>
         </div>
@@ -716,21 +717,21 @@
         <div class="card-title"><i class="fas fa-headphones"></i> Данные звонка</div>
         <div class="form-grid">
           <div class="form-group full-width">
-            <label>👤 Оператор *</label>
+            <label><i class="fas fa-user"></i> Оператор *</label>
             <select id="evOperator" onchange="evOperatorChanged()"><option value="">Загрузка...</option></select>
             <small class="hint" id="evGroupHint">Группа подставится автоматически</small>
           </div>
-          <div class="form-group"><label>📅 Дата звонка *</label><input type="date" id="evDate"></div>
+          <div class="form-group"><label><i class="fas fa-calendar-day"></i> Дата звонка *</label><input type="date" id="evDate"></div>
           <div class="form-group"><label>⏰ Время звонка (МСК)</label><input type="time" id="evTime"></div>
-          <div class="form-group"><label>📞 Телефон</label><input type="tel" id="evPhone" placeholder="+7 (777) 777-77-77"></div>
+          <div class="form-group"><label><i class="fas fa-phone"></i> Телефон</label><input type="tel" id="evPhone" placeholder="+7 (777) 777-77-77"></div>
           <div class="form-group"><label>⏱ Длительность звонка</label><select id="evCriterion"></select></div>
-          <div class="form-group"><label>🏷 Тематика</label><select id="evTopic" onchange="evTopicChanged()"></select></div>
-          <div class="form-group"><label>🏷 Подтематика</label><select id="evSub"></select></div>
-          <div class="form-group"><label>🏙 Город</label>
+          <div class="form-group"><label><i class="fas fa-tag"></i> Тематика</label><select id="evTopic" onchange="evTopicChanged()"></select></div>
+          <div class="form-group"><label><i class="fas fa-tag"></i> Подтематика</label><select id="evSub"></select></div>
+          <div class="form-group"><label><i class="fas fa-city"></i> Город</label>
             <input type="text" id="evCity" list="evCityList" autocomplete="off" placeholder="напр. Москва" onchange="evCityChanged()">
             <datalist id="evCityList"></datalist>
           </div>
-          <div class="form-group"><label>🗺 Агломерация</label>
+          <div class="form-group"><label><i class="fas fa-map"></i> Агломерация</label>
             <input type="text" id="evAgg" list="evAggList" autocomplete="off" placeholder="напр. Москва">
             <datalist id="evAggList"></datalist>
           </div>
@@ -1215,9 +1216,9 @@
     <div class="modal-title"><i class="fas fa-edit"></i> Редактирование заявки</div>
     <div id="editRequestDetail"></div>
     <form id="editForm" onsubmit="submitEdit(event)">
-      <div class="form-group"><label>📅 Дата звонка *</label><input type="date" id="editCallDate" required></div>
+      <div class="form-group"><label><i class="fas fa-calendar-day"></i> Дата звонка *</label><input type="date" id="editCallDate" required></div>
       <div class="form-group"><label>⏰ Время звонка (МСК) *</label><input type="time" id="editCallTime" required></div>
-      <div class="form-group"><label>📞 Номер телефона *</label><input type="tel" id="editPhone" placeholder="+7 (777) 777-77-77" required></div>
+      <div class="form-group"><label><i class="fas fa-phone"></i> Номер телефона *</label><input type="tel" id="editPhone" placeholder="+7 (777) 777-77-77" required></div>
       <div class="btn-row">
         <button type="button" class="btn-cancel" onclick="closeEditModal()">Отмена</button>
         <button type="submit" class="btn-save"><i class="fas fa-save"></i> Сохранить</button>

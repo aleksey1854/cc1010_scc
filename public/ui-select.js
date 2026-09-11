@@ -73,6 +73,10 @@
 
     var wrap = document.createElement('div');
     wrap.className = 'uisel';
+    // Спрятанный список должен остаться спрятанным: иначе наша замена
+    // показывает то, что разметка прятала, — так в шапке дивизиона
+    // висел мёртвый выпадающий список «За всё время».
+    if (sel.classList.contains('hidden')) wrap.classList.add('hidden');
     sel.parentNode.insertBefore(wrap, sel);
     wrap.appendChild(sel);
     sel.classList.add('uisel-native');

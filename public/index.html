@@ -201,7 +201,8 @@
   .form-grid{ display:grid; grid-template-columns:1fr 1fr; gap:15px; }
   .form-group{ display:flex; flex-direction:column; }
   .form-group.full-width{ grid-column:1/-1; }
-  .form-group label i{ color:var(--muted); width:14px; text-align:center; }
+  .form-group label i{ color:var(--muted); display:inline-block; min-width:15px;
+    margin-right:4px; text-align:center; }
   .form-group label{ font-size:13px; font-weight:600; color:var(--ink-2); margin-bottom:6px; }
   .form-group input, .form-group select, .form-group textarea{
     padding:11px 14px; border:1.5px solid var(--border-strong); border-radius:var(--radius-sm); font-size:15px; outline:none; font-family:inherit; color:var(--ink); background:var(--surface); transition:border-color .2s, box-shadow .2s;
@@ -936,12 +937,6 @@
         <label for="orgFrom">с</label><input type="date" id="orgFrom" onchange="loadOrgDashboard(JSON.parse(sessionStorage.getItem('user')||'{}').role)">
         <label for="orgTo">по</label><input type="date" id="orgTo" onchange="loadOrgDashboard(JSON.parse(sessionStorage.getItem('user')||'{}').role)">
       </span>
-      <select id="orgPeriod" class="hidden">
-        <option value="all">За всё время</option>
-        <option value="week">Эта неделя</option>
-        <option value="month">Этот месяц</option>
-        <option value="year">Этот год</option>
-      </select>
       <span class="user-badge"><i class="fas fa-user"></i> <span id="orgUserName"></span></span>
       <span class="user-badge"><i class="fas fa-diagram-project"></i> <span id="orgUserGroup"></span></span>
       <button class="logout-btn" onclick="openPwModal(false)" title="Сменить пароль"><i class="fas fa-key"></i></button>
@@ -3191,7 +3186,7 @@
       const el = document.getElementById('opEvAvg');
       if (!r.success) { hint.textContent = r.error; return; }
       el.textContent = r.count ? pct2(r.avg) : '—';
-      el.style.color = r.count ? scoreColorHex(r.avg) : '';
+      el.style.color = r.count ? scoreColorHex(r.avg) : 'var(--muted)';
       document.getElementById('opAvgLabel').textContent =
         (from === weekStart() && to === new Date().toLocaleDateString('sv'))
           ? 'Качество за неделю' : 'Качество за период';
@@ -3826,7 +3821,18 @@
         // у лежачих столбцов индекс идёт по вертикали: без axis:'y' подсказка
         // ищет ближайший столбец по горизонтали и показывает соседний
         interaction: { mode: 'index', intersect: false, axis: 'y' },
-        scales: { x: { beginAtZero: true, ticks: { precision: 0 } }, y: { grid: { display: false } } }
+        scales: {
+          x: { beginAtZero: true, ticks: { precision: 0 } },
+          y: { grid: { display: false }, ticks: {
+            // Chart.js режет длинную подпись слева, и «Предложение оформления
+            // предварительного заказа» превращалось в «ожение оформления…».
+            // Обрезаем сами — с конца и многоточием; целиком видно в подсказке.
+            callback: function (v) {
+              const t = String(this.getLabelForValue(v));
+              return t.length > 30 ? t.slice(0, 29) + '…' : t;
+            }
+          } }
+        }
       })
     });
   }

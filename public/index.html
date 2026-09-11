@@ -939,8 +939,7 @@
       </span>
       <!-- Такой же сброс диапазона, как у РГО: одинаковые вещи должны
            выглядеть и работать одинаково в обоих кабинетах. -->
-      <button type="button" class="logout-btn" title="За всё время"
-        onclick="clearRange('org', function () { loadOrgDashboard(JSON.parse(sessionStorage.getItem('user')||'{}').role); })">
+      <button type="button" class="logout-btn" title="За всё время" onclick="orgClearDates()">
         <i class="fas fa-rotate-left"></i>
       </button>
       <span class="user-badge"><i class="fas fa-user"></i> <span id="orgUserName"></span></span>
@@ -3091,6 +3090,11 @@
     reload();
   }
   function cmpClearDates() { clearRange('cmp', loadComplaints); }
+  function orgClearDates() {
+    clearRange('org', function () {
+      loadOrgDashboard(JSON.parse(sessionStorage.getItem('user') || '{}').role);
+    });
+  }
 
   // Производственные показатели: строка на оператора, в ней все его оценки
   // за период. Качество — среднее по плановой прослушке; оценки по жалобам

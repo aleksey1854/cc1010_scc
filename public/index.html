@@ -2486,6 +2486,56 @@
   // ---------- ГДЕ МЫ БЫЛИ ----------
   // После F5 возвращаемся на ту вкладку, где работали, а не на первую.
   // Живёт в sessionStorage рядом с токеном и умирает вместе с вкладкой браузера.
+  // ---------- ИСТОРИЯ БРАУЗЕРА ----------
+  // Разделы переключаются без перезагрузки страницы, поэтому «назад» —
+  // и на клавиатуре, и боковой кнопкой мыши — выбрасывало с сайта
+  // целиком. Теперь каждый переход это запись в истории, а возврат
+  // просто перерисовывает нужный раздел.
+  let navApplying = false;
+
+  function navPath(s) {
+    if (!s) return '#/';
+    if (s.page === 'rep') return '#/otchety/' + (s.repTab || 'weekly');
+    if (s.page === 'cab') return '#/kabinet/' + (s.qcTab || 'eval');
+    return '#/';
+  }
+
+  // Записываем состояние после каждого перехода. Повторный переход в то
+  // же место историю не раздувает — просто обновляем текущую запись.
+  function navRecord() {
+    if (navApplying || !sessionStorage.getItem('token')) return;
+    const now = navSnapshot();
+    const path = navPath(now);
+    if (history.state && navPath(history.state) === path) {
+      history.replaceState(now, '', path);
+    } else {
+      history.pushState(now, '', path);
+    }
+  }
+
+  function navApply(want) {
+    const u = JSON.parse(sessionStorage.getItem('user') || '{}');
+    if (!u.role || u.role === 'operator') return;   // оператору переключать нечего
+    navApplying = true;
+    try {
+      const repOpen = !document.getElementById('repPage').classList.contains('hidden');
+      if (want && want.page === 'rep') {
+        if (!repOpen) openReports(want.repFrom || repFrom);
+        repTab(want.repTab || 'weekly');
+      } else {
+        if (repOpen) backFromReports();
+        if (['qc', 'sqc', 'admin'].indexOf(u.role) >= 0) qcTab((want && want.qcTab) || 'eval');
+      }
+      ['page', 'qcTab', 'repTab', 'repFrom'].forEach(function (k) {
+        if (want && want[k] !== undefined) navSet(k, want[k]);
+      });
+    } finally {
+      navApplying = false;
+    }
+  }
+
+  window.addEventListener('popstate', function (e) { navApply(e.state); });
+
   function navSet(k, v) {
     let s = {};
     try { s = JSON.parse(sessionStorage.getItem('nav') || '{}'); } catch (e) {}
@@ -2523,6 +2573,7 @@
       const u = JSON.parse(sessionStorage.getItem('user') || '{}');
       fillHeader();
       document.getElementById('orgTitle').textContent = 'Аналитика качества';
+      navRecord();
       loadOrgDashboard(u.role);
       return;
     }
@@ -2535,6 +2586,7 @@
       document.getElementById(tabs[k][1]).classList.toggle('hidden', k !== t);
     });
     segSyncAll();
+    navRecord();
     if (t === 'req' && !allRequests.length) loadAllRequests();
     if (t === 'staff' && !staffAll.length) loadStaff();
     if (t === 'plan') { if (!document.getElementById('planDate').value) document.getElementById('planDate').value = yesterdayStr(); loadPlan(true); }
@@ -2708,6 +2760,9 @@
     document.getElementById('qcPage').classList.remove('hidden');
     qcTab('eval');
   }
+
+  // Боковая кнопка мыши и «назад» браузера — одно и то же событие, так
+  // что отдельной обработки мыши не нужно: popstate ловит оба.
 
   function loadEvalPage(pre) {
     document.getElementById('evDate').value = new Date().toISOString().split('T')[0];
@@ -3137,11 +3192,13 @@
     refreshAppealBadge();
     weekOffset = 0;
     repTab('weekly');
+    navRecord();
   }
   function backFromReports() {
     navSet('page', 'cab');
     document.getElementById('repPage').classList.add('hidden');
     document.getElementById(repFrom === 'qc' ? 'qcPage' : (repFrom === 'rgo' ? 'rgoPage' : 'orgPage')).classList.remove('hidden');
+    navRecord();
   }
   function repTab(t) {
     navSet('repTab', t);
@@ -3154,6 +3211,7 @@
       document.getElementById(tabs[k][1]).classList.toggle('hidden', k !== t);
     });
     segSyncAll();
+    navRecord();
     if (t === 'bugs') loadBugs();
     if (t === 'weekly') loadWeekly();
     if (t === 'journal') {

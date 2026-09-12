@@ -331,6 +331,13 @@
   /* в шапке поле стоит на светлом фоне карточки — рамка не нужна жирная */
   .header input[type=date]{ padding:7px 10px; min-height:34px; font-size:13px; }
 
+  /* Полоса фильтров всегда на одном месте: сразу под разделами, перед
+     содержимым. Раньше даты стояли то в шапке, то внутри карточки, и
+     на каждом экране их искали заново. */
+  .range-card{ padding:14px 18px; }
+  .btn-filter.btn-quiet{ background:var(--surface-2); color:var(--ink-2); }
+  .btn-filter.btn-quiet:hover{ background:var(--border-strong); color:var(--ink); }
+
   .date-range{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
   /* поля дат на телефоне шире экрана — ужимаем */
   @media (max-width:520px){ .date-range input[type=date]{ max-width:140px; } }
@@ -938,13 +945,6 @@
   <div class="header">
     <h1><i class="fas fa-users-gear"></i> Кабинет РГО</h1>
     <div class="user-info">
-      <span class="date-range">
-        <label for="rgoFrom">с</label><input type="date" id="rgoFrom" onchange="loadRgoDashboard()">
-        <label for="rgoTo">по</label><input type="date" id="rgoTo" onchange="loadRgoDashboard()">
-      </span>
-      <button type="button" class="logout-btn" onclick="clearRange('rgo', loadRgoDashboard)" title="За всё время">
-        <i class="fas fa-rotate-left"></i>
-      </button>
       <span class="user-badge"><i class="fas fa-user"></i> <span class="hdr-name"></span></span>
       <span class="user-badge hdr-role-badge"><i class="fas fa-id-badge"></i> <span class="hdr-role"></span></span>
       <span class="user-badge hdr-group-badge"><i class="fas fa-users"></i> <span class="hdr-group"></span></span>
@@ -954,6 +954,18 @@
     </div>
   </div>
   <div class="container">
+    <div class="seg nav-slot" style="margin-bottom:20px;"></div>
+    <div class="card range-card">
+      <div class="filter-bar" style="margin-bottom:0;">
+        <span class="date-range">
+          <label for="rgoFrom">Период с</label><input type="date" id="rgoFrom" onchange="loadRgoDashboard()">
+          <label for="rgoTo">по</label><input type="date" id="rgoTo" onchange="loadRgoDashboard()">
+        </span>
+        <button type="button" class="btn-filter btn-quiet" onclick="clearRange('rgo', loadRgoDashboard)">
+          <i class="fas fa-rotate-left"></i> За всё время
+        </button>
+      </div>
+    </div>
     <div class="stats-grid">
       <div class="stat-card"><div class="number" id="rgoOpsTotal">0</div><div class="label">Операторов</div></div>
       <div class="stat-card"><div class="number checked" id="rgoOpsChecked">0</div><div class="label">С проверками</div></div>
@@ -981,15 +993,6 @@
   <div class="header">
     <h1><i class="fas fa-chart-pie"></i> <span id="orgTitle">Дивизион</span></h1>
     <div class="user-info">
-      <span class="date-range">
-        <label for="orgFrom">с</label><input type="date" id="orgFrom" onchange="loadOrgDashboard(JSON.parse(sessionStorage.getItem('user')||'{}').role)">
-        <label for="orgTo">по</label><input type="date" id="orgTo" onchange="loadOrgDashboard(JSON.parse(sessionStorage.getItem('user')||'{}').role)">
-      </span>
-      <!-- Такой же сброс диапазона, как у РГО: одинаковые вещи должны
-           выглядеть и работать одинаково в обоих кабинетах. -->
-      <button type="button" class="logout-btn" title="За всё время" onclick="orgClearDates()">
-        <i class="fas fa-rotate-left"></i>
-      </button>
       <span class="user-badge"><i class="fas fa-user"></i> <span class="hdr-name"></span></span>
       <span class="user-badge hdr-role-badge"><i class="fas fa-id-badge"></i> <span class="hdr-role"></span></span>
       <span class="user-badge hdr-group-badge"><i class="fas fa-users"></i> <span class="hdr-group"></span></span>
@@ -1000,6 +1003,19 @@
   </div>
   <div class="container">
     <div class="seg nav-slot" style="margin-bottom:20px;"></div>
+    <div class="card range-card">
+      <div class="filter-bar" style="margin-bottom:0;">
+        <span class="date-range">
+          <label for="orgFrom">Период с</label>
+          <input type="date" id="orgFrom" onchange="loadOrgDashboard(JSON.parse(sessionStorage.getItem('user')||'{}').role)">
+          <label for="orgTo">по</label>
+          <input type="date" id="orgTo" onchange="loadOrgDashboard(JSON.parse(sessionStorage.getItem('user')||'{}').role)">
+        </span>
+        <button type="button" class="btn-filter btn-quiet" onclick="orgClearDates()">
+          <i class="fas fa-rotate-left"></i> За всё время
+        </button>
+      </div>
+    </div>
     <div class="stats-grid">
       <div class="stat-card"><div class="number" id="orgOps">0</div><div class="label">Операторов</div></div>
       <div class="stat-card"><div class="number checked" id="orgOpsChecked">0</div><div class="label">С проверками</div></div>

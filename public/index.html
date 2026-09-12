@@ -1709,6 +1709,10 @@
       loadOperatorAll();
     }
     restoreView(user, want);
+    // Подложка под выбранным пунктом должна стоять до первого клика,
+    // иначе он всегда перескок: раньше она создавалась только в момент
+    // переключения. Касается всех полос — и разделов, и «Звонок был».
+    segSyncAll();
   }
 
   // ---------- ОПЕРАТОР: заявки/стата ----------
@@ -2768,6 +2772,10 @@
       document.querySelectorAll('.seg').forEach(segSync);
     });
   }
+
+  // Страницу могли показать не через showApp — например вернулись из
+  // отчётов. Следим за появлением полос и ставим подложку сразу.
+  document.addEventListener('DOMContentLoaded', segSyncAll);
 
   window.addEventListener('resize', segSyncAll);
 

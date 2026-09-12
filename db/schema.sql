@@ -24,6 +24,7 @@ CREATE TABLE staff (
   full_name     text        NOT NULL,
   team          text        NOT NULL DEFAULT '',      -- группа: ИНВ-1 и т.п.
   role          user_role   NOT NULL DEFAULT 'operator',
+  position      text        NOT NULL DEFAULT '',      -- должность: ДПП, МП Инвитро…
   login         citext,                               -- регистронезависим
   password_hash text,                                 -- sha256$итераций$соль$хеш
   hired_at      date,
@@ -271,3 +272,25 @@ CREATE TABLE listening_marks (
   updated_at  timestamptz   NOT NULL DEFAULT now(),
   PRIMARY KEY (stat_date, operator_id)
 );
+
+-- ============================================================
+-- СООБЩЕНИЯ О ПРОБЛЕМАХ САЙТА
+-- Кнопка в шапке у всех, кроме операторов: что сломалось, где и у кого.
+-- ============================================================
+CREATE TABLE bug_reports (
+  id          bigserial PRIMARY KEY,
+  public_id   text        NOT NULL UNIQUE,
+  author_id   bigint      NOT NULL REFERENCES staff(id),
+  author_role text        NOT NULL DEFAULT '',
+  place       text        NOT NULL DEFAULT '',
+  body        text        NOT NULL,
+  context     text        NOT NULL DEFAULT '',
+  status      text        NOT NULL DEFAULT 'new',
+  answer      text        NOT NULL DEFAULT '',
+  answered_by text        NOT NULL DEFAULT '',
+  answered_at timestamptz,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX bug_reports_status_idx ON bug_reports (status, id DESC);
+CREATE INDEX bug_reports_author_idx ON bug_reports (author_id, id DESC);

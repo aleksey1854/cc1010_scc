@@ -2,7 +2,7 @@
   "name": "kc1010",
   "version": "1.0.0",
   "private": true,
-  "description": "Система контроля качества звонков КЦ1010",
+  "description": "CallAudit1010 — система контроля качества звонков",
   "scripts": {
     "dev": "node scripts/dev-server.js 3000",
     "dev:next": "next dev",

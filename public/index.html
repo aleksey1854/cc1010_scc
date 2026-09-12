@@ -4,7 +4,7 @@
   <base target="_top">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Контроль качества · КЦ1010</title>
+  <title>CallAudit1010 — контроль качества</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <meta name="theme-color" content="#2B59F0">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -510,8 +510,8 @@
 <div id="loginPage" class="login-wrapper">
   <div class="login-container">
     <div class="logo"><i class="fas fa-headset"></i></div>
-    <h1>Контроль качества</h1>
-    <p class="subtitle">Введите логин и пароль</p>
+    <h1>CallAudit1010</h1>
+    <p class="subtitle">Контроль качества звонков · введите логин и пароль</p>
     <form id="loginForm" onsubmit="return login(event)">
       <div class="pin-input-container">
         <i class="fas fa-user"></i>
@@ -554,6 +554,24 @@
 </div>
 
 <!-- АПЕЛЛЯЦИЯ -->
+<div class="review-modal" id="bugModal">
+  <div class="modal-content" style="max-width:600px;">
+    <div class="modal-title"><i class="fas fa-bug"></i> Что-то работает не так</div>
+    <div class="form-group">
+      <label for="bugBody">Опишите, что случилось *</label>
+      <textarea id="bugBody" rows="5" placeholder="Что нажимали, что ожидали увидеть и что увидели вместо этого"
+        style="width:100%;padding:11px;border:1.5px solid var(--border-strong);border-radius:10px;font-family:inherit;font-size:14px;outline:none;"></textarea>
+      <small class="hint">Кто вы, в каком разделе были, какой браузер и экран — подставится само.
+        Чем точнее опишете, тем быстрее починим.</small>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="btn-cancel" onclick="document.getElementById('bugModal').classList.remove('active')">Отмена</button>
+      <button type="button" class="btn-save" onclick="sendBug()"><i class="fas fa-paper-plane"></i> Отправить</button>
+    </div>
+    <div class="message" id="bugMessage"></div>
+  </div>
+</div>
+
 <div class="review-modal" id="sentModal">
   <div class="modal-content" style="max-width:460px;">
     <div class="modal-title"><i class="fas fa-paper-plane"></i> Дата отправки чек-листа</div>
@@ -613,6 +631,7 @@
       <span class="user-badge"><i class="fas fa-user"></i> <span class="hdr-name"></span></span>
       <span class="user-badge hdr-role-badge"><i class="fas fa-id-badge"></i> <span class="hdr-role"></span></span>
       <span class="user-badge hdr-group-badge"><i class="fas fa-users"></i> <span class="hdr-group"></span></span>
+      <button class="logout-btn hdr-bug" onclick="openBug()" title="Сообщить о проблеме в работе сайта"><i class="fas fa-bug"></i></button>
       <button class="logout-btn" onclick="openPwModal(false)" title="Сменить пароль"><i class="fas fa-key"></i></button>
       <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Выйти</button>
     </div>
@@ -739,6 +758,7 @@
       <span class="user-badge hdr-role-badge"><i class="fas fa-id-badge"></i> <span class="hdr-role"></span></span>
       <span class="user-badge hdr-group-badge"><i class="fas fa-users"></i> <span class="hdr-group"></span></span>
       <button class="logout-btn hidden" id="backToOrg" onclick="backToOrgPage()"><i class="fas fa-arrow-left"></i> К дивизиону</button>
+      <button class="logout-btn hdr-bug" onclick="openBug()" title="Сообщить о проблеме в работе сайта"><i class="fas fa-bug"></i></button>
       <button class="logout-btn" onclick="openPwModal(false)" title="Сменить пароль"><i class="fas fa-key"></i></button>
       <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Выйти</button>
     </div>
@@ -914,6 +934,7 @@
       <span class="user-badge"><i class="fas fa-user"></i> <span class="hdr-name"></span></span>
       <span class="user-badge hdr-role-badge"><i class="fas fa-id-badge"></i> <span class="hdr-role"></span></span>
       <span class="user-badge hdr-group-badge"><i class="fas fa-users"></i> <span class="hdr-group"></span></span>
+      <button class="logout-btn hdr-bug" onclick="openBug()" title="Сообщить о проблеме в работе сайта"><i class="fas fa-bug"></i></button>
       <button class="logout-btn" onclick="openPwModal(false)" title="Сменить пароль"><i class="fas fa-key"></i></button>
       <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Выйти</button>
     </div>
@@ -961,6 +982,7 @@
       <span class="user-badge"><i class="fas fa-user"></i> <span class="hdr-name"></span></span>
       <span class="user-badge hdr-role-badge"><i class="fas fa-id-badge"></i> <span class="hdr-role"></span></span>
       <span class="user-badge hdr-group-badge"><i class="fas fa-users"></i> <span class="hdr-group"></span></span>
+      <button class="logout-btn hdr-bug" onclick="openBug()" title="Сообщить о проблеме в работе сайта"><i class="fas fa-bug"></i></button>
       <button class="logout-btn" onclick="openPwModal(false)" title="Сменить пароль"><i class="fas fa-key"></i></button>
       <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Выйти</button>
     </div>
@@ -1025,6 +1047,7 @@
       <span class="user-badge"><i class="fas fa-user"></i> <span class="hdr-name"></span></span>
       <span class="user-badge hdr-role-badge"><i class="fas fa-id-badge"></i> <span class="hdr-role"></span></span>
       <span class="user-badge hdr-group-badge"><i class="fas fa-users"></i> <span class="hdr-group"></span></span>
+      <button class="logout-btn hdr-bug" onclick="openBug()" title="Сообщить о проблеме в работе сайта"><i class="fas fa-bug"></i></button>
       <button class="logout-btn" onclick="openPwModal(false)" title="Сменить пароль"><i class="fas fa-key"></i></button>
       <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Выйти</button>
     </div>
@@ -1039,6 +1062,7 @@
       <button type="button" class="seg-btn" id="repT6" onclick="repTab('complaints')">Жалобы</button>
       <button type="button" class="seg-btn" id="repT7" onclick="repTab('production')">Производственные показатели</button>
       <button type="button" class="seg-btn" id="repT8" onclick="repTab('appeals')">Апелляции<span id="apBadge" class="ap-badge hidden">0</span></button>
+      <button type="button" class="seg-btn" id="repT9" onclick="repTab('bugs')">Работа сайта<span id="bugBadge" class="ap-badge hidden">0</span></button>
     </div>
 
     <!-- Оценки по неделям -->
@@ -1128,6 +1152,22 @@
     </div>
 
     <!-- Апелляции -->
+    <div id="repBugs" class="hidden">
+      <div class="stats-grid">
+        <div class="stat-card"><div class="number new" id="bugOpen">0</div><div class="label">Открытых</div></div>
+        <div class="stat-card"><div class="number checked" id="bugFixed">0</div><div class="label">Исправлено</div></div>
+        <div class="stat-card"><div class="number rejected" id="bugDeclined">0</div><div class="label">Отклонено</div></div>
+        <div class="stat-card"><div class="number" id="bugTotal">0</div><div class="label">Всего сообщений</div></div>
+      </div>
+      <div class="card">
+        <div class="filter-bar" style="margin-bottom:0;">
+          <label class="chk"><input type="checkbox" id="bugOnlyOpen" onchange="loadBugs()"> только открытые</label>
+          <span style="color:var(--muted);font-size:13px;">кнопка с жучком в шапке — это сюда</span>
+        </div>
+      </div>
+      <div class="card"><div id="bugList"></div></div>
+    </div>
+
     <div id="repAppeals" class="hidden">
       <div class="stats-grid">
         <div class="stat-card"><div class="number new" id="apOpen">0</div><div class="label">На рассмотрении</div></div>
@@ -1247,6 +1287,10 @@
           <input type="date" id="stHired">
           <small class="hint">От неё считается стаж. Можно оставить пустой и внести позже.</small>
         </div>
+      </div>
+      <div class="form-group"><label for="stPosition">Должность</label>
+        <input type="text" id="stPosition" placeholder="напр. Директор производственного отдела (ДПП)">
+        <small class="hint">Как человек называется в жизни. Права даёт роль, а должность — только подпись.</small>
       </div>
       <div class="form-group"><label for="stLogin">Логин</label>
         <input type="text" id="stLogin" placeholder="пусто — соберём из ФИО" autocomplete="off"
@@ -1482,6 +1526,50 @@
     });
   }
 
+  // Сообщение о проблеме: человек пишет, что случилось, остальное
+  // подставляем сами — без роли, раздела и браузера чинить нечего.
+  function currentPlace() {
+    const page = ['operatorPage', 'qcPage', 'rgoPage', 'orgPage', 'repPage']
+      .find(function (id) { const e = document.getElementById(id); return e && !e.classList.contains('hidden'); });
+    const named = { operatorPage: 'Кабинет оператора', qcPage: 'Кабинет контроля качества',
+                    rgoPage: 'Кабинет РГО', orgPage: 'Кабинет дивизиона', repPage: 'Отчёты' };
+    const seg = document.querySelector('#' + page + ' .seg .seg-btn.active');
+    return (named[page] || page || '—') + (seg ? ' → ' + seg.textContent.trim() : '');
+  }
+
+  function openBug() {
+    document.getElementById('bugBody').value = '';
+    const m = document.getElementById('bugMessage');
+    m.style.display = 'none'; m.className = 'message';
+    document.getElementById('bugModal').classList.add('active');
+    setTimeout(function () { document.getElementById('bugBody').focus(); }, 150);
+  }
+
+  function sendBug() {
+    const m = document.getElementById('bugMessage');
+    const body = document.getElementById('bugBody').value.trim();
+    if (body.length < 10) {
+      m.textContent = 'Опишите, что случилось — хотя бы одним предложением';
+      m.className = 'message error'; m.style.display = 'block';
+      return;
+    }
+    const ctx = [
+      'экран ' + window.innerWidth + '×' + window.innerHeight,
+      'адрес ' + location.pathname + location.hash,
+      navigator.userAgent
+    ].join(' · ');
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) {
+        m.textContent = r.error; m.className = 'message error'; m.style.display = 'block';
+        return;
+      }
+      document.getElementById('bugModal').classList.remove('active');
+      toast(r.message, 'ok');
+    }).withFailureHandler(function (e) {
+      m.textContent = String(e); m.className = 'message error'; m.style.display = 'block';
+    }).createBugReport(sessionStorage.getItem('token'), body, currentPlace(), ctx);
+  }
+
   // Плашка в углу вместо системного окна: не перехватывает управление,
   // выглядит как остальной интерфейс, снимается кликом или сама.
   function toast(text, kind) {
@@ -1525,12 +1613,22 @@
 
   function fillHeader(user) {
     const u = user || JSON.parse(sessionStorage.getItem('user') || '{}');
-    const role = ROLE_RU[u.role] || u.role || '';
+    // Должность важнее технической роли: у директора производственного
+    // отдела и менеджера проектов права одинаковые, а подписи разные.
+    const roleRu = ROLE_RU[u.role] || u.role || '';
+    const role = u.position || roleRu;
     const group = u.group || '';
     document.querySelectorAll('.hdr-name').forEach(function (e) { e.textContent = u.fullName || ''; });
-    document.querySelectorAll('.hdr-role').forEach(function (e) { e.textContent = role; });
+    document.querySelectorAll('.hdr-role').forEach(function (e) {
+      e.textContent = role;
+      e.parentNode.title = u.position ? 'Права: ' + roleRu : '';
+    });
     document.querySelectorAll('.hdr-group').forEach(function (e) { e.textContent = group; });
     document.querySelectorAll('.hdr-role-badge').forEach(function (e) { e.classList.toggle('hidden', !role); });
+    // операторам кнопку сообщений о проблемах не показываем
+    document.querySelectorAll('.hdr-bug').forEach(function (e) {
+      e.classList.toggle('hidden', u.role === 'operator');
+    });
     // Группу прячем, когда она повторяет роль: у СКК группа так и
     // называется — два одинаковых значка рядом только мешают.
     document.querySelectorAll('.hdr-group-badge').forEach(function (e) {
@@ -2029,6 +2127,7 @@
             '; остаётся в списках три месяца — на случай жалобы">уволен ' + u.dismissed + '</span>' : '') + '</td>' +
         '<td>' + (u.group || '—') + '</td>' +
         '<td><span class="role-badge">' + roleRu(u.role) + '</span></td>' +
+        '<td>' + (u.position || '<span style="color:var(--muted);">—</span>') + '</td>' +
         '<td>' + (u.login || '<span class="no-pass">нет логина</span>') + '</td>' +
         '<td>' + (u.hasPassword ? '✓' : '<span class="no-pass">нет пароля</span>') + '</td>' +
         '<td>' + (u.training || '—') + '</td>' +
@@ -2040,7 +2139,7 @@
       '</tr>').join('');
 
     box.innerHTML = '<div class="table-wrapper"><table><thead><tr>' +
-      '<th>ФИО</th><th>Группа</th><th>Роль</th><th>Логин</th><th>Пароль</th>' +
+      '<th>ФИО</th><th>Группа</th><th>Роль</th><th>Должность</th><th>Логин</th><th>Пароль</th>' +
       '<th>Обучение</th><th>Принят</th><th>Действия</th>' +
       '</tr></thead><tbody>' + rows + '</tbody></table></div>';
 
@@ -2060,6 +2159,7 @@
     document.getElementById('stGroup').value = u ? (u.group || '') : '';
     document.getElementById('stRole').value = u ? u.role : 'operator';
     document.getElementById('stLogin').value = u ? (u.login || '') : '';
+    document.getElementById('stPosition').value = u ? (u.position || '') : '';
     document.getElementById('stTraining').value = u ? (u.trainingIso || '') : '';
     document.getElementById('stHired').value = u ? (u.hiredIso || '') : '';
     stRoleChanged();
@@ -2097,6 +2197,7 @@
     const role = document.getElementById('stRole').value;
     const login = document.getElementById('stLogin').value.trim();
     const pass = document.getElementById('stPass').value.trim();
+    const position = document.getElementById('stPosition').value.trim();
     const training = document.getElementById('stTraining').value;
     const hired = document.getElementById('stHired').value;
     if (!name) { staffMsg('Укажите ФИО', 'error'); return false; }
@@ -2126,7 +2227,7 @@
       google.script.run
         .withSuccessHandler(r => r.success ? done('Добавлен, логин: ' + r.login) : failed(r.error))
         .withFailureHandler(e => failed(e))
-        .addUser(t, name, group, role, login, pass, hired, training);
+        .addUser(t, name, group, role, login, pass, hired, training, position);
       return false;
     }
 
@@ -2152,7 +2253,7 @@
         });
       })
       .withFailureHandler(e => failed(e))
-      .updateUser(t, staffEditing, name, group, role, hired, training);
+      .updateUser(t, staffEditing, name, group, role, hired, training, position);
     return false;
   }
 
@@ -3046,12 +3147,14 @@
     navSet('repTab', t);
     const tabs = { weekly: ['repT1', 'repWeekly'], journal: ['repT2', 'repJournal'], kk: ['repT3', 'repKk'],
                    criteria: ['repT4', 'repCriteria'], topics: ['repT5', 'repTopics'], complaints: ['repT6', 'repComplaints'],
-                   production: ['repT7', 'repProduction'], appeals: ['repT8', 'repAppeals'] };
+                   production: ['repT7', 'repProduction'], appeals: ['repT8', 'repAppeals'],
+                   bugs: ['repT9', 'repBugs'] };
     Object.keys(tabs).forEach(function (k) {
       document.getElementById(tabs[k][0]).classList.toggle('active', k === t);
       document.getElementById(tabs[k][1]).classList.toggle('hidden', k !== t);
     });
     segSyncAll();
+    if (t === 'bugs') loadBugs();
     if (t === 'weekly') loadWeekly();
     if (t === 'journal') {
       // по умолчанию — текущий месяц, дальше диапазон правят руками
@@ -3500,6 +3603,80 @@
       });
     }).getAppeals(sessionStorage.getItem('token'),
       { onlyOpen: document.getElementById('apOnlyOpen').checked });
+  }
+
+  // Сообщения о проблемах сайта: кто написал, где был, что ответили.
+  const BUG_ST = { new: 'ap-new', in_work: 'ap-partial', fixed: 'ap-fixed', declined: 'ap-rejected' };
+
+  function loadBugs() {
+    const box = document.getElementById('bugList');
+    box.innerHTML = loadingRows(3);
+    const onlyOpen = document.getElementById('bugOnlyOpen').checked;
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
+      let rows = r.rows;
+      if (onlyOpen) rows = rows.filter(function (x) { return x.status === 'new' || x.status === 'in_work'; });
+      document.getElementById('bugTotal').textContent = r.rows.length;
+      document.getElementById('bugOpen').textContent = r.open;
+      document.getElementById('bugFixed').textContent = r.rows.filter(function (x) { return x.status === 'fixed'; }).length;
+      document.getElementById('bugDeclined').textContent = r.rows.filter(function (x) { return x.status === 'declined'; }).length;
+      const badge = document.getElementById('bugBadge');
+      badge.textContent = r.open;
+      badge.classList.toggle('hidden', !r.open);
+
+      if (!rows.length) {
+        box.innerHTML = '<div class="empty-state"><i class="fas fa-bug"></i><p>' +
+          (onlyOpen ? 'Открытых сообщений нет' : 'Сообщений пока нет') + '</p></div>';
+        return;
+      }
+      let html = '';
+      rows.forEach(function (b) {
+        html += '<div class="fail-call" data-bug="' + b.id + '">' +
+          '<div class="fc-head"><div><strong>' + b.author + '</strong>' +
+            ' <span style="color:var(--muted);">' + (b.authorTeam || '') + '</span>' +
+            ' · ' + b.date + ' ' + b.time + ' · ' + b.place +
+            (b.mine ? ' <span class="fail-tag minor">ваше</span>' : '') + '</div>' +
+          '<div><span class="ap-status ' + (BUG_ST[b.status] || 'ap-new') + '">' + b.statusRu + '</span></div></div>' +
+          '<div style="margin:8px 0;white-space:pre-wrap;">' + b.body + '</div>' +
+          (b.context ? '<details class="memo"><summary>Технические подробности</summary>' +
+            '<div class="hint" style="padding:8px 0;word-break:break-word;">' + b.context + '</div></details>' : '') +
+          (b.answer ? '<div class="all-pass" style="margin-top:8px;"><i class="fas fa-reply"></i> ' +
+            b.answer + ' <span style="color:var(--muted);">— ' + b.answeredBy +
+            (b.answeredAt ? ', ' + b.answeredAt : '') + '</span></div>' : '');
+        if (r.canAnswer) {
+          html += '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">' +
+            '<input type="text" class="bug-answer" placeholder="Комментарий (необязательно)" ' +
+              'style="flex:1;min-width:200px;padding:8px 10px;border:1.5px solid var(--border-strong);border-radius:8px;font-family:inherit;font-size:13px;">' +
+            '<button class="btn-small" data-st="in_work">В работу</button>' +
+            '<button class="btn-small" data-st="fixed">Исправлено</button>' +
+            '<button class="btn-small btn-danger" data-st="declined">Отклонить</button>' +
+            '</div>';
+        }
+        html += '</div>';
+      });
+      box.innerHTML = html;
+      box.querySelectorAll('[data-bug]').forEach(function (wrap) {
+        wrap.querySelectorAll('button[data-st]').forEach(function (btn) {
+          btn.onclick = function () {
+            const inp = wrap.querySelector('.bug-answer');
+            answerBug(wrap.getAttribute('data-bug'), btn.getAttribute('data-st'), inp ? inp.value : '', btn);
+          };
+        });
+      });
+    }).withFailureHandler(function (e) {
+      box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + e + '</p></div>';
+    }).getBugReports(sessionStorage.getItem('token'), {});
+  }
+
+  function answerBug(id, status, answer, btn) {
+    btn.disabled = true;
+    google.script.run.withSuccessHandler(function (r) {
+      btn.disabled = false;
+      if (!r.success) { toast(r.error); return; }
+      toast(r.message, 'ok');
+      loadBugs();
+    }).withFailureHandler(function (e) { btn.disabled = false; toast(e); })
+      .answerBugReport(sessionStorage.getItem('token'), id, status, answer);
   }
 
   function answerAppeal(id, status, answer, btn) {

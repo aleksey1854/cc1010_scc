@@ -1469,6 +1469,22 @@
     });
   }
 
+  // Окна закрываются Escape и кликом мимо — так ведут себя все восемь,
+  // а не каждое по-своему. Раньше выйти можно было только кнопкой
+  // «Отмена», и если её не заметили — окно висело.
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    const open = [...document.querySelectorAll('.review-modal.active')];
+    if (open.length) open[open.length - 1].classList.remove('active');
+  });
+
+  document.addEventListener('mousedown', function (e) {
+    // именно по подложке, а не по содержимому окна
+    if (e.target.classList && e.target.classList.contains('review-modal')) {
+      e.target.classList.remove('active');
+    }
+  });
+
   // Одна шапка на все кабинеты: кто вошёл, в какой роли, в какой группе.
   // Раньше каждая страница заполняла свои значки сама — на отчётах их
   // забыли вовсе, а старший СКК видел «СКК» так же, как рядовой:

@@ -2185,7 +2185,9 @@
         '</td>' +
       '</tr>').join('');
 
-    box.innerHTML = '<div class="table-wrapper"><table><thead><tr>' +
+    // Состав — таблица на девять колонок: набираем её плотнее, иначе
+    // не влезает и приходится возить вбок ради двух кнопок справа.
+    box.innerHTML = '<div class="table-wrapper table-dense"><table><thead><tr>' +
       '<th>ФИО</th><th>Группа</th><th>Роль</th><th>Должность</th><th>Логин</th><th>Пароль</th>' +
       '<th>Обучение</th><th>Принят</th><th>Действия</th>' +
       '</tr></thead><tbody>' + rows + '</tbody></table></div>';

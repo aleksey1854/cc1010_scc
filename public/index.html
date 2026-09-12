@@ -245,7 +245,11 @@
   .hint{ display:block; color:var(--muted); font-size:12px; margin-top:5px; }
   /* восемь вкладок отчётов в строку на узком экране не помещались и
      распирали всю страницу — переносим их по словам */
-  .seg{ display:flex; flex-wrap:wrap; background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:4px; margin-bottom:16px; gap:4px; position:relative; }
+  /* Полоса обнимает кнопки, а не растягивается во всю страницу: пустой
+     хвост справа читался как «тут что-то недогрузилось». */
+  .seg{ display:flex; width:fit-content; max-width:100%; flex-wrap:wrap;
+    background:var(--surface-2); border:1px solid var(--border); border-radius:12px;
+    padding:4px; margin-bottom:16px; gap:4px; position:relative; }
   /* Подсветка вкладки переезжает, а не гаснет и зажигается в другом месте:
      видно, откуда и куда ушёл фокус. Едет только подложка — сами кнопки
      стоят на месте, ширину меняет один элемент вне потока. */
@@ -2581,12 +2585,24 @@
     document.querySelectorAll('.nav-slot').forEach(function (slot) {
       if (!items.length) { slot.classList.add('hidden'); return; }
       slot.classList.remove('hidden');
-      slot.innerHTML = items.map(function (it) {
-        return '<button type="button" class="seg-btn' + (it[0] === active ? ' active' : '') +
-          '" data-nav="' + it[0] + '"><i class="fas ' + it[2] + '"></i> ' + it[1] + '</button>';
-      }).join('');
+      // Пересобираем кнопки только когда меняется сам набор разделов.
+      // Иначе innerHTML сносит и подложку — она создавалась заново на
+      // каждом переключении и не ехала, а перескакивала.
+      const keys = items.map(function (it) { return it[0]; }).join(',');
+      if (slot.dataset.keys !== keys) {
+        slot.dataset.keys = keys;
+        const ind = slot.querySelector('.seg-ind');
+        slot.innerHTML = items.map(function (it) {
+          return '<button type="button" class="seg-btn" data-nav="' + it[0] + '">' +
+            '<i class="fas ' + it[2] + '"></i> ' + it[1] + '</button>';
+        }).join('');
+        if (ind) slot.insertBefore(ind, slot.firstChild);
+        slot.querySelectorAll('button[data-nav]').forEach(function (b) {
+          b.onclick = function () { navGoTo(b.getAttribute('data-nav')); };
+        });
+      }
       slot.querySelectorAll('button[data-nav]').forEach(function (b) {
-        b.onclick = function () { navGoTo(b.getAttribute('data-nav')); };
+        b.classList.toggle('active', b.getAttribute('data-nav') === active);
       });
     });
     segSyncAll();

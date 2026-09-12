@@ -308,6 +308,29 @@
   .btn-partial{ background:var(--mid); color:#fff; }
   .hired-set{ display:flex; align-items:center; gap:6px; }
   .hired-set input{ width:auto; padding:5px 8px; font-size:13px; }
+  /* Поля дат и времени браузер рисует по-своему: серый системный текст,
+     чужой шрифт, блёклая иконка календаря. Рядом с остальными полями это
+     выглядело как чужая деталь. Приводим к общему виду, не трогая сам
+     календарь — он родной, и это правильно. */
+  input[type=date], input[type=time]{
+    padding:9px 12px; border:1.5px solid var(--border-strong); border-radius:var(--radius-sm);
+    font-family:inherit; font-size:14px; color:var(--ink); background:var(--surface);
+    transition:border-color .18s var(--ease-out), box-shadow .18s var(--ease-out);
+    min-height:38px;
+  }
+  input[type=date]:hover, input[type=time]:hover{ border-color:var(--muted); }
+  input[type=date]:focus, input[type=time]:focus{
+    border-color:var(--accent); box-shadow:0 0 0 3px rgba(43,89,240,.14);
+  }
+  input[type=date]::-webkit-calendar-picker-indicator,
+  input[type=time]::-webkit-calendar-picker-indicator{
+    opacity:.55; cursor:pointer; transition:opacity .15s var(--ease-out);
+  }
+  input[type=date]:hover::-webkit-calendar-picker-indicator,
+  input[type=time]:hover::-webkit-calendar-picker-indicator{ opacity:1; }
+  /* в шапке поле стоит на светлом фоне карточки — рамка не нужна жирная */
+  .header input[type=date]{ padding:7px 10px; min-height:34px; font-size:13px; }
+
   .date-range{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
   /* поля дат на телефоне шире экрана — ужимаем */
   @media (max-width:520px){ .date-range input[type=date]{ max-width:140px; } }
@@ -757,21 +780,13 @@
       <span class="user-badge"><i class="fas fa-user"></i> <span class="hdr-name"></span></span>
       <span class="user-badge hdr-role-badge"><i class="fas fa-id-badge"></i> <span class="hdr-role"></span></span>
       <span class="user-badge hdr-group-badge"><i class="fas fa-users"></i> <span class="hdr-group"></span></span>
-      <button class="logout-btn hidden" id="backToOrg" onclick="backToOrgPage()"><i class="fas fa-arrow-left"></i> К дивизиону</button>
       <button class="logout-btn hdr-bug" onclick="openBug()" title="Сообщить о проблеме в работе сайта"><i class="fas fa-bug"></i></button>
       <button class="logout-btn" onclick="openPwModal(false)" title="Сменить пароль"><i class="fas fa-key"></i></button>
       <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Выйти</button>
     </div>
   </div>
   <div class="container">
-    <div class="seg" style="margin-bottom:20px;">
-      <button type="button" class="seg-btn active" id="tabEvalBtn" onclick="qcTab('eval')">Оценка звонка</button>
-      <button type="button" class="seg-btn" id="tabPlanBtn" onclick="qcTab('plan')">План прослушки</button>
-      <button type="button" class="seg-btn" id="tabReqBtn" onclick="qcTab('req')">Заявки операторов</button>
-      <button type="button" class="seg-btn hidden" id="tabAnaBtn" onclick="qcTab('ana')">Аналитика</button>
-      <button type="button" class="seg-btn hidden" id="tabRepBtn" onclick="openReports('qc')">Отчёты</button>
-      <button type="button" class="seg-btn hidden" id="tabStaffBtn" onclick="qcTab('staff')">Сотрудники</button>
-    </div>
+    <div class="seg nav-slot" style="margin-bottom:20px;"></div>
 
     <!-- ОЦЕНКА ЗВОНКА (чек-лист v2) -->
     <div id="qcEvalTab">
@@ -923,7 +938,6 @@
   <div class="header">
     <h1><i class="fas fa-users-gear"></i> Кабинет РГО</h1>
     <div class="user-info">
-      <button class="logout-btn" onclick="openReports('rgo')"><i class="fas fa-table"></i> Отчёты</button>
       <span class="date-range">
         <label for="rgoFrom">с</label><input type="date" id="rgoFrom" onchange="loadRgoDashboard()">
         <label for="rgoTo">по</label><input type="date" id="rgoTo" onchange="loadRgoDashboard()">
@@ -967,9 +981,6 @@
   <div class="header">
     <h1><i class="fas fa-chart-pie"></i> <span id="orgTitle">Дивизион</span></h1>
     <div class="user-info">
-      <button class="logout-btn hidden" id="backToQc" onclick="backToQc()"><i class="fas fa-arrow-left"></i> К оценке</button>
-      <button class="logout-btn" onclick="openReports('org')"><i class="fas fa-table"></i> Отчёты</button>
-      <button class="logout-btn hidden" id="orgStaffBtn" onclick="openStaffPage()"><i class="fas fa-users"></i> Сотрудники</button>
       <span class="date-range">
         <label for="orgFrom">с</label><input type="date" id="orgFrom" onchange="loadOrgDashboard(JSON.parse(sessionStorage.getItem('user')||'{}').role)">
         <label for="orgTo">по</label><input type="date" id="orgTo" onchange="loadOrgDashboard(JSON.parse(sessionStorage.getItem('user')||'{}').role)">
@@ -988,6 +999,7 @@
     </div>
   </div>
   <div class="container">
+    <div class="seg nav-slot" style="margin-bottom:20px;"></div>
     <div class="stats-grid">
       <div class="stat-card"><div class="number" id="orgOps">0</div><div class="label">Операторов</div></div>
       <div class="stat-card"><div class="number checked" id="orgOpsChecked">0</div><div class="label">С проверками</div></div>
@@ -1043,7 +1055,6 @@
   <div class="header">
     <h1><i class="fas fa-table"></i> Отчёты</h1>
     <div class="user-info">
-      <button class="logout-btn" onclick="backFromReports()"><i class="fas fa-arrow-left"></i> Назад</button>
       <span class="user-badge"><i class="fas fa-user"></i> <span class="hdr-name"></span></span>
       <span class="user-badge hdr-role-badge"><i class="fas fa-id-badge"></i> <span class="hdr-role"></span></span>
       <span class="user-badge hdr-group-badge"><i class="fas fa-users"></i> <span class="hdr-group"></span></span>
@@ -1053,6 +1064,7 @@
     </div>
   </div>
   <div class="container">
+    <div class="seg nav-slot" style="margin-bottom:12px;"></div>
     <div class="seg" style="margin-bottom:20px;">
       <button type="button" class="seg-btn active" id="repT1" onclick="repTab('weekly')">Оценки по неделям</button>
       <button type="button" class="seg-btn" id="repT2" onclick="repTab('journal')">Журнал оценок</button>
@@ -1649,24 +1661,16 @@
       document.getElementById('orgPage').classList.remove('hidden');
       fillHeader(user);
       document.getElementById('orgTitle').textContent = user.role === 'manager' ? 'Кабинет менеджера проекта' : 'Дивизион · старший РГО';
-      document.getElementById('orgStaffBtn').classList.toggle('hidden',
-        ['srgo', 'manager', 'admin'].indexOf(user.role) < 0);
+      renderNav();   // состав полосы разделов определяет роль
       loadOrgDashboard(user.role);
     } else if (user.role === 'rgo') {
       document.getElementById('rgoPage').classList.remove('hidden');
       fillHeader(user);
+      renderNav();
       loadHiredDates(loadRgoDashboard);
     } else if (user.role === 'qc' || user.role === 'sqc' || user.role === 'admin') {
       document.getElementById('qcPage').classList.remove('hidden');
       fillHeader(user);
-      const isSqc = user.role === 'sqc' || user.role === 'admin';
-      document.getElementById('tabAnaBtn').classList.toggle('hidden', !isSqc);
-      // Отчёты открыты всему КК: качество СКК ведёт по всему КЦ, а кнопка
-      // была видна только старшему — данные отдавались, а зайти было некуда
-      document.getElementById('tabRepBtn').classList.remove('hidden');
-      // состав ведут старший СКК, старший РГО, руководитель и администратор
-      document.getElementById('tabStaffBtn').classList.toggle('hidden',
-        ['sqc', 'srgo', 'manager', 'admin'].indexOf(user.role) < 0);
       qcTab('eval');
       loadEvalPage();
     } else {
@@ -2051,19 +2055,11 @@
     document.getElementById('qcPage').classList.remove('hidden');
     const u = JSON.parse(sessionStorage.getItem('user') || '{}');
     fillHeader();
-    ['tabEvalBtn', 'tabPlanBtn', 'tabReqBtn', 'tabAnaBtn', 'tabRepBtn'].forEach(function (id) {
-      document.getElementById(id).classList.add('hidden');    // им тут нужен только состав
-    });
-    document.getElementById('backToOrg').classList.remove('hidden');
     qcTab('staff');
   }
 
   function backToOrgPage() {
     document.getElementById('qcPage').classList.add('hidden');
-    ['tabEvalBtn', 'tabPlanBtn', 'tabReqBtn'].forEach(function (id) {
-      document.getElementById(id).classList.remove('hidden');
-    });
-    document.getElementById('backToOrg').classList.add('hidden');
     const u = JSON.parse(sessionStorage.getItem('user') || '{}');
     showApp(u);
   }
@@ -2486,6 +2482,81 @@
   // ---------- ГДЕ МЫ БЫЛИ ----------
   // После F5 возвращаемся на ту вкладку, где работали, а не на первую.
   // Живёт в sessionStorage рядом с токеном и умирает вместе с вкладкой браузера.
+  // ---------- ОДНА ПОЛОСА РАЗДЕЛОВ ----------
+  // Раньше отчёты и аналитика открывались «отдельным экраном», и путь
+  // назад в каждом был свой: «Назад», «К оценке», «К дивизиону» — в
+  // разных углах. Теперь у каждой роли одна полоса разделов, одинаковая
+  // на всех страницах: никуда не уходишь, просто переключаешься.
+  const NAV_ITEMS = {
+    operator: [],
+    qc:      [['eval', 'Оценка звонка', 'fa-clipboard-check'], ['plan', 'План прослушки', 'fa-headphones'],
+              ['req', 'Заявки операторов', 'fa-inbox'], ['rep', 'Отчёты', 'fa-table']],
+    sqc:     [['eval', 'Оценка звонка', 'fa-clipboard-check'], ['plan', 'План прослушки', 'fa-headphones'],
+              ['req', 'Заявки операторов', 'fa-inbox'], ['ana', 'Аналитика', 'fa-chart-pie'],
+              ['rep', 'Отчёты', 'fa-table'], ['staff', 'Сотрудники', 'fa-users-gear']],
+    rgo:     [['home', 'Мои операторы', 'fa-users'], ['rep', 'Отчёты', 'fa-table']],
+    srgo:    [['home', 'Аналитика', 'fa-chart-pie'], ['rep', 'Отчёты', 'fa-table'],
+              ['staff', 'Сотрудники', 'fa-users-gear']],
+    manager: [['home', 'Аналитика', 'fa-chart-pie'], ['rep', 'Отчёты', 'fa-table'],
+              ['staff', 'Сотрудники', 'fa-users-gear']]
+  };
+  NAV_ITEMS.admin = NAV_ITEMS.sqc;
+
+  function navHome(role) {
+    if (role === 'rgo') return 'rgo';
+    if (role === 'srgo' || role === 'manager') return 'org';
+    return 'qc';
+  }
+
+  // Где мы сейчас — по тому, какая страница открыта и что в ней выбрано.
+  function navActive(role) {
+    const shown = id => { const e = document.getElementById(id); return e && !e.classList.contains('hidden'); };
+    if (shown('repPage')) return 'rep';
+    if (shown('orgPage')) return (role === 'sqc' || role === 'admin') ? 'ana' : 'home';
+    if (shown('rgoPage')) return 'home';
+    if (shown('qcPage')) {
+      const t = navGet('qcTab') || 'eval';
+      if (t === 'staff' && ['srgo', 'manager'].indexOf(role) >= 0) return 'staff';
+      return t;
+    }
+    return 'home';
+  }
+
+  function navGoTo(key) {
+    const u = JSON.parse(sessionStorage.getItem('user') || '{}');
+    const home = navHome(u.role);
+    if (key === 'rep') { openReports(home); return; }
+    if (key === 'staff' && ['srgo', 'manager'].indexOf(u.role) >= 0) { openStaffPage(); return; }
+    if (key === 'home') {
+      if (!document.getElementById('repPage').classList.contains('hidden')) backFromReports();
+      else if (home === 'org' && !document.getElementById('qcPage').classList.contains('hidden')) backToOrgPage();
+      else if (home === 'rgo') backFromReports();
+      navRecord();
+      return;
+    }
+    // вкладки кабинета КК: если мы в отчётах — сначала вернуться
+    if (!document.getElementById('repPage').classList.contains('hidden')) backFromReports();
+    qcTab(key);
+  }
+
+  function renderNav() {
+    const u = JSON.parse(sessionStorage.getItem('user') || '{}');
+    const items = NAV_ITEMS[u.role] || [];
+    const active = navActive(u.role);
+    document.querySelectorAll('.nav-slot').forEach(function (slot) {
+      if (!items.length) { slot.classList.add('hidden'); return; }
+      slot.classList.remove('hidden');
+      slot.innerHTML = items.map(function (it) {
+        return '<button type="button" class="seg-btn' + (it[0] === active ? ' active' : '') +
+          '" data-nav="' + it[0] + '"><i class="fas ' + it[2] + '"></i> ' + it[1] + '</button>';
+      }).join('');
+      slot.querySelectorAll('button[data-nav]').forEach(function (b) {
+        b.onclick = function () { navGoTo(b.getAttribute('data-nav')); };
+      });
+    });
+    segSyncAll();
+  }
+
   // ---------- ИСТОРИЯ БРАУЗЕРА ----------
   // Разделы переключаются без перезагрузки страницы, поэтому «назад» —
   // и на клавиатуре, и боковой кнопкой мыши — выбрасывало с сайта
@@ -2569,23 +2640,27 @@
     if (t === 'ana') {
       document.getElementById('qcPage').classList.add('hidden');
       document.getElementById('orgPage').classList.remove('hidden');
-      document.getElementById('backToQc').classList.remove('hidden');
       const u = JSON.parse(sessionStorage.getItem('user') || '{}');
       fillHeader();
       document.getElementById('orgTitle').textContent = 'Аналитика качества';
+      renderNav();
       navRecord();
       loadOrgDashboard(u.role);
       return;
     }
-    // Кнопка и её вкладка в одной строке: раньше «Сотрудники» показывались,
-    // но подсветку им никто не ставил — наверху не горело ничего.
-    const tabs = { eval: ['tabEvalBtn', 'qcEvalTab'], plan: ['tabPlanBtn', 'qcPlanTab'],
-                   req: ['tabReqBtn', 'qcReqTab'], staff: ['tabStaffBtn', 'qcStaffTab'] };
+    // Аналитика подменяет весь экран кабинетом дивизиона. Возвращаемся
+    // оттуда здесь же — иначе «назад» из аналитики не делал ничего:
+    // вкладка переключалась под невидимой страницей.
+    const me = JSON.parse(sessionStorage.getItem('user') || '{}');
+    if (['qc', 'sqc', 'admin'].indexOf(me.role) >= 0) {
+      document.getElementById('orgPage').classList.add('hidden');
+      document.getElementById('qcPage').classList.remove('hidden');
+    }
+    const tabs = { eval: 'qcEvalTab', plan: 'qcPlanTab', req: 'qcReqTab', staff: 'qcStaffTab' };
     Object.keys(tabs).forEach(function (k) {
-      document.getElementById(tabs[k][0]).classList.toggle('active', k === t);
-      document.getElementById(tabs[k][1]).classList.toggle('hidden', k !== t);
+      document.getElementById(tabs[k]).classList.toggle('hidden', k !== t);
     });
-    segSyncAll();
+    renderNav();
     navRecord();
     if (t === 'req' && !allRequests.length) loadAllRequests();
     if (t === 'staff' && !staffAll.length) loadStaff();
@@ -3192,12 +3267,14 @@
     refreshAppealBadge();
     weekOffset = 0;
     repTab('weekly');
+    renderNav();
     navRecord();
   }
   function backFromReports() {
     navSet('page', 'cab');
     document.getElementById('repPage').classList.add('hidden');
     document.getElementById(repFrom === 'qc' ? 'qcPage' : (repFrom === 'rgo' ? 'rgoPage' : 'orgPage')).classList.remove('hidden');
+    renderNav();
     navRecord();
   }
   function repTab(t) {

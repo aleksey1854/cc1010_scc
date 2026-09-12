@@ -597,8 +597,9 @@
   <div class="header">
     <h1><i class="fas fa-headset"></i> Оператор КК</h1>
     <div class="user-info">
-      <span class="user-badge"><i class="fas fa-user"></i> <span id="opUserName"></span></span>
-      <span class="user-badge"><i class="fas fa-users"></i> <span id="opUserGroup"></span></span>
+      <span class="user-badge"><i class="fas fa-user"></i> <span class="hdr-name"></span></span>
+      <span class="user-badge hdr-role-badge"><i class="fas fa-id-badge"></i> <span class="hdr-role"></span></span>
+      <span class="user-badge hdr-group-badge"><i class="fas fa-users"></i> <span class="hdr-group"></span></span>
       <button class="logout-btn" onclick="openPwModal(false)" title="Сменить пароль"><i class="fas fa-key"></i></button>
       <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Выйти</button>
     </div>
@@ -721,8 +722,9 @@
   <div class="header">
     <h1><i class="fas fa-clipboard-check"></i> Контроль качества</h1>
     <div class="user-info">
-      <span class="user-badge"><i class="fas fa-user"></i> <span id="qcUserName"></span></span>
-      <span class="user-badge"><i class="fas fa-users"></i> <span id="qcUserGroup"></span></span>
+      <span class="user-badge"><i class="fas fa-user"></i> <span class="hdr-name"></span></span>
+      <span class="user-badge hdr-role-badge"><i class="fas fa-id-badge"></i> <span class="hdr-role"></span></span>
+      <span class="user-badge hdr-group-badge"><i class="fas fa-users"></i> <span class="hdr-group"></span></span>
       <button class="logout-btn hidden" id="backToOrg" onclick="backToOrgPage()"><i class="fas fa-arrow-left"></i> К дивизиону</button>
       <button class="logout-btn" onclick="openPwModal(false)" title="Сменить пароль"><i class="fas fa-key"></i></button>
       <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Выйти</button>
@@ -896,8 +898,9 @@
       <button type="button" class="logout-btn" onclick="clearRange('rgo', loadRgoDashboard)" title="За всё время">
         <i class="fas fa-rotate-left"></i>
       </button>
-      <span class="user-badge"><i class="fas fa-user"></i> <span id="rgoUserName"></span></span>
-      <span class="user-badge"><i class="fas fa-users"></i> <span id="rgoUserGroup"></span></span>
+      <span class="user-badge"><i class="fas fa-user"></i> <span class="hdr-name"></span></span>
+      <span class="user-badge hdr-role-badge"><i class="fas fa-id-badge"></i> <span class="hdr-role"></span></span>
+      <span class="user-badge hdr-group-badge"><i class="fas fa-users"></i> <span class="hdr-group"></span></span>
       <button class="logout-btn" onclick="openPwModal(false)" title="Сменить пароль"><i class="fas fa-key"></i></button>
       <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Выйти</button>
     </div>
@@ -942,8 +945,9 @@
       <button type="button" class="logout-btn" title="За всё время" onclick="orgClearDates()">
         <i class="fas fa-rotate-left"></i>
       </button>
-      <span class="user-badge"><i class="fas fa-user"></i> <span id="orgUserName"></span></span>
-      <span class="user-badge"><i class="fas fa-diagram-project"></i> <span id="orgUserGroup"></span></span>
+      <span class="user-badge"><i class="fas fa-user"></i> <span class="hdr-name"></span></span>
+      <span class="user-badge hdr-role-badge"><i class="fas fa-id-badge"></i> <span class="hdr-role"></span></span>
+      <span class="user-badge hdr-group-badge"><i class="fas fa-users"></i> <span class="hdr-group"></span></span>
       <button class="logout-btn" onclick="openPwModal(false)" title="Сменить пароль"><i class="fas fa-key"></i></button>
       <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Выйти</button>
     </div>
@@ -1005,7 +1009,9 @@
     <h1><i class="fas fa-table"></i> Отчёты</h1>
     <div class="user-info">
       <button class="logout-btn" onclick="backFromReports()"><i class="fas fa-arrow-left"></i> Назад</button>
-      <span class="user-badge"><i class="fas fa-user"></i> <span id="repUserName"></span></span>
+      <span class="user-badge"><i class="fas fa-user"></i> <span class="hdr-name"></span></span>
+      <span class="user-badge hdr-role-badge"><i class="fas fa-id-badge"></i> <span class="hdr-role"></span></span>
+      <span class="user-badge hdr-group-badge"><i class="fas fa-users"></i> <span class="hdr-group"></span></span>
       <button class="logout-btn" onclick="openPwModal(false)" title="Сменить пароль"><i class="fas fa-key"></i></button>
       <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Выйти</button>
     </div>
@@ -1463,6 +1469,30 @@
     });
   }
 
+  // Одна шапка на все кабинеты: кто вошёл, в какой роли, в какой группе.
+  // Раньше каждая страница заполняла свои значки сама — на отчётах их
+  // забыли вовсе, а старший СКК видел «СКК» так же, как рядовой:
+  // показывалась группа, а не роль.
+  const ROLE_RU = {
+    operator: 'Оператор', qc: 'СКК', sqc: 'ССКК', rgo: 'РГО',
+    srgo: 'СРГО', manager: 'Руководитель проекта', admin: 'Администратор'
+  };
+
+  function fillHeader(user) {
+    const u = user || JSON.parse(sessionStorage.getItem('user') || '{}');
+    const role = ROLE_RU[u.role] || u.role || '';
+    const group = u.group || '';
+    document.querySelectorAll('.hdr-name').forEach(function (e) { e.textContent = u.fullName || ''; });
+    document.querySelectorAll('.hdr-role').forEach(function (e) { e.textContent = role; });
+    document.querySelectorAll('.hdr-group').forEach(function (e) { e.textContent = group; });
+    document.querySelectorAll('.hdr-role-badge').forEach(function (e) { e.classList.toggle('hidden', !role); });
+    // Группу прячем, когда она повторяет роль: у СКК группа так и
+    // называется — два одинаковых значка рядом только мешают.
+    document.querySelectorAll('.hdr-group-badge').forEach(function (e) {
+      e.classList.toggle('hidden', !group || group === role);
+    });
+  }
+
   function showApp(user) {
     const want = navSnapshot();
     resetState();
@@ -1474,21 +1504,18 @@
     });
     if (user.role === 'manager' || user.role === 'srgo') {
       document.getElementById('orgPage').classList.remove('hidden');
-      document.getElementById('orgUserName').textContent = user.fullName;
-      document.getElementById('orgUserGroup').textContent = user.group;
+      fillHeader(user);
       document.getElementById('orgTitle').textContent = user.role === 'manager' ? 'Кабинет менеджера проекта' : 'Дивизион · старший РГО';
       document.getElementById('orgStaffBtn').classList.toggle('hidden',
         ['srgo', 'manager', 'admin'].indexOf(user.role) < 0);
       loadOrgDashboard(user.role);
     } else if (user.role === 'rgo') {
       document.getElementById('rgoPage').classList.remove('hidden');
-      document.getElementById('rgoUserName').textContent = user.fullName;
-      document.getElementById('rgoUserGroup').textContent = user.group;
+      fillHeader(user);
       loadHiredDates(loadRgoDashboard);
     } else if (user.role === 'qc' || user.role === 'sqc' || user.role === 'admin') {
       document.getElementById('qcPage').classList.remove('hidden');
-      document.getElementById('qcUserName').textContent = user.fullName;
-      document.getElementById('qcUserGroup').textContent = user.group;
+      fillHeader(user);
       const isSqc = user.role === 'sqc' || user.role === 'admin';
       document.getElementById('tabAnaBtn').classList.toggle('hidden', !isSqc);
       // Отчёты открыты всему КК: качество СКК ведёт по всему КЦ, а кнопка
@@ -1501,8 +1528,7 @@
       loadEvalPage();
     } else {
       document.getElementById('operatorPage').classList.remove('hidden');
-      document.getElementById('opUserName').textContent = user.fullName;
-      document.getElementById('opUserGroup').textContent = user.group;
+      fillHeader(user);
       document.getElementById('callDate').value = new Date().toISOString().split('T')[0];
       // статистику принятых звонков грузят за прошедший день
       document.getElementById('upDate').value = yesterdayStr();
@@ -1881,8 +1907,7 @@
     });
     document.getElementById('qcPage').classList.remove('hidden');
     const u = JSON.parse(sessionStorage.getItem('user') || '{}');
-    document.getElementById('qcUserName').textContent = u.fullName || '';
-    document.getElementById('qcUserGroup').textContent = u.group || '';
+    fillHeader();
     ['tabEvalBtn', 'tabPlanBtn', 'tabReqBtn', 'tabAnaBtn', 'tabRepBtn'].forEach(function (id) {
       document.getElementById(id).classList.add('hidden');    // им тут нужен только состав
     });
@@ -2350,8 +2375,7 @@
       document.getElementById('orgPage').classList.remove('hidden');
       document.getElementById('backToQc').classList.remove('hidden');
       const u = JSON.parse(sessionStorage.getItem('user') || '{}');
-      document.getElementById('orgUserName').textContent = u.fullName || '';
-      document.getElementById('orgUserGroup').textContent = u.group || '';
+      fillHeader();
       document.getElementById('orgTitle').textContent = 'Аналитика качества';
       loadOrgDashboard(u.role);
       return;
@@ -2959,7 +2983,7 @@
     ['operatorPage', 'qcPage', 'rgoPage', 'orgPage'].forEach(function (id) { document.getElementById(id).classList.add('hidden'); });
     document.getElementById('repPage').classList.remove('hidden');
     const u = JSON.parse(sessionStorage.getItem('user') || '{}');
-    document.getElementById('repUserName').textContent = u.fullName || '';
+    fillHeader();
     // апелляции: подают РГО и выше, разбирает старший СКК; рядовому СКК
     // и оператору вкладка ни к чему
     document.getElementById('repT8').classList.toggle('hidden',

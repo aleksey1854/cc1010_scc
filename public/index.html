@@ -39,6 +39,11 @@
   html { scrollbar-gutter:stable; }
   body { font-family:var(--font); background:var(--paper); color:var(--ink); min-height:100vh; -webkit-font-smoothing:antialiased; }
   .hidden { display:none !important; }
+  /* Смена раздела меняет и длину страницы: в отчётах она втрое больше.
+     Короткое проявление снимает ощущение подмены. Двигаем только
+     прозрачность — ни размеров, ни положения. */
+  @keyframes pageIn{ from{ opacity:0; } to{ opacity:1; } }
+  .page-in{ animation:pageIn .16s var(--ease-out); }
   ::selection { background:var(--accent); color:#fff; }
   /* Кнопки и ссылки не показывали фокус: с клавиатуры было не понять,
      где ты находишься. Только :focus-visible — мышью рамка не мигает. */
@@ -257,6 +262,15 @@
     box-shadow:0 2px 8px rgba(43,89,240,.28); opacity:0; pointer-events:none; z-index:0;
     transition:transform .2s var(--ease-out), width .2s var(--ease-out), opacity .15s linear; }
   .seg-ind.seg-jump{ transition:none; }
+  /* Вкладки отчётов — второй уровень. Две одинаковые синие полосы друг
+     под другом читались как рывок: глазу непонятно, что главнее. Здесь
+     тот же механизм, но тише — светлая подложка и мельче шрифт. */
+  .seg.seg-sub{ background:transparent; border-color:transparent; padding:0 2px; gap:2px; }
+  .seg-sub .seg-btn{ font-size:13px; padding:7px 13px; color:var(--muted); }
+  .seg-sub .seg-btn:hover{ color:var(--ink-2); }
+  .seg-sub .seg-btn.active{ background:var(--accent-soft); color:var(--accent-ink); box-shadow:none; }
+  .seg-sub .seg-ind{ background:var(--accent-soft); box-shadow:none; }
+  .seg-sub.has-ind .seg-btn.active{ color:var(--accent-ink); }
   .seg-btn{ position:relative; z-index:1; border:none; background:transparent; color:var(--ink-2); font-family:var(--display); font-weight:600; font-size:14px; padding:9px 18px; border-radius:9px; cursor:pointer; transition:background .18s var(--ease-out), color .18s var(--ease-out), transform .16s var(--ease-out); }
   .seg-btn.active{ background:var(--accent); color:#fff; box-shadow:0 2px 8px rgba(43,89,240,.28); }
   /* has-ind ставит скрипт, когда подложка встала на место: не встанет —
@@ -365,6 +379,9 @@
 
   /* ===== ТАБЛИЦЫ ===== */
   .table-wrapper{ overflow-x:auto; margin:0 -4px; }
+  /* Кнопки в последней колонке не рвём по словам: лучше прокрутка, чем
+     обрезанное «Изменит». */
+  .table-wrapper td:last-child{ white-space:nowrap; }
   /* Многоколоночные отчёты набираем плотнее — иначе на ноутбуке они
      не влезают и приходится возить таблицу вбок. */
   .table-dense table{ font-size:13px; }
@@ -1089,8 +1106,8 @@
     </div>
   </div>
   <div class="container">
-    <div class="seg nav-slot" style="margin-bottom:12px;"></div>
-    <div class="seg" style="margin-bottom:20px;">
+    <div class="seg nav-slot" style="margin-bottom:10px;"></div>
+    <div class="seg seg-sub" style="margin-bottom:20px;">
       <button type="button" class="seg-btn active" id="repT1" onclick="repTab('weekly')">Оценки по неделям</button>
       <button type="button" class="seg-btn" id="repT2" onclick="repTab('journal')">Журнал оценок</button>
       <button type="button" class="seg-btn" id="repT3" onclick="repTab('kk')">Отчёт КК</button>
@@ -2058,6 +2075,10 @@
     ['rgo', 'РГО'], ['srgo', 'Старший РГО'], ['manager', 'Руководитель'], ['admin', 'Администратор']
   ];
   const roleRu = c => (ROLES.find(r => r[0] === c) || [c, c])[1];
+  // «Ответственный за базу данных Инвитро-1 (ОБД Инвитро-1)» занимал в
+  // таблице четыре строки и выдавливал кнопки за край. В скобках уже
+  // есть короткая форма — её и показываем, полная висит в подсказке.
+  const shortPos = p => { const m = /\(([^)]+)\)\s*$/.exec(p || ''); return m ? m[1] : (p || ''); };
   let staffAll = [];
   let staffEditing = null;
 
@@ -2152,7 +2173,8 @@
             '; остаётся в списках три месяца — на случай жалобы">уволен ' + u.dismissed + '</span>' : '') + '</td>' +
         '<td>' + (u.group || '—') + '</td>' +
         '<td><span class="role-badge">' + roleRu(u.role) + '</span></td>' +
-        '<td>' + (u.position || '<span style="color:var(--muted);">—</span>') + '</td>' +
+        '<td title="' + (u.position || '').replace(/"/g, '&quot;') + '">' +
+          (shortPos(u.position) || '<span style="color:var(--muted);">—</span>') + '</td>' +
         '<td>' + (u.login || '<span class="no-pass">нет логина</span>') + '</td>' +
         '<td>' + (u.hasPassword ? '✓' : '<span class="no-pass">нет пароля</span>') + '</td>' +
         '<td>' + (u.training || '—') + '</td>' +
@@ -2554,7 +2576,7 @@
   function navGoTo(key) {
     const u = JSON.parse(sessionStorage.getItem('user') || '{}');
     const home = navHome(u.role);
-    if (key === 'rep') { openReports(home); return; }
+    if (key === 'rep') { openReports(home); pageFade(); return; }
     if (key === 'staff' && ['srgo', 'manager'].indexOf(u.role) >= 0) { openStaffPage(); return; }
     if (key === 'home') {
       if (!document.getElementById('repPage').classList.contains('hidden')) backFromReports();
@@ -2580,6 +2602,18 @@
     const items = NAV_ITEMS[u.role] || [];
     if (!items.length) return;
     navGoTo(items[0][0]);
+  }
+
+  // Короткое проявление содержимого при смене раздела.
+  function pageFade() {
+    const page = ['operatorPage', 'qcPage', 'rgoPage', 'orgPage', 'repPage']
+      .map(function (id) { return document.getElementById(id); })
+      .find(function (e) { return e && !e.classList.contains('hidden'); });
+    const box = page && page.querySelector('.container');
+    if (!box) return;
+    box.classList.remove('page-in');
+    void box.offsetWidth;          // без этого класс не перезапустит анимацию
+    box.classList.add('page-in');
   }
 
   function renderNav() {
@@ -3334,6 +3368,7 @@
     document.getElementById('repPage').classList.add('hidden');
     document.getElementById(repFrom === 'qc' ? 'qcPage' : (repFrom === 'rgo' ? 'rgoPage' : 'orgPage')).classList.remove('hidden');
     renderNav();
+    pageFade();
     navRecord();
   }
   function repTab(t) {

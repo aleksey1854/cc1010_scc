@@ -152,6 +152,11 @@
     position:sticky; top:0; z-index:50;
   }
   .header h1{ font-family:var(--display); font-size:18px; font-weight:600; letter-spacing:-.2px; display:flex; align-items:center; gap:12px; }
+  /* Заголовок с логотипом — путь домой из любого раздела, как везде */
+  .header h1.home-link{ cursor:pointer; user-select:none; border-radius:12px; padding:2px 8px 2px 2px;
+    margin-left:-2px; transition:background .18s var(--ease-out); }
+  .header h1.home-link:hover{ background:var(--surface-2); }
+  .header h1.home-link:active{ transform:scale(.985); }
   .header h1 i{
     width:36px; height:36px; border-radius:10px; background:var(--accent-soft); color:var(--accent);
     display:inline-flex; align-items:center; justify-content:center; font-size:16px; margin:0;
@@ -656,7 +661,7 @@
 <!-- ОПЕРАТОР -->
 <div id="operatorPage" class="hidden">
   <div class="header">
-    <h1><i class="fas fa-headset"></i> Оператор КК</h1>
+    <h1 class="home-link" role="button" tabindex="0" title="На главную" onclick="goHome()" onkeydown="homeKey(event)"><i class="fas fa-headset"></i> Оператор КК</h1>
     <div class="user-info">
       <span class="user-badge"><i class="fas fa-user"></i> <span class="hdr-name"></span></span>
       <span class="user-badge hdr-role-badge"><i class="fas fa-id-badge"></i> <span class="hdr-role"></span></span>
@@ -782,7 +787,7 @@
 <!-- QC -->
 <div id="qcPage" class="hidden">
   <div class="header">
-    <h1><i class="fas fa-clipboard-check"></i> Контроль качества</h1>
+    <h1 class="home-link" role="button" tabindex="0" title="На главную" onclick="goHome()" onkeydown="homeKey(event)"><i class="fas fa-clipboard-check"></i> Контроль качества</h1>
     <div class="user-info">
       <span class="user-badge"><i class="fas fa-user"></i> <span class="hdr-name"></span></span>
       <span class="user-badge hdr-role-badge"><i class="fas fa-id-badge"></i> <span class="hdr-role"></span></span>
@@ -943,7 +948,7 @@
 <!-- РГО -->
 <div id="rgoPage" class="hidden">
   <div class="header">
-    <h1><i class="fas fa-users-gear"></i> Кабинет РГО</h1>
+    <h1 class="home-link" role="button" tabindex="0" title="На главную" onclick="goHome()" onkeydown="homeKey(event)"><i class="fas fa-users-gear"></i> Кабинет РГО</h1>
     <div class="user-info">
       <span class="user-badge"><i class="fas fa-user"></i> <span class="hdr-name"></span></span>
       <span class="user-badge hdr-role-badge"><i class="fas fa-id-badge"></i> <span class="hdr-role"></span></span>
@@ -991,7 +996,7 @@
 <!-- ДИВИЗИОН: СРГО / МЕНЕДЖЕР -->
 <div id="orgPage" class="hidden">
   <div class="header">
-    <h1><i class="fas fa-chart-pie"></i> <span id="orgTitle">Дивизион</span></h1>
+    <h1 class="home-link" role="button" tabindex="0" title="На главную" onclick="goHome()" onkeydown="homeKey(event)"><i class="fas fa-chart-pie"></i> <span id="orgTitle">Дивизион</span></h1>
     <div class="user-info">
       <span class="user-badge"><i class="fas fa-user"></i> <span class="hdr-name"></span></span>
       <span class="user-badge hdr-role-badge"><i class="fas fa-id-badge"></i> <span class="hdr-role"></span></span>
@@ -1069,7 +1074,7 @@
 <!-- ОТЧЁТЫ -->
 <div id="repPage" class="hidden">
   <div class="header">
-    <h1><i class="fas fa-table"></i> Отчёты</h1>
+    <h1 class="home-link" role="button" tabindex="0" title="На главную" onclick="goHome()" onkeydown="homeKey(event)"><i class="fas fa-table"></i> Отчёты</h1>
     <div class="user-info">
       <span class="user-badge"><i class="fas fa-user"></i> <span class="hdr-name"></span></span>
       <span class="user-badge hdr-role-badge"><i class="fas fa-id-badge"></i> <span class="hdr-role"></span></span>
@@ -2553,6 +2558,20 @@
     // вкладки кабинета КК: если мы в отчётах — сначала вернуться
     if (!document.getElementById('repPage').classList.contains('hidden')) backFromReports();
     qcTab(key);
+  }
+
+  // Домой — это первый раздел роли: у СКК оценка звонка, у РГО его
+  // операторы, у дивизиона аналитика. Оператору переключать нечего,
+  // он и так на своей единственной странице.
+  function homeKey(e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goHome(); }
+  }
+
+  function goHome() {
+    const u = JSON.parse(sessionStorage.getItem('user') || '{}');
+    const items = NAV_ITEMS[u.role] || [];
+    if (!items.length) return;
+    navGoTo(items[0][0]);
   }
 
   function renderNav() {

@@ -183,6 +183,19 @@
   .stat-card .number.rejected{ color:var(--bad-ink); }
   .stat-card .number.rating{ color:var(--accent); }
 
+  /* Сообщения об ошибках: одно место и один вид. Системное окно браузера
+     останавливало работу и выглядело чужим, а половина кода и так
+     показывала ошибку плашкой. */
+  .toasts{ position:fixed; right:18px; bottom:18px; z-index:1300; display:flex;
+    flex-direction:column; gap:10px; max-width:min(420px, calc(100vw - 36px)); }
+  .toast{ display:flex; align-items:flex-start; gap:10px; padding:12px 14px;
+    border-radius:var(--radius-sm); border:1px solid var(--border-strong);
+    background:var(--surface); box-shadow:var(--shadow-lg); font-size:14px;
+    line-height:1.45; cursor:pointer; }
+  .toast i{ margin-top:2px; }
+  .toast.err{ border-color:var(--bad); background:var(--bad-bg); color:var(--bad-ink); }
+  .toast.ok{ border-color:var(--good); background:var(--good-bg); color:var(--good-ink); }
+
   /* Каркас на время загрузки. Крутилка сообщает «идёт работа», каркас —
      ещё и «сейчас тут будет таблица», поэтому глазу спокойнее. */
   .skel{ padding:2px 0; }
@@ -1469,6 +1482,22 @@
     });
   }
 
+  // Плашка в углу вместо системного окна: не перехватывает управление,
+  // выглядит как остальной интерфейс, снимается кликом или сама.
+  function toast(text, kind) {
+    const box = document.getElementById('toasts');
+    if (!box) return;
+    const t = document.createElement('div');
+    const err = kind !== 'ok';
+    t.className = 'toast ' + (err ? 'err' : 'ok');
+    t.innerHTML = '<i class="fas ' + (err ? 'fa-circle-exclamation' : 'fa-circle-check') + '"></i>' +
+      '<span></span>';
+    t.lastChild.textContent = String(text).replace(/^[❌✅]\s*/, '');
+    t.onclick = function () { t.remove(); };
+    box.appendChild(t);
+    setTimeout(function () { t.remove(); }, err ? 9000 : 5000);
+  }
+
   // Окна закрываются Escape и кликом мимо — так ведут себя все восемь,
   // а не каждое по-своему. Раньше выйти можно было только кнопкой
   // «Отмена», и если её не заметили — окно висело.
@@ -1716,7 +1745,7 @@
     google.script.run.withSuccessHandler(function () {
       drawNewEvals([]);
       loadMyEvaluations();
-    }).withFailureHandler(function (e) { alert(e); })
+    }).withFailureHandler(function (e) { toast(e); })
       .markEvaluationsSeen(sessionStorage.getItem('token'));
   }
 
@@ -2131,10 +2160,10 @@
     if (!confirm('Удалить «' + fullName + '»?\n\nУчётка выключается, логин освобождается, сессии гаснут.\nОценки и заявки остаются в отчётах.')) return;
     google.script.run
       .withSuccessHandler(function (r) {
-        if (!r.success) { alert(r.error); return; }
+        if (!r.success) { toast(r.error); return; }
         loadStaff();
       })
-      .withFailureHandler(e => alert(e))
+      .withFailureHandler(e => toast(e))
       .deleteUser(sessionStorage.getItem('token'), fullName);
   }
 
@@ -2277,8 +2306,8 @@
   function deleteRequest(requestId) {
     if (!confirm('Удалить заявку #' + requestId + '?')) return;
     google.script.run
-      .withSuccessHandler(function (result) { if (result.success) { alert('✅ Удалено'); loadAllRequests(); } else { alert('❌ ' + result.error); } })
-      .withFailureHandler(function (error) { alert('❌ Ошибка: ' + error); })
+      .withSuccessHandler(function (result) { if (result.success) { toast('✅ Удалено'); loadAllRequests(); } else { toast('❌ ' + result.error); } })
+      .withFailureHandler(function (error) { toast('❌ Ошибка: ' + error); })
       .deleteRequest(sessionStorage.getItem('token'), requestId);
   }
 
@@ -2299,11 +2328,11 @@
 
   function saveHired(fullName) {
     const el = document.getElementById('hd_' + cssId(fullName));
-    if (!el || !el.value) { alert('Выберите дату приёмки'); return; }
+    if (!el || !el.value) { toast('Выберите дату приёмки'); return; }
     google.script.run.withSuccessHandler(function (r) {
-      if (!r.success) { alert(r.error); return; }
+      if (!r.success) { toast(r.error); return; }
       loadHiredDates(loadRgoDashboard);
-    }).withFailureHandler(e => alert(e))
+    }).withFailureHandler(e => toast(e))
       .setHiredDate(sessionStorage.getItem('token'), fullName, el.value);
   }
 
@@ -2512,9 +2541,9 @@
       box.querySelectorAll('select[data-mark]').forEach(function (sel) {
         sel.onchange = function () {
           google.script.run.withSuccessHandler(function (res) {
-            if (!res.success) { alert(res.error); return; }
+            if (!res.success) { toast(res.error); return; }
             loadPlan(false);
-          }).withFailureHandler(function (e) { alert(e); })
+          }).withFailureHandler(function (e) { toast(e); })
             .setListenMark(sessionStorage.getItem('token'),
               document.getElementById('planDate').value, sel.getAttribute('data-mark'), sel.value);
         };
@@ -2932,7 +2961,7 @@
   // открываем в той же форме и переписываем целиком, включая комментарии.
   function editEvaluation(evId) {
     google.script.run.withSuccessHandler(function (r) {
-      if (!r.success) { alert(r.error); return; }
+      if (!r.success) { toast(r.error); return; }
       // Журнал живёт на отдельной странице отчётов. Без этого форма
       // заполнялась, а человек оставался в журнале и решал, что кнопка
       // не работает.
@@ -3359,9 +3388,9 @@
     if (!confirm('Точно удалить чек-лист ' + who + ' ' + pct2(Number(score)) + '?\n\n' +
       'Оценка ' + evId + ' пропадёт из журнала и всех отчётов. Отменить будет нельзя.')) return;
     google.script.run.withSuccessHandler(function (r) {
-      if (!r.success) { alert(r.error); return; }
+      if (!r.success) { toast(r.error); return; }
       loadJournal();
-    }).withFailureHandler(function (e) { alert(e); })
+    }).withFailureHandler(function (e) { toast(e); })
       .deleteEvaluation(sessionStorage.getItem('token'), evId);
   }
 
@@ -3477,9 +3506,9 @@
     btn.disabled = true;
     google.script.run.withSuccessHandler(function (r) {
       btn.disabled = false;
-      if (!r.success) { alert(r.error); return; }
+      if (!r.success) { toast(r.error); return; }
       loadAppeals();
-    }).withFailureHandler(function (e) { btn.disabled = false; alert(e); })
+    }).withFailureHandler(function (e) { btn.disabled = false; toast(e); })
       .answerAppeal(sessionStorage.getItem('token'), id, status, answer);
   }
 
@@ -3661,7 +3690,7 @@
     // Пустой файл сохранять нельзя: Excel потом ругается «формат недопустим»,
     // и непонятно, что сломалось — сервер или страница.
     if (!r || (!r.contentBase64 && !r.content)) {
-      alert('❌ Сервер не прислал файл. Обновите страницу (Ctrl+F5) и повторите.');
+      toast('❌ Сервер не прислал файл. Обновите страницу (Ctrl+F5) и повторите.');
       return;
     }
     if (r.contentBase64) {
@@ -3692,13 +3721,13 @@
       from: document.getElementById('cmpFrom').value, to: document.getElementById('cmpTo').value };
     else params = { period: 'month' };
     google.script.run.withSuccessHandler(function (r) {
-      if (!r.success) { alert('❌ ' + r.error); return; }
+      if (!r.success) { toast('❌ ' + r.error); return; }
       saveFile(r);
     }).exportReport(sessionStorage.getItem('token'), kind, params);
   }
   function downloadEval(id) {
     google.script.run.withSuccessHandler(function (r) {
-      if (!r.success) { alert('❌ ' + r.error); return; }
+      if (!r.success) { toast('❌ ' + r.error); return; }
       saveFile(r);
     }).exportReport(sessionStorage.getItem('token'), 'evaluation', { id: id });
   }
@@ -3926,5 +3955,6 @@
   });
 </script>
 
+<div class="toasts" id="toasts"></div>
 </body>
 </html>

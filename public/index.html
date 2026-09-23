@@ -1108,7 +1108,6 @@
   <div class="container">
     <div class="seg nav-slot" style="margin-bottom:10px;"></div>
     <div class="seg seg-sub" style="margin-bottom:20px;">
-      <button type="button" class="seg-btn active" id="repT1" onclick="repTab('weekly')">Оценки по неделям</button>
       <button type="button" class="seg-btn" id="repT2" onclick="repTab('journal')">Журнал оценок</button>
       <button type="button" class="seg-btn" id="repT3" onclick="repTab('kk')">Отчёт КК</button>
       <button type="button" class="seg-btn" id="repT4" onclick="repTab('criteria')">Критерии по неделям</button>
@@ -1120,19 +1119,6 @@
     </div>
 
     <!-- Оценки по неделям -->
-    <div id="repWeekly">
-      <div class="card">
-        <div class="filter-bar" style="margin-bottom:0;">
-          <button class="btn-filter" onclick="weekShift(-1)"><i class="fas fa-chevron-left"></i></button>
-          <strong id="weekLabel" style="min-width:210px;text-align:center;font-family:var(--display);">—</strong>
-          <button class="btn-filter" onclick="weekShift(1)"><i class="fas fa-chevron-right"></i></button>
-          <select id="weekGroup" onchange="loadWeekly()"><option value="">Все группы</option></select>
-          <button class="btn-filter" style="margin-left:auto;background:var(--good);" onclick="downloadReport('weekly')"><i class="fas fa-download"></i> Скачать неделю</button>
-        </div>
-      </div>
-      <div class="card"><div id="weeklyGrid"></div></div>
-    </div>
-
     <!-- Журнал -->
     <div id="repJournal" class="hidden">
       <div class="card">
@@ -1163,7 +1149,12 @@
     <div id="repKk" class="hidden">
       <div class="card">
         <div class="filter-bar" style="margin-bottom:0;">
-          <span style="color:var(--muted);font-size:13px;">Неделя и месяц считаются от текущей даты</span>
+          <span class="date-range">
+            <label for="kkFrom">Период с</label><input type="date" id="kkFrom" onchange="loadKk()">
+            <label for="kkTo">по</label><input type="date" id="kkTo" onchange="loadKk()">
+          </span>
+          <button type="button" class="btn-filter btn-quiet" onclick="kkWeek()"><i class="fas fa-rotate-left"></i> Текущая неделя</button>
+          <span id="kkHint" style="color:var(--muted);font-size:13px;"></span>
           <button class="btn-filter" style="margin-left:auto;background:var(--good);" onclick="downloadReport('kk')"><i class="fas fa-download"></i> Скачать</button>
         </div>
       </div>
@@ -1572,7 +1563,7 @@
     allRequests = []; orgOperators = []; staffAll = []; staffEditing = null; myRequests = [];
     evLinkedReq = ''; evEditing = ''; evComplaintSrc = ''; evCmtOpen = {};
     evCfg = null; evAnswers = {}; evComments = {};
-    hasCallState = 'yes'; weekOffset = 0; repFrom = 'org';
+    hasCallState = 'yes'; repFrom = 'org';
     ['opRequestsList', 'opEvalsList', 'qcRequestsList', 'rgoOperatorsList',
      'orgOperatorsTable', 'planTable', 'evChecklist', 'staffList', 'staffAudit'].forEach(function (id) {
       const el = document.getElementById(id);
@@ -2657,7 +2648,7 @@
 
   function navPath(s) {
     if (!s) return '#/';
-    if (s.page === 'rep') return '#/otchety/' + (s.repTab || 'weekly');
+    if (s.page === 'rep') return '#/otchety/' + (s.repTab || 'journal');
     if (s.page === 'cab') return '#/kabinet/' + (s.qcTab || 'eval');
     return '#/';
   }
@@ -2683,7 +2674,7 @@
       const repOpen = !document.getElementById('repPage').classList.contains('hidden');
       if (want && want.page === 'rep') {
         if (!repOpen) openReports(want.repFrom || repFrom);
-        repTab(want.repTab || 'weekly');
+        repTab(want.repTab || 'journal');
       } else {
         if (repOpen) backFromReports();
         if (['qc', 'sqc', 'admin'].indexOf(u.role) >= 0) qcTab((want && want.qcTab) || 'eval');
@@ -2720,7 +2711,7 @@
     if (user.role === 'operator') return;
     if (want.page === 'rep') {
       openReports(want.repFrom || 'org');
-      if (want.repTab && want.repTab !== 'weekly') repTab(want.repTab);
+      repTab(want.repTab || 'journal');
       return;
     }
     if (want.qcTab && want.qcTab !== 'eval' && ['qc', 'sqc', 'admin'].indexOf(user.role) >= 0) qcTab(want.qcTab);
@@ -3345,7 +3336,6 @@
   }
 
   // ---------- ОТЧЁТЫ ----------
-  let weekOffset = 0;
   let repFrom = 'org';   // куда возвращаться
 
   function openReports(from) {
@@ -3360,8 +3350,7 @@
     document.getElementById('repT8').classList.toggle('hidden',
       ['rgo', 'sqc', 'srgo', 'manager', 'admin'].indexOf(u.role) < 0);
     refreshAppealBadge();
-    weekOffset = 0;
-    repTab('weekly');
+    repTab('journal');
     renderNav();
     navRecord();
   }
@@ -3375,7 +3364,9 @@
   }
   function repTab(t) {
     navSet('repTab', t);
-    const tabs = { weekly: ['repT1', 'repWeekly'], journal: ['repT2', 'repJournal'], kk: ['repT3', 'repKk'],
+    // «Оценки по неделям» убрали: то же самое видно в отчёте КК и в
+    // производственных показателях, а лишняя вкладка только путала.
+    const tabs = { journal: ['repT2', 'repJournal'], kk: ['repT3', 'repKk'],
                    criteria: ['repT4', 'repCriteria'], topics: ['repT5', 'repTopics'], complaints: ['repT6', 'repComplaints'],
                    production: ['repT7', 'repProduction'], appeals: ['repT8', 'repAppeals'],
                    bugs: ['repT9', 'repBugs'] };
@@ -3386,7 +3377,6 @@
     segSyncAll();
     navRecord();
     if (t === 'bugs') loadBugs();
-    if (t === 'weekly') loadWeekly();
     if (t === 'journal') {
       // по умолчанию — текущий месяц, дальше диапазон правят руками
       const f = document.getElementById('jFrom'), to = document.getElementById('jTo');
@@ -3936,37 +3926,6 @@
     }).getAppeals(sessionStorage.getItem('token'), {});
   }
 
-  function weekShift(d) { weekOffset += d; loadWeekly(); }
-
-  function loadWeekly() {
-    const box = document.getElementById('weeklyGrid');
-    box.innerHTML = loadingRows();
-    google.script.run.withSuccessHandler(function (r) {
-      if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
-      document.getElementById('weekLabel').textContent = r.week.label;
-      const gs = document.getElementById('weekGroup');
-      if (gs.options.length <= 1) gs.innerHTML = '<option value="">Все группы</option>' + r.groups.map(function (g) { return '<option>' + g + '</option>'; }).join('');
-
-      let html = '<div class="table-wrapper"><table><thead><tr><th>Оператор</th><th>Группа</th>';
-      for (let i = 1; i <= r.maxCells; i++) html += '<th>Оценка ' + i + '</th>';
-      html += '<th>Среднее</th><th>ПЖ</th></tr></thead><tbody>';
-      let prevG = null;
-      r.rows.forEach(function (x) {
-        if (x.group !== prevG) { html += '<tr><td colspan="' + (r.maxCells + 4) + '" style="background:var(--surface-2);font-weight:700;">' + x.group + '</td></tr>'; prevG = x.group; }
-        html += '<tr><td>' + x.operator + '</td><td>' + x.group + '</td>';
-        for (let i = 0; i < r.maxCells; i++) {
-          const c = x.cells[i];
-          if (!c) { html += '<td style="color:#ccc">—</td>'; continue; }
-          const mark = c.complaint ? ' ⚠' : (c.gratitude ? ' ★' : '');
-          html += '<td><button class="btn-small" style="background:transparent;color:' + scoreColorHex(c.score) + ';font-weight:700;" onclick="downloadEval(\'' + c.id + '\')" title="Скачать чек-лист">' + pct2(c.score) + mark + '</button></td>';
-        }
-        html += '<td>' + (x.avg === null ? '<span style="color:#bbb">—</span>' : '<strong style="color:' + scoreColorHex(x.avg) + '">' + pct2(x.avg) + '</strong>') + '</td>';
-        html += '<td>' + (x.complaints || '') + '</td></tr>';
-      });
-      html += '</tbody></table></div>';
-      box.innerHTML = html;
-    }).getWeeklyGrid(sessionStorage.getItem('token'), weekOffset, document.getElementById('weekGroup').value);
-  }
 
   function jFilters() {
     return {
@@ -4072,22 +4031,35 @@
     }).getJournal(sessionStorage.getItem('token'), jFilters());
   }
 
+  // По умолчанию — текущая неделя: отчёт сдают заказчику по понедельникам.
+  function kkWeek() {
+    document.getElementById('kkFrom').value = weekStart();
+    document.getElementById('kkTo').value = new Date().toLocaleDateString('sv');
+    loadKk();
+  }
+
   function loadKk() {
     const box = document.getElementById('kkTable');
     box.innerHTML = loadingRows();
     google.script.run.withSuccessHandler(function (r) {
       if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
-      let html = '<div class="table-wrapper"><table><thead><tr><th>Оператор</th><th>Группа</th><th>Стаж, мес</th><th>Оценок (нед)</th><th>% без КО (нед)</th><th>Оценок (мес)</th><th>% без КО (мес)</th><th>Недоп. событий</th><th>Подтв. жалоб</th></tr></thead><tbody>';
+      document.getElementById('kkHint').textContent = 'с ' + r.from + (r.to ? ' по ' + r.to : ' по сегодня');
+      let html = '<div class="table-wrapper table-dense"><table><thead><tr>' +
+        '<th>Оператор</th><th>Группа</th><th>Стаж, мес</th><th>Оценок</th><th>% без КО</th>' +
+        '<th>Недоп. событий</th><th title="подтверждённые жалобы от заказчика">Жалоб: заказчик</th>' +
+        '<th title="подтверждённые жалобы от клиента">Жалоб: клиент</th></tr></thead><tbody>';
       r.rows.forEach(function (x) {
         html += '<tr><td>' + x.operator + '</td><td>' + x.group + '</td><td>' + (x.months === '' ? '—' : x.months) + '</td>' +
-          '<td>' + x.weekCount + '</td><td>' + (x.weekAvg === null ? '—' : '<strong style="color:' + scoreColorHex(x.weekAvg) + '">' + pct2(x.weekAvg) + '</strong>') + '</td>' +
-          '<td>' + x.monthCount + '</td><td>' + (x.monthAvg === null ? '—' : '<strong style="color:' + scoreColorHex(x.monthAvg) + '">' + pct2(x.monthAvg) + '</strong>') + '</td>' +
+          '<td>' + x.count + '</td>' +
+          '<td>' + (x.avg === null ? '—' : '<strong style="color:' + scoreColorHex(x.avg) + '">' + pct2(x.avg) + '</strong>') + '</td>' +
           '<td>' + (x.ko ? '<span class="fail-tag">' + x.ko + '</span>' : '0') + '</td>' +
-          '<td>' + (x.complaints ? '<span class="fail-tag">' + x.complaints + '</span>' : '0') + '</td></tr>';
+          '<td>' + (x.pjCustomer ? '<span class="fail-tag">' + x.pjCustomer + '</span>' : '0') + '</td>' +
+          '<td>' + (x.pjClient ? '<span class="fail-tag">' + x.pjClient + '</span>' : '0') + '</td></tr>';
       });
       html += '</tbody></table></div>';
       box.innerHTML = html;
-    }).getKkReport(sessionStorage.getItem('token'), 'month');
+    }).getKkReport(sessionStorage.getItem('token'),
+      document.getElementById('kkFrom').value, document.getElementById('kkTo').value);
   }
 
   // ---------- СКАЧИВАНИЕ ----------
@@ -4117,8 +4089,7 @@
   }
   function downloadReport(kind) {
     let params;
-    if (kind === 'weekly') params = { weekOffset: weekOffset, group: document.getElementById('weekGroup').value };
-    else if (kind === 'journal' || kind === 'checklists') params = jFilters();
+    if (kind === 'journal' || kind === 'checklists') params = jFilters();
     else if (kind === 'criteria') params = { period: 'all',
       from: document.getElementById('cFrom').value, to: document.getElementById('cTo').value };
     else if (kind === 'topics') params = { period: 'all',
@@ -4127,6 +4098,9 @@
       to: document.getElementById('prTo').value, group: document.getElementById('prGroup').value };
     else if (kind === 'complaints') params = { period: 'all',
       from: document.getElementById('cmpFrom').value, to: document.getElementById('cmpTo').value };
+    // отчёт КК скачивается за тот же период, что открыт на экране
+    else if (kind === 'kk') params = { from: document.getElementById('kkFrom').value,
+      to: document.getElementById('kkTo').value };
     else params = { period: 'month' };
     google.script.run.withSuccessHandler(function (r) {
       if (!r.success) { toast('❌ ' + r.error); return; }

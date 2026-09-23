@@ -449,7 +449,7 @@ const R = (fn, ...a) => api.call(fn, a);
   head('ШАГ 9. ОТЧЁТЫ');
   for (const [n, fn, args] of [
     ['журнал', 'getJournal', [mgrT, {}]],
-    ['Отчёт КК', 'getKkReport', [mgrT, 'all']],
+    ['Отчёт КК', 'getKkReport', [mgrT, '2026-08-01', '2026-09-30']],
     ['недели', 'getWeeklyGrid', [mgrT, 0, '']],
     ['критерии', 'getCriteriaReport', [mgrT, 'all']],
     ['тематики', 'getTopicsReport', [mgrT, 'all']],
@@ -483,7 +483,7 @@ const R = (fn, ...a) => api.call(fn, a);
 
   const rgoRep = await R('getTopicsReport', rgoT, 'all');
   chk('РГО получил доступ к тематикам (было «Нет доступа»)', rgoRep.success === true, rgoRep.error);
-  chk('оператору отчёты закрыты', (await R('getKkReport', opT, 'all')).success === false);
+  chk('оператору отчёты закрыты', (await R('getKkReport', opT, '2026-08-01', '2026-09-30')).success === false);
 
   // СКК ведёт качество по всему КЦ — отчёты ему нужны наравне со старшим
   for (const [n, fn, args] of [

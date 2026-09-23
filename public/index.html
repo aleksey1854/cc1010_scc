@@ -1567,7 +1567,7 @@
         } else { m.textContent = '❌ ' + r.error; m.className = 'message error'; m.style.display = 'block'; }
       })
       .withFailureHandler(function (e) { m.textContent = '❌ ' + e; m.className = 'message error'; m.style.display = 'block'; })
-      .changePassword(oldP, n1);
+      .changePassword(sessionStorage.getItem('token'), oldP, n1);
   }
   function logout() {
     const t = sessionStorage.getItem('token');

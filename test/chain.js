@@ -688,6 +688,25 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('старый пароль больше не подходит', (await R('login', QC[3], QC[4])).success === false);
   chk('новый пароль работает', (await R('login', QC[3], 'NovyyParol9')).success === true);
 
+  head('ШАГ 11. ИНТЕРФЕЙС ПЕРЕДАЁТ ТОКЕН');
+  // Сервер тут проверяли прямыми вызовами с токеном, а кнопка смены
+  // пароля в интерфейсе токен не передавала — и отвечала «Не выполнен
+  // вход». Смотрим сам index.html: первым аргументом у каждого вызова
+  // должен идти токен (или объект data/payload, внутри которого pin).
+  const html = fs.readFileSync(require('path').join(__dirname, '..', 'public', 'index.html'), 'utf8');
+  // аргумент режем по первой скобке, поэтому getItem('token' без закрывающей
+  const TOKEN_ARG = /^(sessionStorage\.getItem\('token'|token|tok|t|p|pin|data|payload)$/;
+  const noToken = [];
+  for (const fn of Object.keys(api.HANDLERS)) {
+    if (fn === 'login' || fn === 'health') continue;
+    const needle = '.' + fn + '(';
+    for (let i = html.indexOf(needle); i >= 0; i = html.indexOf(needle, i + 1)) {
+      const first = html.slice(i + needle.length, i + needle.length + 80).split(/[,)]/)[0].trim();
+      if (!TOKEN_ARG.test(first)) noToken.push(fn + '(' + first + ')');
+    }
+  }
+  chk('каждый вызов сервера из интерфейса несёт токен', noToken.length === 0, noToken);
+
   console.log(`\nПРОВАЛЕНО: ${bad.length}`);
   bad.forEach(b => console.log('   ·', b));
   await db.pool.end();

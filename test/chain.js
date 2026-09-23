@@ -389,6 +389,63 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('выгрузка ДЦ — живой xlsx', dcXls.success === true && /^UEsD/.test(dcXls.contentBase64 || ''), dcXls.error);
   chk('ДЦ-оценку убираем за собой', (await R('deleteEvaluation', qcT, dcEv.id)).success === true);
 
+  head('ШАГ 3в3. ПЕРЕВОД В ДРУГУЮ ГРУППУ');
+  // ПТП расформировывают посреди недели: людей переводят в другие группы.
+  // Оценка остаётся за той группой, где человек был, когда его слушали,
+  // и в отчётах он стоит двумя строками — старая группа и новая.
+  const MOVER = creds.find(x => x[2] === 'operator' && x[1] === 'ИНВ-2');
+  const mvMeta = { ...META, operator: MOVER[0], group: 'ИНВ-2', reqId: '' };
+  const mv1 = await R('saveEvaluation', { pin: qcT,
+    meta: { ...mvMeta, callTime: '17:10', phone: '79165550001' }, answers: ans, comments: {} });
+  chk('оценка в старой группе', mv1.success === true, mv1.error);
+  chk('оператора переводят в другую группу',
+    (await R('updateUser', srgoT, MOVER[0], MOVER[0], 'ИНВ-3', 'operator')).success === true);
+  const mvAns = { ...ans, B2P1: 'Положительно' };
+  const mv2 = await R('saveEvaluation', { pin: qcT,
+    meta: { ...mvMeta, group: 'ИНВ-3', callTime: '17:20', phone: '79165550002' }, answers: mvAns, comments: {} });
+  chk('оценка уже в новой группе', mv2.success === true, mv2.error);
+
+  const mvJ = (await R('getJournal', qcT, { period: 'all', operator: MOVER[0] })).rows;
+  chk('в журнале первая оценка осталась за старой группой',
+    mvJ.find(r => r.id === mv1.id).group === 'ИНВ-2' && mvJ.find(r => r.id === mv2.id).group === 'ИНВ-3',
+    mvJ.map(r => [r.id, r.group]));
+
+  const mvProd = await R('getProductionReport', qcT, DATE, DATE, '');
+  const mvRows = [].concat(...mvProd.groups.map(g => g.operators.map(o => ({ g: g.name, o }))))
+    .filter(x => x.o.name === MOVER[0]);
+  chk('производственные: две строки, по одной на группу',
+    mvRows.length === 2 && mvRows.some(x => x.g === 'ИНВ-2') && mvRows.some(x => x.g === 'ИНВ-3'),
+    mvRows.map(x => x.g));
+  chk('  у каждой строки своя оценка',
+    mvRows.every(x => x.o.scores.length === 1) &&
+    mvRows.find(x => x.g === 'ИНВ-2').o.avg === mv1.result.score &&
+    mvRows.find(x => x.g === 'ИНВ-3').o.avg === mv2.result.score,
+    mvRows.map(x => [x.g, x.o.avg]));
+  chk('  человек посчитан один раз',
+    mvProd.operators === new Set([].concat(...mvProd.groups.map(g => g.operators.map(o => o.name)))).size,
+    mvProd.operators);
+  const mvOld = await R('getProductionReport', qcT, DATE, DATE, 'ИНВ-2');
+  chk('  отчёт старой группы видит его оценку',
+    mvOld.groups.length === 1 && mvOld.groups[0].operators.some(o => o.name === MOVER[0] && o.scores.length === 1),
+    mvOld.groups.map(g => g.name));
+
+  const mvKk = (await R('getKkReport', qcT, DATE, DATE)).rows.filter(x => x.operator === MOVER[0]);
+  chk('отчёт КК: тоже две строки',
+    mvKk.length === 2 && mvKk.every(x => x.count === 1) &&
+    mvKk.find(x => x.group === 'ИНВ-2').avg === mv1.result.score &&
+    mvKk.find(x => x.group === 'ИНВ-3').avg === mv2.result.score,
+    mvKk.map(x => [x.group, x.count, x.avg]));
+  const kkNobody = (await R('getKkReport', qcT, DATE, DATE)).rows.filter(x => x.operator === OP[0]);
+  chk('  а у непереведённого одна строка', kkNobody.length === 1, kkNobody.length);
+
+  chk('оценки перевода убираем', (await R('deleteEvaluation', qcT, mv1.id)).success === true &&
+    (await R('deleteEvaluation', qcT, mv2.id)).success === true);
+  chk('  и возвращаем оператора в группу',
+    (await R('updateUser', srgoT, MOVER[0], MOVER[0], 'ИНВ-2', 'operator')).success === true);
+  const mvBack = (await R('getKkReport', qcT, DATE, DATE)).rows.filter(x => x.operator === MOVER[0]);
+  chk('  после этого снова одна пустая строка',
+    mvBack.length === 1 && mvBack[0].group === 'ИНВ-2' && mvBack[0].count === 0, mvBack);
+
   head('ШАГ 3г. АПЕЛЛЯЦИИ');
   // РГО не согласен с оценкой своего оператора
   const noReason = await R('createAppeal', rgoT, ev.id, '  ');

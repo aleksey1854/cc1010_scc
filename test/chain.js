@@ -338,6 +338,57 @@ const R = (fn, ...a) => api.call(fn, a);
     !(await R('getJournal', qcT, { period: 'all' })).rows.some(r => r.id === kz.id));
   chk('  повторное удаление отклонено', (await R('deleteEvaluation', qcT, kz.id)).success === false);
 
+  head('ШАГ 3в2. ПРОЕКТ ДЦ');
+  // Универсал работает и на ФСС, и на ДЦ. ДЦ-оценка не должна попадать
+  // в качество ФСС, а среднее ФСС+ДЦ идёт на зарплату — его проверяем
+  // по цифрам, а не «что-то посчиталось».
+  const prodBefore = await R('getProductionReport', qcT, DATE, DATE, '');
+  const opBefore = [].concat(...prodBefore.groups.map(g => g.operators)).find(o => o.name === OP[0]);
+  const fssBefore = opBefore ? opBefore.scores.length : 0;
+  const kkBefore = (await R('getKkReport', qcT, DATE, DATE)).rows.find(x => x.operator === OP[0]);
+
+  const dcAns = { ...ans, B2P1: 'Положительно' };
+  const dcEv = await R('saveEvaluation', { pin: qcT,
+    meta: { ...META, reqId: '', callTime: '16:40', phone: '79164445566', dc: true },
+    answers: dcAns, comments: {} });
+  chk('ДЦ-оценка сохраняется', dcEv.success === true, dcEv.error);
+  const dcCard = await R('getEvaluationCard', qcT, dcEv.id);
+  chk('  признак ДЦ вернулся в карточке', dcCard.meta.dc === true, dcCard.meta);
+  const dcJ = await R('getJournal', qcT, { period: 'all', onlyDc: true });
+  chk('фильтр «ДЦ» в журнале отбирает только их',
+    dcJ.rows.length === 1 && dcJ.rows[0].id === dcEv.id && dcJ.rows[0].dc === true, dcJ.rows.length);
+
+  const prodAfter = await R('getProductionReport', qcT, DATE, DATE, '');
+  const opAfter = [].concat(...prodAfter.groups.map(g => g.operators)).find(o => o.name === OP[0]);
+  chk('ДЦ не попадает в производственные (ФСС)',
+    opAfter && opAfter.scores.length === fssBefore, [fssBefore, opAfter && opAfter.scores.length]);
+  const kkAfter = (await R('getKkReport', qcT, DATE, DATE)).rows.find(x => x.operator === OP[0]);
+  chk('ДЦ не попадает в отчёт КК', kkAfter && kkBefore && kkAfter.count === kkBefore.count,
+    [kkBefore && kkBefore.count, kkAfter && kkAfter.count]);
+
+  const dcRep = await R('getDcReport', qcT, DATE, DATE, '');
+  const dcRow = dcRep.rows.find(x => x.operator === OP[0]);
+  chk('отчёт ДЦ открывается', dcRep.success === true, dcRep.error);
+  chk('  оператор с ДЦ в нём есть', !!dcRow);
+  chk('  оценка ДЦ посчитана', dcRow && dcRow.dcCount === 1 && dcRow.dcAvg === dcEv.result.score,
+    dcRow && [dcRow.dcCount, dcRow.dcAvg, dcEv.result.score]);
+  // ФСС в отчёте ДЦ — это всё, что не ДЦ, кроме неподтверждённых жалоб:
+  // ровно то, что лежит в производственных в оценках и подтверждённых ПЖ
+  const fssScores = opAfter.scores.concat(opAfter.pj).map(x => x.score);
+  const avg2 = a => Math.round(a.reduce((s, x) => s + x, 0) / a.length * 100) / 100;
+  chk('  качество ФСС совпадает с производственными',
+    dcRow && dcRow.fssCount === fssScores.length && dcRow.fssAvg === avg2(fssScores),
+    dcRow && [dcRow.fssCount, dcRow.fssAvg, fssScores.length, avg2(fssScores)]);
+  chk('  среднее ФСС+ДЦ — по всем оценкам вместе',
+    dcRow && dcRow.bothAvg === avg2(fssScores.concat([dcEv.result.score])),
+    dcRow && [dcRow.bothAvg, avg2(fssScores.concat([dcEv.result.score]))]);
+  chk('  без ДЦ оператор в отчёт не попадает',
+    dcRep.rows.every(x => x.dcCount > 0), dcRep.rows.map(x => x.dcCount));
+  chk('оператору отчёт ДЦ закрыт', (await R('getDcReport', opT, DATE, DATE, '')).success === false);
+  const dcXls = await R('exportReport', qcT, 'dc', { from: DATE, to: DATE });
+  chk('выгрузка ДЦ — живой xlsx', dcXls.success === true && /^UEsD/.test(dcXls.contentBase64 || ''), dcXls.error);
+  chk('ДЦ-оценку убираем за собой', (await R('deleteEvaluation', qcT, dcEv.id)).success === true);
+
   head('ШАГ 3г. АПЕЛЛЯЦИИ');
   // РГО не согласен с оценкой своего оператора
   const noReason = await R('createAppeal', rgoT, ev.id, '  ');

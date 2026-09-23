@@ -290,6 +290,8 @@
   .pj-col{ background:var(--bad-bg); }
   .kz-col{ background:var(--kz-bg); color:var(--kz); }
   th.kz-col{ color:var(--kz); }
+  .dc-col{ background:var(--good-bg); color:#0a6e3d; }
+  th.dc-col{ color:#0a6e3d; }
   .chk{ display:flex; align-items:center; gap:6px; font-size:14px; color:var(--ink-2); }
   .chk input{ width:16px; height:16px; }
   .mark-sel{ width:auto; min-width:104px; padding:5px 8px; font-size:13px; }
@@ -309,11 +311,14 @@
   .kz-badge{ display:inline-block; padding:2px 8px; border-radius:6px; font-size:12px;
     font-weight:700; background:var(--kz); color:#fff; white-space:nowrap; }
   .kz-tag{ background:var(--kz-bg); color:var(--kz); border:1px solid var(--kz); }
+  .dc-tag{ background:var(--good-bg); color:#0a6e3d; border:1px solid var(--good); }
   .new-chip{ display:inline-block; padding:1px 7px; border-radius:6px; font-size:11px;
     font-weight:700; background:var(--accent); color:#fff; margin-left:6px; vertical-align:middle; }
   .ev-kz{ padding:5px 10px; border:1px solid var(--border-strong); border-radius:8px;
     background:var(--surface); white-space:nowrap; }
   .ev-kz input:checked + span, .ev-kz:has(input:checked){ color:var(--accent-ink); border-color:var(--accent); background:var(--accent-soft); }
+  /* ДЦ — свой цвет, чтобы не путать с контрольным звонком */
+  .ev-dc:has(input:checked){ color:#0a6e3d; border-color:var(--good); background:var(--good-bg); }
   .ap-badge{ display:inline-block; margin-left:7px; min-width:18px; padding:1px 6px; border-radius:9px;
     background:var(--bad); color:#fff; font-size:11px; font-weight:700; vertical-align:middle; }
   .ap-status{ display:inline-block; padding:3px 10px; border-radius:8px; font-size:12px; font-weight:600; white-space:nowrap; }
@@ -887,6 +892,9 @@
           <label class="chk ev-kz" title="контрольный звонок заказчика: в бланк для почты этот признак не попадает">
             <input type="checkbox" id="evControl"> КЗ от заказчика
           </label>
+          <label class="chk ev-kz ev-dc" title="звонок по проекту ДЦ: такие оценки считаются отдельным отчётом">
+            <input type="checkbox" id="evDc"> ДЦ
+          </label>
         </div>
         <button class="btn-submit" style="width:auto;padding:12px 26px;" onclick="submitEvaluation()"><i class="fas fa-save"></i> Сохранить оценку</button>
       </div>
@@ -1115,6 +1123,7 @@
       <button type="button" class="seg-btn" id="repT6" onclick="repTab('complaints')">Жалобы</button>
       <button type="button" class="seg-btn" id="repT7" onclick="repTab('production')">Производственные показатели</button>
       <button type="button" class="seg-btn" id="repT8" onclick="repTab('appeals')">Апелляции<span id="apBadge" class="ap-badge hidden">0</span></button>
+      <button type="button" class="seg-btn" id="repT10" onclick="repTab('dc')">Проект ДЦ</button>
       <button type="button" class="seg-btn" id="repT9" onclick="repTab('bugs')">Работа сайта<span id="bugBadge" class="ap-badge hidden">0</span></button>
     </div>
 
@@ -1136,6 +1145,7 @@
           <label class="chk"><input type="checkbox" id="jNs"> только НС</label>
           <label class="chk"><input type="checkbox" id="jAnyPj" title="и подтверждённые, и необоснованные"> все жалобы</label>
           <label class="chk"><input type="checkbox" id="jKz"> КЗ</label>
+          <label class="chk"><input type="checkbox" id="jDc"> ДЦ</label>
           <button class="btn-filter" style="background:var(--accent);" onclick="loadJournal()"><i class="fas fa-magnifying-glass"></i> Найти</button>
           <button class="btn-filter" onclick="jReset()" title="Сбросить фильтры"><i class="fas fa-rotate-left"></i></button>
           <button class="btn-filter" style="margin-left:auto;background:var(--good);" onclick="downloadReport('journal')"><i class="fas fa-download"></i> Скачать журнал</button>
@@ -1197,6 +1207,27 @@
     </div>
 
     <!-- Апелляции -->
+    <div id="repDc" class="hidden">
+      <div class="stats-grid">
+        <div class="stat-card"><div class="number checked" id="dcAvg">—</div><div class="label">Качество по ДЦ</div></div>
+        <div class="stat-card"><div class="number new" id="dcCount">0</div><div class="label">Оценок ДЦ</div></div>
+        <div class="stat-card"><div class="number rating" id="dcBoth">—</div><div class="label">Среднее ФСС + ДЦ</div></div>
+        <div class="stat-card"><div class="number" id="dcOps">0</div><div class="label">Операторов на ДЦ</div></div>
+      </div>
+      <div class="card">
+        <div class="filter-bar" style="margin-bottom:0;">
+          <span class="date-range">
+            <label for="dcFrom">Период с</label><input type="date" id="dcFrom" onchange="loadDc()">
+            <label for="dcTo">по</label><input type="date" id="dcTo" onchange="loadDc()">
+          </span>
+          <button type="button" class="btn-filter btn-quiet" onclick="clearRange('dc', loadDc)"><i class="fas fa-rotate-left"></i> За всё время</button>
+          <span style="color:var(--muted);font-size:13px;">на зарплату идёт среднее ФСС и ДЦ вместе</span>
+          <button class="btn-filter" style="margin-left:auto;background:var(--good);" onclick="downloadReport('dc')"><i class="fas fa-download"></i> Скачать</button>
+        </div>
+      </div>
+      <div class="card"><div id="dcTable"></div></div>
+    </div>
+
     <div id="repBugs" class="hidden">
       <div class="stats-grid">
         <div class="stat-card"><div class="number new" id="bugOpen">0</div><div class="label">Открытых</div></div>
@@ -3159,6 +3190,7 @@
         reqId: evLinkedReq,
         complaintSource: evComplaintSrc,
         controlCall: document.getElementById('evControl').checked,
+        dc: document.getElementById('evDc').checked,
         evId: evEditing
       },
       answers: evAnswers,
@@ -3261,6 +3293,7 @@
   function resetEvalForm() {
     evAnswers = defaultAnswers(); evComments = {}; evCmtOpen = {}; evComplaintSrc = '';
     document.getElementById('evControl').checked = false;
+    document.getElementById('evDc').checked = false;
     ['evPhone', 'evTime', 'evCity'].forEach(function (id) { document.getElementById(id).value = ''; });
     const agg = document.getElementById('evAgg');
     agg.value = ''; agg.dataset.auto = '';
@@ -3316,6 +3349,7 @@
       evCmtOpen = {};
       evComplaintSrc = r.meta.complaintSource || '';
       document.getElementById('evControl').checked = r.meta.controlCall === true;
+      document.getElementById('evDc').checked = r.meta.dc === true;
       renderChecklist(); recalcEval(); evSubmitReady();
       evMsg('Правка ' + r.id + ' · ' + r.meta.operator + ': измените, что нужно, и нажмите «Сохранить правку»', 'success');
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -3369,13 +3403,14 @@
     const tabs = { journal: ['repT2', 'repJournal'], kk: ['repT3', 'repKk'],
                    criteria: ['repT4', 'repCriteria'], topics: ['repT5', 'repTopics'], complaints: ['repT6', 'repComplaints'],
                    production: ['repT7', 'repProduction'], appeals: ['repT8', 'repAppeals'],
-                   bugs: ['repT9', 'repBugs'] };
+                   bugs: ['repT9', 'repBugs'], dc: ['repT10', 'repDc'] };
     Object.keys(tabs).forEach(function (k) {
       document.getElementById(tabs[k][0]).classList.toggle('active', k === t);
       document.getElementById(tabs[k][1]).classList.toggle('hidden', k !== t);
     });
     segSyncAll();
     navRecord();
+    if (t === 'dc') loadDc();
     if (t === 'bugs') loadBugs();
     if (t === 'journal') {
       // по умолчанию — текущий месяц, дальше диапазон правят руками
@@ -3826,6 +3861,49 @@
       { onlyOpen: document.getElementById('apOnlyOpen').checked });
   }
 
+  // Проект ДЦ: у универсалов две линии сразу, качество считают по
+  // каждой и по обеим вместе — последнее идёт на зарплату.
+  function loadDc() {
+    const box = document.getElementById('dcTable');
+    box.innerHTML = loadingRows();
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
+      document.getElementById('dcAvg').textContent = r.dcAvg === null ? '—' : pct2(r.dcAvg);
+      document.getElementById('dcCount').textContent = r.dcCount;
+      document.getElementById('dcBoth').textContent = r.bothAvg === null ? '—' : pct2(r.bothAvg);
+      document.getElementById('dcOps').textContent = r.operators;
+      if (!r.rows.length) {
+        box.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>За этот период оценок по ДЦ нет</p></div>';
+        return;
+      }
+      let head = '<div class="table-wrapper table-dense"><table><thead><tr>' +
+        '<th>Группа</th><th>Оператор</th><th>Оценок ДЦ</th><th>Качество ДЦ</th>' +
+        '<th>Оценок ФСС</th><th>Качество ФСС</th><th title="его и берут на зарплату">Среднее ФСС + ДЦ</th>';
+      for (let i = 0; i < r.maxDc; i++) head += '<th class="dc-col">ДЦ ' + (i + 1) + '</th>';
+      let html = head + '</tr></thead><tbody>';
+      r.rows.forEach(function (o) {
+        html += '<tr><td>' + o.group + '</td><td>' + o.operator + '</td>' +
+          '<td>' + o.dcCount + '</td>' +
+          '<td>' + (o.dcAvg === null ? '—' : '<strong style="color:' + scoreColorHex(o.dcAvg) + '">' + pct2(o.dcAvg) + '</strong>') + '</td>' +
+          '<td>' + o.fssCount + '</td>' +
+          '<td>' + (o.fssAvg === null ? '—' : '<span style="color:' + scoreColorHex(o.fssAvg) + '">' + pct2(o.fssAvg) + '</span>') + '</td>' +
+          '<td>' + (o.bothAvg === null ? '—' : '<strong style="color:' + scoreColorHex(o.bothAvg) + '">' + pct2(o.bothAvg) + '</strong>') + '</td>';
+        for (let i = 0; i < r.maxDc; i++) {
+          const x = o.dcScores[i];
+          html += '<td class="dc-col"' + (x ? ' title="' + x.id + ' · ' + x.date + '"' : '') + '>' +
+            (x ? '<span style="color:' + scoreColorHex(x.score) + '">' + pct2(x.score) + '</span>' : '') + '</td>';
+        }
+        html += '</tr>';
+      });
+      html += '</tbody></table></div>';
+      box.innerHTML = html;
+    }).withFailureHandler(function (e) {
+      box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + e + '</p></div>';
+    }).getDcReport(sessionStorage.getItem('token'),
+      document.getElementById('dcFrom').value, document.getElementById('dcTo').value,
+      '');
+  }
+
   // Сообщения о проблемах сайта: кто написал, где был, что ответили.
   const BUG_ST = { new: 'ap-new', in_work: 'ap-partial', fixed: 'ap-fixed', declined: 'ap-rejected' };
 
@@ -3940,7 +4018,8 @@
       onlyComplaint: document.getElementById('jPj').checked,
       onlyViolation: document.getElementById('jNs').checked,
       onlyAnyComplaint: document.getElementById('jAnyPj').checked,
-      onlyControl: document.getElementById('jKz').checked
+      onlyControl: document.getElementById('jKz').checked,
+      onlyDc: document.getElementById('jDc').checked
     };
   }
 
@@ -3951,7 +4030,7 @@
   function jReset() {
     ['jOperator', 'jQc', 'jPhone'].forEach(function (id) { document.getElementById(id).value = ''; });
     document.getElementById('jGroup').value = '';
-    ['jErrors', 'jPj', 'jNs', 'jAnyPj', 'jKz'].forEach(function (id) { document.getElementById(id).checked = false; });
+    ['jErrors', 'jPj', 'jNs', 'jAnyPj', 'jKz', 'jDc'].forEach(function (id) { document.getElementById(id).checked = false; });
     const now = new Date();
     document.getElementById('jFrom').value = new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString('sv');
     document.getElementById('jTo').value = now.toLocaleDateString('sv');
@@ -3980,7 +4059,7 @@
         const errs = e.failed.length
           ? e.failed.map(function (f) { return '<div style="margin:2px 0;"><span class="fail-tag' + (f.critical ? '' : ' minor') + '">' + f.text + '</span>' + (f.comment ? '<span style="color:var(--muted);font-size:12px;"> — ' + f.comment + '</span>' : '') + '</div>'; }).join('')
           : '<span style="color:var(--good-ink);font-weight:600;">без ошибок</span>';
-        const flags = (e.violation ? ' <span class="fail-tag">НС</span>' : '') + (e.complaint ? ' <span class="fail-tag">ПЖ</span>' : '') + (e.gratitude ? ' <span class="fail-tag minor">★</span>' : '') + (e.controlCall ? ' <span class="fail-tag kz-tag" title="контрольный звонок заказчика">КЗ</span>' : '');
+        const flags = (e.violation ? ' <span class="fail-tag">НС</span>' : '') + (e.complaint ? ' <span class="fail-tag">ПЖ</span>' : '') + (e.gratitude ? ' <span class="fail-tag minor">★</span>' : '') + (e.controlCall ? ' <span class="fail-tag kz-tag" title="контрольный звонок заказчика">КЗ</span>' : '') + (e.dc ? ' <span class="fail-tag dc-tag" title="звонок по проекту ДЦ">ДЦ</span>' : '');
         // дату отправки вносят только у чек-листов по жалобе — их
         // оценивают одним днём, а отправляют другим
         const sent = (canEditEval && e.isComplaint)
@@ -4101,6 +4180,8 @@
     // отчёт КК скачивается за тот же период, что открыт на экране
     else if (kind === 'kk') params = { from: document.getElementById('kkFrom').value,
       to: document.getElementById('kkTo').value };
+    else if (kind === 'dc') params = { from: document.getElementById('dcFrom').value,
+      to: document.getElementById('dcTo').value, group: '' };
     else params = { period: 'month' };
     google.script.run.withSuccessHandler(function (r) {
       if (!r.success) { toast('❌ ' + r.error); return; }

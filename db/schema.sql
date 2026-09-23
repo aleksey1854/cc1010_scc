@@ -166,6 +166,7 @@ CREATE TABLE evaluations (
   complaint_source text       NOT NULL DEFAULT '',   -- Клиент / Заказчик
   sent_at       date,                                 -- когда отправили чек-лист по жалобе
   control_call  boolean     NOT NULL DEFAULT false,   -- контрольный звонок заказчика
+  dc            boolean     NOT NULL DEFAULT false,   -- звонок по проекту ДЦ
   seen_at       timestamptz,                          -- оператор увидел оценку
 
   reply_date    date,
@@ -185,6 +186,7 @@ CREATE INDEX evaluations_qc_idx            ON evaluations (qc_id, call_date DESC
 CREATE INDEX evaluations_date_idx          ON evaluations (call_date DESC);
 CREATE INDEX evaluations_topic_idx         ON evaluations (topic) WHERE topic <> '';
 CREATE INDEX evaluations_unseen_idx        ON evaluations (operator_id) WHERE seen_at IS NULL;
+CREATE INDEX evaluations_dc_idx            ON evaluations (dc) WHERE dc;
 
 -- Ответы по пунктам. Храним ТОЛЬКО отклонения: «Положительно» — значение
 -- по умолчанию, отсутствие строки означает, что пункт выполнен.

@@ -12,6 +12,7 @@
 const fs = require('fs');
 const path = require('path');
 const { Client } = require('pg');
+require('./only-test-db')('db-reset');
 
 (async () => {
   const c = new Client({ connectionString: process.env.DATABASE_URL });

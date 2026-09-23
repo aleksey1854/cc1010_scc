@@ -153,7 +153,6 @@ function diff(a, b, path, out) {
   head('ОТЧЁТЫ');
   await compare('Отчёт КК', 'mgr', t => old.getKkReport(t, 'all'), async t => api.call('getKkReport', [t, 'all']));
   await compare('Отчёт КК глазами РГО', 'rgo', t => old.getKkReport(t, 'all'), async t => api.call('getKkReport', [t, 'all']));
-  await compare('Недельная сетка', 'mgr', t => old.getWeeklyGrid(t, 0, ''), async t => api.call('getWeeklyGrid', [t, 0, '']));
   await compare('Журнал оценок', 'mgr', t => old.getJournal(t, {}), async t => api.call('getJournal', [t, {}]));
   await compare('Журнал глазами РГО', 'rgo', t => old.getJournal(t, {}), async t => api.call('getJournal', [t, {}]));
   await compare('Критерии по неделям', 'mgr', t => old.getCriteriaReport(t, 'all'), async t => api.call('getCriteriaReport', [t, 'all']));

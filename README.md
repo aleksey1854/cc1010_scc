@@ -114,6 +114,9 @@ fetch('/api/getRgoDashboard', {
 3. **Данные.** `DATABASE_URL=... node scripts/migrate.js dump.json`.
    Боевой `dump.json` — выгрузка листов; для проверки на пустом месте подойдёт
    `node scripts/seed.js --write`.
+   С запуска 28.09.2026 боевая база живая, и `db-reset`, `migrate`, `load-real`,
+   `set-staff` без `TEST_DB=1` в окружении не запускаются: они стёрли бы
+   состав и розданные пароли. Метка стоит только в `.env.test`.
 4. **Vercel.** Import Git Repository, фреймворк определится сам (Next.js).
    В Settings → Environment Variables добавить `DATABASE_URL` (та же pooled-строка)
    и `PG_POOL_MAX=3`. Deploy.

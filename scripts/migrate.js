@@ -11,6 +11,7 @@
 const fs = require('fs');
 const core = require('../lib/core');
 const db = require('../lib/db');
+require('./only-test-db')('migrate');
 
 const RU_ROLE = new Set(core.ALLOWED_ROLES);
 

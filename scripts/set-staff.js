@@ -14,6 +14,7 @@
 const fs = require('fs');
 const core = require('../lib/core');
 const db = require('../lib/db');
+require('./only-test-db')('set-staff');
 
 const SRC = process.argv[2];
 if (!SRC) { console.error('укажите файл состава'); process.exit(1); }

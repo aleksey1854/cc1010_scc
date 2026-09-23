@@ -53,7 +53,7 @@ psql -d kc1010 -c 'CREATE EXTENSION citext;' -f db/schema.sql
 export DATABASE_URL='postgresql://...'
 
 node scripts/seed.js --write          # демо-данные, либо своя выгрузка
-node scripts/migrate.js dump.json
+TEST_DB=1 node scripts/migrate.js dump.json   # без метки откажется: боевую базу не трогает
 node scripts/dev-server.js 3000       # или next dev
 ```
 

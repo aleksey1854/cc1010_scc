@@ -1,9 +1,10 @@
 #!/bin/bash
 # Полный прогон. Требует поднятого Postgres и DATABASE_URL.
 cd "$(dirname "$0")/.."
-# Тесты пересоздают схему и стирают данные — по умолчанию берут .env,
-# но боевую базу так трогать нельзя: ENV_FILE=.env.test bash test/run.sh
-ENV_FILE="${ENV_FILE:-.env}"
+# Тесты пересоздают схему и стирают данные, поэтому по умолчанию берут
+# .env.test. В .env лежит боевая база — на ней скрипты сброса откажутся
+# работать сами (scripts/only-test-db.js), но и звать её незачем.
+ENV_FILE="${ENV_FILE:-.env.test}"
 [ -f "$ENV_FILE" ] || : "${DATABASE_URL:?задайте DATABASE_URL или положите $ENV_FILE}"
 total=0; failed=0; skipped=""
 for t in parity migration parity-api chain; do

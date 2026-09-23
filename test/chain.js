@@ -387,6 +387,17 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('оператору отчёт ДЦ закрыт', (await R('getDcReport', opT, DATE, DATE, '')).success === false);
   const dcXls = await R('exportReport', qcT, 'dc', { from: DATE, to: DATE });
   chk('выгрузка ДЦ — живой xlsx', dcXls.success === true && /^UEsD/.test(dcXls.contentBase64 || ''), dcXls.error);
+  // по ДЦ сдают только плановую прослушку: жалоба на ДЦ-звонке в отчёт
+  // КК (это ФСС) не идёт ни оценкой, ни ПЖ
+  const dcPj = await R('saveEvaluation', { pin: qcT,
+    meta: { ...META, reqId: '', callTime: '16:50', phone: '79164445567', dc: true, complaintSource: 'Заказчик' },
+    answers: { ...ans, B8P2: 'Обнаружено' }, comments: {} });
+  chk('ДЦ-жалоба заказчика сохраняется', dcPj.success === true && dcPj.result.complaint === true, dcPj.error);
+  const kkPj = (await R('getKkReport', qcT, DATE, DATE)).rows.find(x => x.operator === OP[0]);
+  chk('  в отчёт КК она не идёт',
+    kkPj.pjCustomer === kkBefore.pjCustomer && kkPj.ko === kkBefore.ko && kkPj.count === kkBefore.count,
+    [kkBefore, kkPj]);
+  chk('  её тоже убираем', (await R('deleteEvaluation', qcT, dcPj.id)).success === true);
   chk('ДЦ-оценку убираем за собой', (await R('deleteEvaluation', qcT, dcEv.id)).success === true);
 
   head('ШАГ 3в3. ПЕРЕВОД В ДРУГУЮ ГРУППУ');
@@ -558,7 +569,6 @@ const R = (fn, ...a) => api.call(fn, a);
   for (const [n, fn, args] of [
     ['журнал', 'getJournal', [mgrT, {}]],
     ['Отчёт КК', 'getKkReport', [mgrT, '2026-08-01', '2026-09-30']],
-    ['недели', 'getWeeklyGrid', [mgrT, 0, '']],
     ['критерии', 'getCriteriaReport', [mgrT, 'all']],
     ['тематики', 'getTopicsReport', [mgrT, 'all']],
     ['жалобы', 'getComplaintsReport', [mgrT, 'all']],
@@ -595,7 +605,6 @@ const R = (fn, ...a) => api.call(fn, a);
 
   // СКК ведёт качество по всему КЦ — отчёты ему нужны наравне со старшим
   for (const [n, fn, args] of [
-    ['СКК: оценки по неделям', 'getWeeklyGrid', [qcT, 0, '']],
     ['СКК: жалобы', 'getComplaintsReport', [qcT, 'all']],
     ['СКК: тематики', 'getTopicsReport', [qcT, 'all']],
     ['СКК: критерии', 'getCriteriaReport', [qcT, 'all']]

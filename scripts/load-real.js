@@ -19,6 +19,7 @@
 const fs = require('fs');
 const core = require('../lib/core');
 const db = require('../lib/db');
+require('./only-test-db')('load-real');
 
 const SRC = process.argv[2];
 if (!SRC) { console.error('укажите файл выгрузки'); process.exit(1); }

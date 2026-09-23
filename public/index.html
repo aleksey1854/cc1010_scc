@@ -1351,8 +1351,9 @@
     <form id="staffForm" onsubmit="return submitStaff(event)">
       <div class="form-group"><label for="stName">ФИО *</label><input type="text" id="stName" required autocomplete="off"></div>
       <div class="form-group"><label for="stGroup">Группа</label>
-        <input type="text" id="stGroup" list="stGroups" placeholder="напр. ИНВ-1" autocomplete="off">
-        <datalist id="stGroups"></datalist>
+        <select id="stGroup" onchange="stGroupChanged()"></select>
+        <input type="text" id="stGroupNew" class="hidden" style="margin-top:8px;" autocomplete="off"
+               placeholder="название, как в Oktell: ИНВ-…">
       </div>
       <div class="form-group"><label for="stRole">Роль *</label><select id="stRole" onchange="stRoleChanged()"></select></div>
       <div class="form-grid" id="stDates">
@@ -2168,7 +2169,6 @@
     const groups = [...new Set(staffAll.map(u => u.group).filter(Boolean))].sort();
     document.getElementById('staffGroupFilter').innerHTML =
       '<option value="">Все группы</option>' + groups.map(g => '<option>' + g + '</option>').join('');
-    document.getElementById('stGroups').innerHTML = groups.map(g => '<option value="' + g + '">').join('');
   }
 
   function renderStaff() {
@@ -2227,7 +2227,7 @@
     document.getElementById('staffModalTitle').textContent = u ? 'Сотрудник: ' + u.fullName : 'Новый сотрудник';
     document.getElementById('stRole').innerHTML = ROLES.map(r => '<option value="' + r[0] + '">' + r[1] + '</option>').join('');
     document.getElementById('stName').value = u ? u.fullName : '';
-    document.getElementById('stGroup').value = u ? (u.group || '') : '';
+    fillStGroup(u ? (u.group || '') : '');
     document.getElementById('stRole').value = u ? u.role : 'operator';
     document.getElementById('stLogin').value = u ? (u.login || '') : '';
     document.getElementById('stPosition').value = u ? (u.position || '') : '';
@@ -2245,6 +2245,29 @@
     setTimeout(() => document.getElementById('stName').focus(), 50);
   }
   function closeStaffModal() { document.getElementById('staffModal').classList.remove('active'); }
+
+  // Группа — выбор из тех, что уже есть у действующих сотрудников: при
+  // вводе руками выходили «ИНВ 1» и «инв-1», и человек выпадал из своей
+  // группы в отчётах. Расформировали группу, перевели всех — она сама
+  // пропадёт из списка. Новую завести можно, но отдельным пунктом.
+  function fillStGroup(current) {
+    const groups = [...new Set(staffAll.filter(x => x.active !== false).map(x => x.group).filter(Boolean))];
+    if (current && groups.indexOf(current) < 0) groups.push(current);
+    groups.sort((a, b) => a.localeCompare(b, 'ru'));
+    const q = g => String(g).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    const sel = document.getElementById('stGroup');
+    sel.innerHTML = '<option value="">— без группы —</option>' +
+      groups.map(g => '<option value="' + q(g) + '">' + q(g) + '</option>').join('') +
+      '<option value="__new">+ Новая группа…</option>';
+    sel.value = current || '';
+    stGroupChanged();
+  }
+  function stGroupChanged() {
+    const isNew = document.getElementById('stGroup').value === '__new';
+    const inp = document.getElementById('stGroupNew');
+    inp.classList.toggle('hidden', !isNew);
+    if (isNew) { inp.value = ''; setTimeout(() => inp.focus(), 30); }
+  }
 
   function staffMsg(text, kind) {
     const m = document.getElementById('staffMessage');
@@ -2264,7 +2287,8 @@
   function submitStaff(ev) {
     ev.preventDefault();
     const name = document.getElementById('stName').value.trim();
-    const group = document.getElementById('stGroup').value.trim();
+    const gPick = document.getElementById('stGroup').value;
+    const group = gPick === '__new' ? document.getElementById('stGroupNew').value.trim() : gPick;
     const role = document.getElementById('stRole').value;
     const login = document.getElementById('stLogin').value.trim();
     const pass = document.getElementById('stPass').value.trim();
@@ -2272,6 +2296,11 @@
     const training = document.getElementById('stTraining').value;
     const hired = document.getElementById('stHired').value;
     if (!name) { staffMsg('Укажите ФИО', 'error'); return false; }
+    if (gPick === '__new' && !group) {
+      staffMsg('Впишите название новой группы', 'error');
+      document.getElementById('stGroupNew').focus();
+      return false;
+    }
     if (role === 'operator' && !training) {
       staffMsg('Укажите дату начала обучения', 'error');
       document.getElementById('stTraining').focus();
@@ -2758,6 +2787,7 @@
       document.getElementById('orgTitle').textContent = 'Аналитика качества';
       renderNav();
       navRecord();
+      pageFade();
       loadOrgDashboard(u.role);
       return;
     }
@@ -2791,6 +2821,9 @@
     return h + '</div>';
   }
 
+  // где в последний раз стояла подложка полосы разделов — на любой странице
+  let navIndLast = null;
+
   // Переезд подсветки. Между строками (вкладки переносятся на узком
   // экране) не летим по диагонали — там просто перескок.
   function segSync(seg) {
@@ -2805,6 +2838,23 @@
       ind = document.createElement('span');
       ind.className = 'seg-ind seg-jump';
       seg.insertBefore(ind, seg.firstChild);
+    }
+    // Аналитика и отчёты — отдельные страницы, у каждой своя полоса
+    // разделов. Подложка новой полосы вставала сразу на место: ехать ей
+    // было неоткуда. Раскладка у полос одна, поэтому ставим её туда, где
+    // стояла подложка прежней страницы, и уже оттуда везём.
+    if (seg.classList.contains('nav-slot')) {
+      if (navIndLast && navIndLast.seg !== seg && navIndLast.top === btn.offsetTop) {
+        ind.classList.add('seg-jump');
+        ind.style.width = navIndLast.w + 'px';
+        ind.style.height = navIndLast.h + 'px';
+        ind.style.transform = 'translate(' + navIndLast.left + 'px,' + navIndLast.top + 'px)';
+        ind.style.opacity = '1';
+        ind.dataset.top = String(navIndLast.top);
+        void ind.offsetWidth;          // зафиксировать старт, иначе браузер склеит два шага
+        ind.classList.remove('seg-jump');
+      }
+      navIndLast = { seg: seg, left: btn.offsetLeft, top: btn.offsetTop, w: btn.offsetWidth, h: btn.offsetHeight };
     }
     const jump = ind.dataset.top !== String(btn.offsetTop);
     if (jump) ind.classList.add('seg-jump');

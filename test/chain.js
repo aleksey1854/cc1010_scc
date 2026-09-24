@@ -131,6 +131,16 @@ const R = (fn, ...a) => api.call(fn, a);
     card.answers.B3P1 === 'Положительно', card.answers.B3P1);
   chk('оператору карточка закрыта', (await R('getEvaluationCard', opT, cEv.id)).success === false);
 
+  // агломерация: округ из списка или своя — сохраняется ровно выбранная
+  for (const [agg, tm, ph] of [['Урал', '14:30', '79165550101'], ['Казахстан', '14:35', '79165550102']]) {
+    const a = await R('saveEvaluation', { pin: qcT, meta: { ...META, reqId: '', callTime: tm, phone: ph, agg },
+      answers: ans, comments: {} });
+    const c = a.success ? await R('getEvaluationCard', qcT, a.id) : {};
+    chk('агломерация «' + agg + '» сохранилась как есть', a.success === true && c.meta.agg === agg,
+      a.error || (c.meta && c.meta.agg));
+    if (a.success) await R('deleteEvaluation', qcT, a.id);
+  }
+
   // апелляция: снимаем ошибку и убираем комментарий
   const fixed = { ...cAns, B2P1: 'Положительно' };
   const upd = await R('updateEvaluation', {

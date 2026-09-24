@@ -177,6 +177,7 @@
      десятками колонок не влезали, и внизу висел горизонтальный бегунок,
      хотя справа оставалось пустое место. */
   #repPage .container{ max-width:min(1900px, 100%); }
+  .kbd-hint{ display:block; margin-top:4px; color:var(--muted); font-size:12px; }
   /* Полоса разделов стоит по центру: прижатая к левому краю, она при
      входе в отчёты прыгала влево вместе с широким контейнером (на 1920
      — на 350px). Контейнеры центрированы все, так что по центру она на
@@ -613,7 +614,7 @@
     </div>
     <div class="btn-row">
       <button type="button" class="btn-cancel" onclick="document.getElementById('importModal').classList.remove('active')">Отмена</button>
-      <button type="button" class="btn-save" onclick="submitImport()"><i class="fas fa-check"></i> Загрузить</button>
+      <button type="button" class="btn-save" data-primary onclick="submitImport()"><i class="fas fa-check"></i> Загрузить</button>
     </div>
     <div class="message" id="impMessage"></div>
   </div>
@@ -628,11 +629,13 @@
       <textarea id="bugBody" rows="5" placeholder="Что нажимали, что ожидали увидеть и что увидели вместо этого"
         style="width:100%;padding:11px;border:1.5px solid var(--border-strong);border-radius:10px;font-family:inherit;font-size:14px;outline:none;"></textarea>
       <small class="hint">Кто вы, в каком разделе были, какой браузер и экран — подставится само.
-        Чем точнее опишете, тем быстрее починим.</small>
+        Чем точнее опишете, тем быстрее починим. Скриншоты и ссылки на них не прикладывайте:
+        по ПВТР их нельзя выкладывать на сторонние сервисы — только словами.
+        <span class="kbd-hint">Ctrl+Enter — отправить</span></small>
     </div>
     <div class="btn-row">
       <button type="button" class="btn-cancel" onclick="document.getElementById('bugModal').classList.remove('active')">Отмена</button>
-      <button type="button" class="btn-save" onclick="sendBug()"><i class="fas fa-paper-plane"></i> Отправить</button>
+      <button type="button" class="btn-save" data-primary onclick="sendBug()"><i class="fas fa-paper-plane"></i> Отправить</button>
     </div>
     <div class="message" id="bugMessage"></div>
   </div>
@@ -650,7 +653,7 @@
     <div class="btn-row">
       <button type="button" class="btn-cancel" onclick="document.getElementById('sentModal').classList.remove('active')">Отмена</button>
       <button type="button" class="btn-save" style="background:var(--bad);" onclick="saveSentDate(true)">Снять дату</button>
-      <button type="button" class="btn-save" onclick="saveSentDate(false)"><i class="fas fa-check"></i> Сохранить</button>
+      <button type="button" class="btn-save" data-primary onclick="saveSentDate(false)"><i class="fas fa-check"></i> Сохранить</button>
     </div>
     <div class="message" id="sentMessage"></div>
   </div>
@@ -664,11 +667,12 @@
       <label for="appealReason">Причина апелляции *</label>
       <textarea id="appealReason" rows="5" placeholder="С чем именно не согласны и почему"
         style="width:100%;padding:11px;border:1.5px solid var(--border-strong);border-radius:10px;font-family:inherit;font-size:14px;outline:none;"></textarea>
-      <small class="hint">Её увидит старший СКК: он разберёт и ответит решением.</small>
+      <small class="hint">Её увидит старший СКК: он разберёт и ответит решением.
+        <span class="kbd-hint">Ctrl+Enter — отправить</span></small>
     </div>
     <div class="btn-row">
       <button type="button" class="btn-cancel" onclick="document.getElementById('appealModal').classList.remove('active')">Отмена</button>
-      <button type="button" class="btn-save" onclick="submitAppeal()"><i class="fas fa-paper-plane"></i> Отправить</button>
+      <button type="button" class="btn-save" data-primary onclick="submitAppeal()"><i class="fas fa-paper-plane"></i> Отправить</button>
     </div>
     <div class="message" id="appealMessage"></div>
   </div>
@@ -683,7 +687,7 @@
     <div class="form-group"><label for="pwNew2">Повторите новый</label><input type="password" id="pwNew2" autocomplete="new-password"></div>
     <div class="btn-row">
       <button type="button" class="btn-cancel" onclick="closePwModal()">Отмена</button>
-      <button type="button" class="btn-save" onclick="submitPw()"><i class="fas fa-save"></i> Сохранить</button>
+      <button type="button" class="btn-save" data-primary onclick="submitPw()"><i class="fas fa-save"></i> Сохранить</button>
     </div>
     <div class="message" id="pwMessage"></div>
   </div>
@@ -1672,9 +1676,38 @@
   // а не каждое по-своему. Раньше выйти можно было только кнопкой
   // «Отмена», и если её не заметили — окно висело.
   document.addEventListener('keydown', function (e) {
-    if (e.key !== 'Escape') return;
+    // Escape, погашенный выпадающим списком, закрывает только список:
+    // раньше закрывалось и окно, где этот список стоит
+    if (e.key !== 'Escape' || e.defaultPrevented) return;
     const open = [...document.querySelectorAll('.review-modal.active')];
     if (open.length) open[open.length - 1].classList.remove('active');
+  });
+
+  // Enter — главная кнопка окна («Сохранить», «Отправить»). В окнах-формах
+  // это делает сам браузер (неявная отправка формы); здесь — окна без
+  // <form>, у них главная кнопка помечена data-primary. В многострочном
+  // поле Enter остаётся переносом строки, отправка — Ctrl+Enter.
+  // Не трогаем: кнопку и ссылку (Enter нажимает их самих), выпадающий
+  // список (Enter выбирает пункт) и чек-лист оценки — там случайный
+  // Enter отправил бы недослушанный звонок.
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' || e.defaultPrevented || e.isComposing || e.shiftKey || e.altKey) return;
+    const t = e.target;
+    if (!t || !t.closest || t.closest('.uisel-panel')) return;
+    const tag = t.tagName;
+    if (tag === 'BUTTON' || tag === 'A' || tag === 'SELECT') return;
+    if (tag === 'INPUT' && /^(checkbox|radio|file|button|submit|reset)$/.test(t.type)) return;
+    const multi = tag === 'TEXTAREA';
+    if (multi && !(e.ctrlKey || e.metaKey)) return;
+    if (t.form) {                       // однострочные поля браузер отправит сам
+      if (multi) { e.preventDefault(); t.form.requestSubmit(); }
+      return;
+    }
+    const box = t.closest('.review-modal.active');
+    const btn = box && box.querySelector('[data-primary]');
+    if (!btn || btn.disabled || !btn.offsetParent) return;
+    e.preventDefault();
+    btn.click();
   });
 
   document.addEventListener('mousedown', function (e) {
@@ -2206,9 +2239,12 @@
         '<td>' + (u.hasPassword ? '✓' : '<span class="no-pass">нет пароля</span>') + '</td>' +
         '<td>' + (u.training || '—') + '</td>' +
         '<td>' + (u.hired || '<span class="no-pass">не принят</span>') + '</td>' +
-        '<td>' +
-          '<button class="btn-small" data-staff-edit type="button" title="Изменить"><i class="fas fa-pen"></i></button> ' +
-          '<button class="btn-small btn-danger" data-staff-del type="button" title="Уволить: учётка выключится, логин освободится"><i class="fas fa-user-minus"></i></button>' +
+        // уволенного сервер не меняет и второй раз не увольняет — кнопки
+        // у него отвечали только «Пользователь не найден»
+        '<td>' + (u.active === false
+          ? '<span style="color:var(--muted);" title="уволен: в списке только ради старых оценок и жалоб">—</span>'
+          : '<button class="btn-small" data-staff-edit type="button" title="Изменить"><i class="fas fa-pen"></i></button> ' +
+            '<button class="btn-small btn-danger" data-staff-del type="button" title="Уволить: учётка выключится, логин освободится"><i class="fas fa-user-minus"></i></button>') +
         '</td>' +
       '</tr>').join('');
 
@@ -2221,7 +2257,9 @@
 
     // имена подставляем через свойство, а не в разметку: кавычки в ФИО ничего не сломают
     [...box.querySelectorAll('tbody tr')].forEach((tr, i) => {
-      tr.querySelector('[data-staff-edit]').onclick = () => openStaffModal(list[i].fullName);
+      const ed = tr.querySelector('[data-staff-edit]');
+      if (!ed) return;
+      ed.onclick = () => openStaffModal(list[i].fullName);
       tr.querySelector('[data-staff-del]').onclick = () => deleteStaff(list[i].fullName);
     });
   }

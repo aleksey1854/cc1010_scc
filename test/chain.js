@@ -480,6 +480,20 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('  и может отвечать', listSqc.canAnswer === true);
   chk('оператору апелляции закрыты', (await R('getAppeals', opT, {})).success === false);
 
+  // рядовой СКК смотрит апелляции, но только на чтение
+  const listQc = await R('getAppeals', qcT, {});
+  chk('СКК видит апелляции', listQc.success === true && listQc.rows.some(x => x.id === ap.id), listQc.error);
+  chk('  только на чтение: ни ответить, ни подать',
+    listQc.readOnly === true && listQc.canAnswer === false && listQc.canFile === false,
+    [listQc.readOnly, listQc.canAnswer, listQc.canFile]);
+  chk('  отвечать ему сервер не даёт',
+    (await R('answerAppeal', qcT, ap.id, 'fixed', 'попробую')).success === false);
+  chk('  и «прочитано» за РГО не поставит',
+    (await R('markAppealSeen', qcT, ap.id)).success === false);
+  chk('  своих апелляций у него нет — и уведомлений тоже',
+    listQc.rows.every(x => x.mine === false) && listQc.unseen === 0, listQc.unseen);
+  chk('у РГО его апелляция помечена как своя', listRgo.rows.find(x => x.id === ap.id).mine === true);
+
   chk('отказ без объяснения не проходит',
     (await R('answerAppeal', sqcT, ap.id, 'rejected', '')).success === false);
   chk('чужое решение не принимается',

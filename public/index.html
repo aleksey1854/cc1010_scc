@@ -3472,10 +3472,10 @@
     document.getElementById('repPage').classList.remove('hidden');
     const u = JSON.parse(sessionStorage.getItem('user') || '{}');
     fillHeader();
-    // апелляции: подают РГО и выше, разбирает старший СКК; рядовому СКК
-    // и оператору вкладка ни к чему
+    // апелляции: подают РГО и выше, разбирает старший СКК, рядовой СКК
+    // смотрит без права ответа; оператору вкладка ни к чему
     document.getElementById('repT8').classList.toggle('hidden',
-      ['rgo', 'sqc', 'srgo', 'manager', 'admin'].indexOf(u.role) < 0);
+      ['rgo', 'qc', 'sqc', 'srgo', 'manager', 'admin'].indexOf(u.role) < 0);
     refreshAppealBadge();
     repTab('journal');
     renderNav();
@@ -3893,7 +3893,9 @@
       document.getElementById('apPartial').textContent = by('partial');
       document.getElementById('apHint').textContent = r.canAnswer
         ? 'Решение по апелляции: отказ и частичное удовлетворение нужно объяснить.'
-        : 'Здесь видно, что ответил старший СКК по вашим апелляциям.';
+        : r.readOnly
+          ? 'Апелляции РГО на оценки и решения по ним. Только просмотр — разбирает старший СКК.'
+          : 'Здесь видно, что ответил старший СКК по вашим апелляциям.';
       apBadge(r.canAnswer ? r.open : r.unseen);
 
       if (!r.rows.length) {
@@ -3906,7 +3908,7 @@
         (r.canAnswer ? 'Разбор' : 'Ответ') + '</th></tr></thead><tbody>';
 
       r.rows.forEach(function (a) {
-        const unseen = a.status !== 'new' && !a.seen && !r.canAnswer;
+        const unseen = a.mine && a.status !== 'new' && !a.seen;
         html += '<tr' + (unseen ? ' class="ap-unseen"' : '') + '>' +
           '<td><strong>' + a.id + '</strong><div class="hint">' + a.createdAt + ' · ' + a.author + '</div></td>' +
           '<td>' + a.evId + '<div class="hint">' + a.callDate + '</div></td>' +

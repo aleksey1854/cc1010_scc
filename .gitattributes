@@ -1,3 +1,4 @@
 * text=auto eol=lf
 *.sql text
 *.md text
+*.cmd text eol=crlf

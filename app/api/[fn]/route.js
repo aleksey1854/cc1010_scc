@@ -6,6 +6,7 @@
 // на каждую функцию не нужен: их 37 и контракт у всех одинаковый.
 // ============================================================
 import { HANDLERS, call } from '../../../lib/api.js';
+import errors from '../../../lib/errors.js';
 
 export const runtime = 'nodejs';           // нужен pg, edge не подойдёт
 export const dynamic = 'force-dynamic';    // ответы зависят от данных
@@ -29,8 +30,11 @@ export async function POST(req, { params }) {
   try {
     return Response.json({ ok: true, result: await call(fn, args) });
   } catch (e) {
-    console.error('[api]', fn, e);          // подробности в лог, наружу — коротко
-    return Response.json({ ok: false, error: 'Внутренняя ошибка' }, { status: 500 });
+    // call() сам ловит исключения обработчиков; сюда попадает только то,
+    // что сломалось вокруг, — его тоже в журнал
+    console.error('[api]', fn, e);
+    const r = await errors.logServerError(fn, args, e);
+    return Response.json({ ok: false, error: r.error, code: r.code }, { status: 500 });
   }
 }
 

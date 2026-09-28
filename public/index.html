@@ -1275,6 +1275,28 @@
         </div>
       </div>
       <div class="card"><div id="bugList"></div></div>
+
+      <!-- Журнал пишется сам: сюда попадает каждый сбой связи, сервера и
+           страницы у любого пользователя, даже если он ничего не сообщил -->
+      <div id="errJournal" class="hidden">
+        <div class="card">
+          <h2 class="card-title"><i class="fas fa-triangle-exclamation"></i> Журнал ошибок сайта</h2>
+          <div class="filter-bar" style="margin-bottom:0;">
+            <label for="errDays">За</label>
+            <select id="errDays" onchange="loadSiteErrors()">
+              <option value="1">сутки</option><option value="7" selected>7 дней</option><option value="30">30 дней</option><option value="90">90 дней</option>
+            </select>
+            <span style="color:var(--muted);font-size:13px;">пишется сам — у кого что сломалось, даже если человек ничего не сообщил</span>
+          </div>
+          <div class="stats-grid" style="margin-top:14px;">
+            <div class="stat-card"><div class="number rejected" id="errDay">0</div><div class="label">За сутки</div></div>
+            <div class="stat-card"><div class="number" id="errPeriod">0</div><div class="label">За период</div></div>
+            <div class="stat-card"><div class="number" id="errPeople">0</div><div class="label">Людей задело</div></div>
+          </div>
+          <div id="errByCode" style="margin:10px 0;"></div>
+          <div id="errList"></div>
+        </div>
+      </div>
     </div>
 
     <div id="repAppeals" class="hidden">
@@ -1731,7 +1753,8 @@
     const box = document.getElementById('toasts');
     if (!box) return;
     const err = kind !== 'ok';
-    const clean = String(text).replace(/^[❌✅]\s*/, '');
+    // «❌ Ошибка: » страница дописывала сама — текст сбоя и так говорит, что это
+    const clean = String(text).replace(/^[❌✅]\s*/, '').replace(/^Ошибка:\s*/i, '');
     const key = (err ? 'err' : 'ok') + '|' + (opts.title || '') + '|' + clean;
 
     // то же самое уже на экране — не плодим копию
@@ -1740,8 +1763,16 @@
       same.classList.remove('bump');
       void same.offsetWidth;           // перезапуск анимации
       same.classList.add('bump');
-      if (!opts.sticky) toastArm(same, opts.ms || toastLife(clean, err));
+      if (!opts.sticky && !same.classList.contains('sticky')) toastArm(same, opts.ms || toastLife(clean, err));
       return;
+    }
+
+    // сбой связи или сервера — к нему «Сообщить о проблеме» с подробностями,
+    // где бы на странице его ни показали
+    const sys = err && !opts.actions && window.__siteErrorFor ? window.__siteErrorFor(clean) : null;
+    if (sys) {
+      opts = Object.assign({}, opts, { ms: Math.max(opts.ms || 0, 10000),
+        actions: [['Сообщить о проблеме', function () { openBug(sysReport(sys)); }, true]] });
     }
 
     const t = document.createElement('div');
@@ -1788,6 +1819,66 @@
     live.filter(function (x) { return !x.classList.contains('sticky'); })
       .slice(0, Math.max(0, extra)).forEach(toastLeave);
   }
+
+  // Текст от людей и из журнала — в разметку только через это
+  function escHtml(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  // Текст для «Сообщить о проблеме»: что увидел человек и подробности
+  // для разбора. Тот же сбой уже лежит в журнале ошибок сам.
+  function sysReport(sys) {
+    const at = new Date(sys.at || Date.now());
+    return ['Сбой: ' + sys.message,
+            'Код: ' + sys.code,
+            'Подробности: ' + sys.detail,
+            'Время: ' + at.toLocaleString('ru-RU')].join('\n');
+  }
+
+  // ---------- СБОИ СТРАНИЦЫ ----------
+  // Ошибка в коде страницы раньше не видна была никому: кнопка просто не
+  // срабатывала, а причина оставалась в консоли браузера. Теперь человек
+  // видит, что делать, а сбой сам уходит в журнал ошибок сайта.
+  const PAGE_ERR = 'На странице произошла ошибка. Обновите страницу (F5); если повторится — сообщите о проблеме.';
+  function pageError(err, where) {
+    const msg = err && err.message ? err.message : String(err);
+    const stack = err && err.stack ? String(err.stack).split('\n').slice(0, 8).join('\n') : '';
+    const detail = (where ? where + ' · ' : '') + msg + (stack ? '\n' + stack : '');
+    if (window.__siteErrorLog) window.__siteErrorLog('JS_ERROR', PAGE_ERR, detail);
+    toast(PAGE_ERR, 'err', { ms: 10000, actions: [['Сообщить о проблеме', function () {
+      openBug(sysReport({ message: PAGE_ERR, code: 'JS_ERROR', detail: detail.split('\n').slice(0, 3).join(' | ') }));
+    }, true]] });
+    console.error('[страница]', where, err);
+  }
+  window.__pageError = pageError;
+  // запрос без своего обработчика ошибок
+  window.__crash = function (where, e) {
+    if (e && e.sys) toast(String(e), 'err');       // сбой связи или сервера: уже в журнале
+    else pageError(e, where);
+  };
+  // Только ошибки нашего кода: расширения браузера и чужие скрипты — не наши,
+  // «ResizeObserver loop» — безвредное предупреждение самого браузера.
+  window.addEventListener('error', function (ev) {
+    const file = ev.filename || '';
+    if (file && file.indexOf(location.origin) !== 0) return;
+    if (!file && !(ev.error && ev.error.stack)) return;
+    if (/ResizeObserver loop/.test(ev.message || '')) return;
+    pageError(ev.error || new Error(ev.message), (file ? file.replace(location.origin, '') : '') + ':' + (ev.lineno || ''));
+  });
+  window.addEventListener('unhandledrejection', function (ev) {
+    const r = ev.reason;
+    if (r && r.sys) return;                        // сбой запроса уже показан и записан
+    pageError(r instanceof Error ? r : new Error(String(r)), 'необработанный промис');
+  });
+
+  // Сессия кончилась посреди работы: раньше каждое действие отвечало
+  // «Не выполнен вход» в своём углу. Теперь одно уведомление с «Войти».
+  // Черновик чек-листа при этом не пропадает — он вернётся после входа.
+  window.__authLost = function (msg) {
+    toast(msg || 'Сессия истекла — войдите заново', 'err', {
+      sticky: true, actions: [['Войти', function () { logout(); }, true]] });
+  };
 
   // Окна закрываются Escape и кликом мимо — так ведут себя все восемь,
   // а не каждое по-своему. Раньше выйти можно было только кнопкой
@@ -3716,12 +3807,14 @@
     const reason = String(err || 'неизвестная ошибка').replace(/^❌\s*/, '');
     const d = String(meta.callDate || '');
     const date = /^\d{4}-\d{2}-\d{2}$/.test(d) ? d.split('-').reverse().join('.') : (d || '—');
+    // сбой связи или сервера — приложим то, что нужно для разбора
+    const sys = window.__siteErrorFor ? window.__siteErrorFor(reason.replace(/^Ошибка:\s*/i, '')) : null;
     const details = [
       (editing ? 'Не сохранилась правка оценки ' + editing : 'Не сохранилась оценка') + '.',
       'Оператор: ' + (meta.operator || '—'),
       'Звонок: ' + date + ' ' + (meta.callTime || '') + ', телефон ' + (meta.phone || '—'),
       'Ошибка: ' + reason
-    ].join('\n');
+    ].concat(sys ? ['Код: ' + sys.code, 'Подробности: ' + sys.detail] : []).join('\n');
     toast(reason, 'err', {
       sticky: true,
       title: editing ? 'Правка НЕ сохранена' : 'Оценка НЕ сохранена',
@@ -4290,19 +4383,22 @@
         return;
       }
       let html = '';
+      // текст пишут люди — в разметку только экранированным, иначе
+      // вписанный в сообщение HTML выполнился бы у того, кто его читает
+      const h = escHtml;
       rows.forEach(function (b) {
-        html += '<div class="fail-call" data-bug="' + b.id + '">' +
-          '<div class="fc-head"><div><strong>' + b.author + '</strong>' +
-            ' <span style="color:var(--muted);">' + (b.authorTeam || '') + '</span>' +
-            ' · ' + b.date + ' ' + b.time + ' · ' + b.place +
+        html += '<div class="fail-call" data-bug="' + h(b.id) + '">' +
+          '<div class="fc-head"><div><strong>' + h(b.author) + '</strong>' +
+            ' <span style="color:var(--muted);">' + h(b.authorTeam || '') + '</span>' +
+            ' · ' + h(b.date) + ' ' + h(b.time) + ' · ' + h(b.place) +
             (b.mine ? ' <span class="fail-tag minor">ваше</span>' : '') + '</div>' +
-          '<div><span class="ap-status ' + (BUG_ST[b.status] || 'ap-new') + '">' + b.statusRu + '</span></div></div>' +
-          '<div style="margin:8px 0;white-space:pre-wrap;">' + b.body + '</div>' +
+          '<div><span class="ap-status ' + (BUG_ST[b.status] || 'ap-new') + '">' + h(b.statusRu) + '</span></div></div>' +
+          '<div style="margin:8px 0;white-space:pre-wrap;">' + h(b.body) + '</div>' +
           (b.context ? '<details class="memo"><summary>Технические подробности</summary>' +
-            '<div class="hint" style="padding:8px 0;word-break:break-word;">' + b.context + '</div></details>' : '') +
+            '<div class="hint" style="padding:8px 0;word-break:break-word;">' + h(b.context) + '</div></details>' : '') +
           (b.answer ? '<div class="all-pass" style="margin-top:8px;"><i class="fas fa-reply"></i> ' +
-            b.answer + ' <span style="color:var(--muted);">— ' + b.answeredBy +
-            (b.answeredAt ? ', ' + b.answeredAt : '') + '</span></div>' : '');
+            h(b.answer) + ' <span style="color:var(--muted);">— ' + h(b.answeredBy) +
+            (b.answeredAt ? ', ' + h(b.answeredAt) : '') + '</span></div>' : '');
         if (r.canAnswer) {
           html += '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">' +
             '<input type="text" class="bug-answer" placeholder="Комментарий (необязательно)" ' +
@@ -4324,8 +4420,57 @@
         });
       });
     }).withFailureHandler(function (e) {
-      box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + e + '</p></div>';
+      box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + escHtml(String(e)) + '</p></div>';
     }).getBugReports(sessionStorage.getItem('token'), {});
+    loadSiteErrors();
+  }
+
+  // ---------- ЖУРНАЛ ОШИБОК САЙТА ----------
+  // Читают те, кто разбирает сбои: старший СКК, руководитель, админ.
+  const ERR_CODE_RU = {
+    NET_OFFLINE: 'нет интернета', NET_FAIL: 'нет связи с сервером', NET_TIMEOUT: 'сервер не ответил',
+    NET_FOREIGN: 'чужая страница (провайдер)', APP_STALE: 'страница устарела', APP_BAD_REQUEST: 'данные не прочитаны',
+    APP_BAD_JSON: 'повреждённый ответ', SRV_TIMEOUT: 'сервер не успел', SRV_TOO_LARGE: 'слишком большой объём',
+    SRV_RESP_TOO_LARGE: 'слишком большой ответ', SRV_RATE: 'слишком много запросов', SRV_UNAVAILABLE: 'сервер недоступен',
+    SRV_HTTP: 'ошибка сервера (HTTP)', SRV_EXCEPTION: 'ошибка в коде сервера', SRV_DB_DOWN: 'нет связи с базой',
+    SRV_DB_TIMEOUT: 'база не успела', JS_ERROR: 'ошибка страницы'
+  };
+  function loadSiteErrors() {
+    const me = JSON.parse(sessionStorage.getItem('user') || '{}');
+    const wrap = document.getElementById('errJournal');
+    if (['sqc', 'manager', 'admin'].indexOf(me.role) < 0) { wrap.classList.add('hidden'); return; }
+    wrap.classList.remove('hidden');
+    const box = document.getElementById('errList');
+    box.innerHTML = loadingRows(3);
+    const h = escHtml;
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + h(r.error) + '</p></div>'; return; }
+      document.getElementById('errDay').textContent = r.day;
+      document.getElementById('errPeriod').textContent = r.period;
+      document.getElementById('errPeople').textContent = r.people;
+      document.getElementById('errByCode').innerHTML = r.byCode.map(function (c) {
+        return '<span class="fail-tag" title="' + h(c.code) + '">' + h(ERR_CODE_RU[c.code] || c.code) + ' · ' + c.n + '</span>';
+      }).join(' ');
+      if (!r.rows.length) {
+        box.innerHTML = '<div class="empty-state"><i class="fas fa-circle-check"></i><p>Сбоев за этот период не было</p></div>';
+        return;
+      }
+      box.innerHTML = '<div class="table-wrapper table-dense"><table><thead><tr>' +
+        '<th>Когда</th><th>Кто</th><th>Где</th><th>Что случилось</th><th>Что увидел человек</th><th>Подробности</th>' +
+        '</tr></thead><tbody>' + r.rows.map(function (x) {
+          const ua = /Edg\//.test(x.ua) ? 'Edge' : /YaBrowser/.test(x.ua) ? 'Яндекс' : /Firefox\//.test(x.ua) ? 'Firefox'
+                   : /Chrome\//.test(x.ua) ? 'Chrome' : (x.source === 'server' ? 'сервер' : '');
+          return '<tr><td style="white-space:nowrap;">' + h(x.at) + '</td>' +
+            '<td>' + h(x.who || '—') + (x.role ? '<div class="hint">' + h(roleRu(x.role)) + '</div>' : '') + '</td>' +
+            '<td>' + h(x.place || '—') + (ua ? '<div class="hint">' + h(ua) + '</div>' : '') + '</td>' +
+            '<td><span class="fail-tag" title="' + h(x.code) + '">' + h(ERR_CODE_RU[x.code] || x.code) + '</span></td>' +
+            '<td style="max-width:320px;">' + h(x.message) + '</td>' +
+            '<td style="max-width:360px;"><details class="memo"><summary>' + h(x.code) + '</summary>' +
+              '<div class="hint" style="padding:6px 0;white-space:pre-wrap;word-break:break-word;">' + h(x.detail) + '</div></details></td></tr>';
+        }).join('') + '</tbody></table></div>';
+    }).withFailureHandler(function (e) {
+      box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + h(String(e)) + '</p></div>';
+    }).getSiteErrors(sessionStorage.getItem('token'), { days: document.getElementById('errDays').value });
   }
 
   function answerBug(id, status, answer, btn) {

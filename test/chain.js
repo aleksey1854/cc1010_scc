@@ -703,6 +703,51 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('оператор не видит чужих новых оценок',
     nevOther.unseen.every(e => e.id !== later.id), nevOther.unseen);
 
+  head('ШАГ 9б. ОШИБКИ: ТЕКСТЫ И ЖУРНАЛ');
+  // Истёкший вход помечен: страница по метке предлагает войти заново
+  const noSes = await R('getOperatorStats', 'T-нет-такой-сессии');
+  chk('истёкшая сессия — понятный текст и метка auth',
+    noSes.success === false && noSes.code === 'auth' && /войдите заново/.test(noSes.error), noSes);
+  const noTok = await R('getOperatorStats', '');
+  chk('без входа вовсе — тоже метка auth', noTok.code === 'auth' && /войдите/.test(noTok.error), noTok);
+  const opDenied = await R('getKkReport', opT, DATE, DATE);
+  chk('«Нет доступа» называет роль',
+    opDenied.success === false && opDenied.code === 'forbidden' && /«Оператор»/.test(opDenied.error), opDenied.error);
+  const opBoot = await R('getOperatorBootstrap', 'T-нет-такой-сессии');
+  chk('кабинет оператора с истёкшей сессией — настоящая причина, а не «Неверный вход»',
+    opBoot.code === 'auth' && /Сессия истекла/.test(opBoot.error), opBoot);
+
+  // журнал: пишет только вошедший, читают только те, кто разбирает
+  chk('без входа в журнал не пишется',
+    (await R('logClientErrors', '', [{ code: 'NET_FAIL', message: 'x' }])).success === false);
+  const logged = await R('logClientErrors', opT, [
+    { code: 'NET_FAIL', message: 'Не удалось связаться с сервером сайта', detail: 'вызов saveEvaluation · TypeError', place: 'Кабинет', ua: 'Mozilla/5.0 Firefox/130.0', at: Date.now() },
+    { code: 'JS_ERROR', message: 'На странице произошла ошибка', detail: 'boom @ index.html:10' },
+    { code: 'не код', message: 'мусор отбрасывается' }]);
+  chk('оператор пишет свои сбои, мусор отброшен', logged.success === true && logged.saved === 2, logged);
+  chk('оператору журнал не открыть', (await R('getSiteErrors', opT, {})).code === 'forbidden');
+  chk('СКК журнал тоже не открыть — его разбирают старшие', (await R('getSiteErrors', qcT, {})).code === 'forbidden');
+  const jr = await R('getSiteErrors', sqcT, { days: 1 });
+  chk('старший СКК видит журнал', jr.success === true, jr.error);
+  const opErrs = jr.rows.filter(x => x.who === OP[0]);
+  chk('  в нём сбои оператора: кто, что, подробности',
+    opErrs.length === 2 && opErrs.some(x => x.code === 'NET_FAIL' && /saveEvaluation/.test(x.detail) && x.source === 'client'), opErrs);
+  chk('  сводка по видам посчитана', jr.byCode.some(c => c.code === 'NET_FAIL') && jr.day >= 2, jr.byCode);
+
+  // исключение на сервере: человеку — понятный текст, в журнал — стек,
+  // а аргументы вызова (там бывают пароли) не пишутся никогда
+  api.HANDLERS.__proverka = async () => { throw new Error('проверочный сбой'); };
+  const boom = await api.call('__proverka', [opT, { password: 'СекретныйПароль123' }]);
+  delete api.HANDLERS.__proverka;
+  chk('исключение сервера — понятный текст, а не сырое сообщение',
+    boom.success === false && boom.code === 'SRV_EXCEPTION' && !/проверочный/.test(boom.error) && /могло не выполниться/.test(boom.error), boom);
+  const jr2 = await R('getSiteErrors', sqcT, { days: 1 });
+  const srv = jr2.rows.find(x => x.source === 'server' && /__proverka/.test(x.place));
+  chk('  сбой сервера записан в журнал с тем, кто вызывал', srv && /проверочный сбой/.test(srv.detail) && srv.who === OP[0], srv);
+  chk('  пароль из аргументов в журнал не попал', srv && !/СекретныйПароль/.test(JSON.stringify(jr2.rows)));
+  const dbDown = require('../lib/errors').classify({ code: 'ECONNRESET', message: 'read ECONNRESET' });
+  chk('обрыв связи с базой — свой текст', dbDown.code === 'SRV_DB_DOWN' && /базой данных/.test(dbDown.error), dbDown);
+
   head('ШАГ 10. СЕССИИ');
   await R('logoutSession', opT);
   chk('после выхода токен не работает', (await R('getOperatorStats', opT)).success === false);

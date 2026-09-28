@@ -296,3 +296,19 @@ CREATE TABLE bug_reports (
 
 CREATE INDEX bug_reports_status_idx ON bug_reports (status, id DESC);
 CREATE INDEX bug_reports_author_idx ON bug_reports (author_id, id DESC);
+
+-- Журнал ошибок сайта (013): системные сбои из браузера и с сервера
+CREATE TABLE site_errors (
+  id        bigserial   PRIMARY KEY,
+  at        timestamptz NOT NULL DEFAULT now(),
+  source    text        NOT NULL,            -- client | server
+  code      text        NOT NULL,            -- NET_FAIL, SRV_500, JS_ERROR…
+  message   text        NOT NULL DEFAULT '', -- что увидел человек
+  detail    text        NOT NULL DEFAULT '', -- для разбора: вызов, статус, стек
+  place     text        NOT NULL DEFAULT '', -- раздел сайта
+  staff_id  bigint      REFERENCES staff(id) ON DELETE SET NULL,
+  who       text        NOT NULL DEFAULT '',
+  role      text        NOT NULL DEFAULT '',
+  ua        text        NOT NULL DEFAULT ''
+);
+CREATE INDEX site_errors_at_idx ON site_errors (at DESC);

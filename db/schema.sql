@@ -312,3 +312,11 @@ CREATE TABLE site_errors (
   ua        text        NOT NULL DEFAULT ''
 );
 CREATE INDEX site_errors_at_idx ON site_errors (at DESC);
+
+-- Примечание к плану прослушки (014): видно СКК и операторам
+CREATE TABLE plan_notes (
+  stat_date  date        PRIMARY KEY,
+  note       text        NOT NULL DEFAULT '',
+  updated_by text        NOT NULL DEFAULT '',
+  updated_at timestamptz NOT NULL DEFAULT now()
+);

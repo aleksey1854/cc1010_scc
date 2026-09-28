@@ -312,6 +312,10 @@
   .btn-small.btn-danger{ background:var(--bad-bg); color:var(--bad-ink); }
   .btn-small.btn-danger:hover{ background:var(--bad); color:#fff; }
   .memo{ margin-top:14px; border-top:1px solid var(--border); padding-top:12px; }
+  /* примечание СКК к плану — у оператора над планом, заметно, но не тревожно */
+  .plan-note{ margin:0 0 12px; padding:10px 14px; border-radius:10px; border-left:4px solid var(--accent);
+    background:var(--accent-soft); color:var(--ink); font-size:14px; line-height:1.45; white-space:pre-wrap; }
+  .plan-note i{ color:var(--accent); margin-right:4px; }
   .memo summary{ cursor:pointer; font-weight:600; color:var(--accent-ink); font-size:14px; }
   .memo summary:hover{ text-decoration:underline; }
   .memo table{ margin-top:12px; }
@@ -936,6 +940,19 @@
 
     <!-- ПЛАН ПРОСЛУШКИ -->
     <div id="qcPlanTab" class="hidden">
+      <!-- СКК объединяют несколько дней в один план, а по плану этого не
+           понять — примечание к дате плана видно и операторам -->
+      <div class="card">
+        <h2 class="card-title"><i class="fas fa-thumbtack"></i> Примечание к плану <span id="planNoteDate" style="color:var(--muted);font-weight:500;"></span></h2>
+        <textarea id="planNote" rows="2" maxlength="500" oninput="planNoteDirty = true"
+          placeholder="Например: в этот план вошли звонки за 26.09 и 27.09"
+          style="width:100%;padding:11px;border:1.5px solid var(--border-strong);border-radius:10px;font-family:inherit;font-size:14px;outline:none;resize:vertical;"></textarea>
+        <div class="filter-bar" style="margin:10px 0 0;">
+          <button class="btn-filter" onclick="savePlanNote()"><i class="fas fa-save"></i> Сохранить примечание</button>
+          <span id="planNoteMeta" class="hint"></span>
+          <span class="hint" style="margin-left:auto;">видно и операторам — в их кабинете, в плане за эту дату</span>
+        </div>
+      </div>
       <div class="stats-grid">
         <div class="stat-card"><div class="number new" id="planOps">0</div><div class="label">Операторов</div></div>
         <div class="stat-card"><div class="number inprogress" id="planNeed">0</div><div class="label">Нужно прослушать</div></div>
@@ -949,6 +966,11 @@
           <span id="planPct" style="color:var(--muted);font-size:13px;"></span>
           <button class="btn-filter" style="margin-left:auto;" onclick="openImport()"><i class="fas fa-upload"></i> Загрузить статистику дня</button>
         </div>
+        <!-- та же памятка, что у операторов: сколько выгружать и какой длительности -->
+        <details class="memo">
+          <summary>Памятка: сколько выгружать и какой длительности</summary>
+          <div id="planMemo"></div>
+        </details>
       </div>
       <div class="card">
         <h2 class="card-title"><i class="fas fa-headphones"></i> Кого и сколько слушать</h2>
@@ -3037,6 +3059,10 @@
   }
 
   function qcTab(t) {
+    // уходим из плана — запоминаем, докуда долистали
+    const planEl = document.getElementById('qcPlanTab');
+    if (t !== 'plan' && planEl && !planEl.classList.contains('hidden')) planKeptY = window.scrollY;
+    if (t === 'plan' && planKeptY !== null) { planScrollY = planKeptY; planKeptY = null; }
     navSet('page', 'cab'); navSet('qcTab', t);
     if (t === 'ana') {
       document.getElementById('qcPage').classList.add('hidden');
@@ -3167,12 +3193,14 @@
         loadPlan(false);
         return;
       }
+      showPlanNote(r);
+      renderUploadMemo(null, 'planMemo');
       document.getElementById('planOps').textContent = r.summary.operators;
       document.getElementById('planNeed').textContent = r.summary.plan;
       document.getElementById('planDone').textContent = r.summary.done;
       document.getElementById('planLeft').textContent = r.summary.left;
       document.getElementById('planPct').textContent = 'выборка ' + r.percent + '% от принятых';
-      if (r.noData) { box.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Нет статистики за ' + r.date + '. Нажмите «Загрузить статистику дня».</p></div>'; return; }
+      if (r.noData) { box.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Нет статистики за ' + r.date + '. Нажмите «Загрузить статистику дня».</p></div>'; planScrollBack(); return; }
       // Отметка «в работе» слева: двое СКК не возьмут одного оператора.
       let html = '<div class="table-wrapper"><table><thead><tr>' +
         '<th title="кто уже взял оператора в работу">Разбор</th>' +
@@ -3192,6 +3220,7 @@
       });
       html += '</tbody></table></div>';
       box.innerHTML = html;
+      planScrollBack();
       box.querySelectorAll('select[data-mark]').forEach(function (sel) {
         sel.onchange = function () {
           google.script.run.withSuccessHandler(function (res) {
@@ -3203,6 +3232,44 @@
         };
       });
     }).getListeningPlan(sessionStorage.getItem('token'), document.getElementById('planDate').value);
+  }
+
+  // ---------- ПРИМЕЧАНИЕ К ПЛАНУ ----------
+  // Недописанное не затираем, когда план перерисовывается (например,
+  // после отметки «В работе»); другую дату — показываем её примечание.
+  let planNoteDirty = false, planNoteFor = '';
+  function showPlanNote(r) {
+    const date = document.getElementById('planDate').value;
+    document.getElementById('planNoteDate').textContent = 'за ' + r.date;
+    if (!planNoteDirty || planNoteFor !== date) {
+      document.getElementById('planNote').value = r.note ? r.note.text : '';
+      planNoteDirty = false;
+    }
+    planNoteFor = date;
+    document.getElementById('planNoteMeta').textContent = r.note ? 'написал(а) ' + r.note.by + ' · ' + r.note.at : '';
+  }
+  function savePlanNote() {
+    const date = document.getElementById('planDate').value;
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) { toast(r.error); return; }
+      planNoteDirty = false;
+      document.getElementById('planNoteMeta').textContent = r.note ? 'написал(а) ' + r.note.by + ' · ' + r.note.at : '';
+      toast(r.message, 'ok');
+    }).withFailureHandler(function (e) { toast(e); })
+      .setPlanNote(sessionStorage.getItem('token'), date, document.getElementById('planNote').value);
+  }
+
+  // ---------- ВОЗВРАТ НА ТО ЖЕ МЕСТО ----------
+  // Из плана уходят в чек-лист и возвращаются — и листали длинный план
+  // заново с самого верха. Теперь место запоминается при уходе и
+  // восстанавливается, когда план дорисуется.
+  let planScrollY = null;     // куда вернуть при ближайшей отрисовке плана
+  let planKeptY = null;       // докуда долистали, когда ушли из плана
+  function planScrollBack() {
+    if (planScrollY === null) return;
+    const y = planScrollY;
+    planScrollY = null;
+    requestAnimationFrame(function () { window.scrollTo({ top: y, behavior: 'instant' }); });
   }
 
   function openImport() {
@@ -3347,7 +3414,7 @@
   // своей. Раньше поле было подсказкой по справочнику городов (там
   // агломерации — это города, их сотни), а при сохранении вписанное
   // руками молча заменялось значением из справочника.
-  const AGGS = ['Дальний Восток', 'Москва', 'Приволжье', 'Северо-Запад', 'Сибирь', 'Урал', 'Центр', 'Юг'];
+  const AGGS = ['Армения', 'Дальний Восток', 'Крым', 'Москва', 'Приволжье', 'Северо-Запад', 'Сибирь', 'Урал', 'Центр', 'Юг'];
 
   function setAgg(v) {
     const sel = document.getElementById('evAgg');
@@ -4107,7 +4174,9 @@
     return m ? [+m[1], +m[2]] : null;
   }
 
-  function renderUploadMemo(accepted) {
+  // target — куда: у оператора своя строка подсвечена, у СКК операторов
+  // много, там памятка без подсветки
+  function renderUploadMemo(accepted, target) {
     let html = '<div class="table-wrapper"><table><thead><tr>' +
       '<th>Принято звонков</th><th>Звонков к прослушке</th>' +
       '<th>Максимум самостоятельно от ОП</th>' +
@@ -4115,13 +4184,20 @@
       '</tr></thead><tbody>';
     UPLOAD_MEMO.forEach(function (r) {
       const rg = memoRange(r[0]);
-      const mine = rg && accepted >= rg[0] && accepted <= rg[1];
+      const mine = rg && typeof accepted === 'number' && accepted >= rg[0] && accepted <= rg[1];
       html += '<tr' + (mine ? ' class="mine"' : '') + '><td>' + r[0] + '</td><td>' + r[1] + '</td>' +
         '<td>' + r[2] + '</td><td>' + r[3] + '</td><td>' + r[4] + '</td></tr>';
     });
     html += '</tbody></table></div>' +
       '<div class="hint" style="margin-top:8px;">СР — средний, КР — короткий, ДЛ — длинный, ЗКВ — запись/консультация к врачу.</div>';
-    document.getElementById('upMemo').innerHTML = html;
+    document.getElementById(target || 'upMemo').innerHTML = html;
+  }
+
+  // примечание СКК к плану за этот день — у оператора над его планом
+  function planNoteHtml(note) {
+    if (!note) return '';
+    return '<div class="plan-note"><i class="fas fa-thumbtack"></i> <strong>Примечание СКК:</strong> ' +
+      escHtml(note.text) + '</div>';
   }
 
   function loadUploadPlan(auto) {
@@ -4139,11 +4215,11 @@
           loadUploadPlan(false);
           return;
         }
-        box.innerHTML = '<div class="empty-state"><i class="fas fa-hourglass-half"></i>' +
+        box.innerHTML = planNoteHtml(r.note) + '<div class="empty-state"><i class="fas fa-hourglass-half"></i>' +
           '<p>Статистику за ' + r.date + ' ещё не загрузили.<br>План появится, как только СКК её выгрузит.</p></div>';
         return;
       }
-      box.innerHTML = '<div class="table-wrapper"><table><thead><tr>' +
+      box.innerHTML = planNoteHtml(r.note) + '<div class="table-wrapper"><table><thead><tr>' +
         '<th>Оператор</th><th>Группа</th><th>Принято</th><th>План (' + r.percent + '%)</th>' +
         '<th>Выгружаете вы</th><th>Выгружено</th><th>Осталось</th></tr></thead><tbody>' +
         '<tr><td>' + r.operator + '</td><td>' + r.group + '</td><td>' + r.accepted + '</td>' +
@@ -4595,7 +4671,7 @@
         gs.innerHTML = '<option value="">Все группы</option>' + groups.map(function (g) { return '<option>' + g + '</option>'; }).join('');
       }
       if (!r.rows.length) { box.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Оценок нет</p></div>'; return; }
-      let html = '<div class="table-wrapper table-dense"><table><thead><tr><th>Дата звонка</th><th>Дата прослушки</th><th>Оператор</th><th>Группа</th><th>СКК</th><th>Телефон</th><th>Тематика</th><th>Подтематика</th><th>Качество</th><th>Ошибки</th><th></th></tr></thead><tbody>';
+      let html = '<div class="table-wrapper table-dense"><table><thead><tr><th>Дата звонка</th><th>Дата прослушки</th><th>Оператор</th><th>Группа</th><th>СКК</th><th>Телефон</th><th>Длительность</th><th>Тематика</th><th>Подтематика</th><th>Качество</th><th>Ошибки</th><th></th></tr></thead><tbody>';
       r.rows.forEach(function (e) {
         const errs = e.failed.length
           ? e.failed.map(function (f) { return '<div style="margin:2px 0;"><span class="fail-tag' + (f.critical ? '' : ' minor') + '">' + f.text + '</span>' + (f.comment ? '<span style="color:var(--muted);font-size:12px;"> — ' + f.comment + '</span>' : '') + '</div>'; }).join('')
@@ -4626,6 +4702,8 @@
             (e.sentDate ? '<div class="hint">отправлен ' + e.sentDate + '</div>' : '') + '</td>' +
           '<td>' + e.operator + '</td><td>' + e.group + '</td><td>' + e.qc + '</td>' +
           '<td style="white-space:nowrap;">' + (e.phone || '—') + '</td>' +
+          // «Длит: » в каждой строке лишнее — это и так колонка длительности
+          '<td style="white-space:nowrap;">' + (e.criterion ? escHtml(String(e.criterion).replace(/^Длит:\s*/i, '')) : '—') + '</td>' +
           '<td>' + (e.topic || '—') + '</td><td>' + (e.sub || '—') + '</td>' +
           '<td><strong style="color:' + scoreColorHex(e.score) + '">' + pct2(e.score) + '</strong>' + flags + '</td>' +
           '<td style="max-width:420px;">' + errs + '</td>' +

@@ -748,6 +748,28 @@ const R = (fn, ...a) => api.call(fn, a);
   const dbDown = require('../lib/errors').classify({ code: 'ECONNRESET', message: 'read ECONNRESET' });
   chk('обрыв связи с базой — свой текст', dbDown.code === 'SRV_DB_DOWN' && /базой данных/.test(dbDown.error), dbDown);
 
+  head('ШАГ 9в. ПРИМЕЧАНИЕ К ПЛАНУ И ПОРЯДОК ЖУРНАЛА');
+  const pn = await R('setPlanNote', qcT, DATE, 'в этот план вошли звонки за 26.09 и 27.09');
+  chk('СКК пишет примечание к плану', pn.success === true && pn.note && pn.note.by === QC[0], pn);
+  const planN = await R('getListeningPlan', qcT, DATE);
+  chk('  оно в плане прослушки', planN.note && /26\.09 и 27\.09/.test(planN.note.text), planN.note);
+  const upN = await R('getMyUploadPlan', opT, DATE);
+  chk('  и у оператора в его плане', upN.note && /26\.09 и 27\.09/.test(upN.note.text), upN.note);
+  chk('оператор примечание не пишет', (await R('setPlanNote', opT, DATE, 'моё')).code === 'forbidden');
+  chk('пустое — убирает примечание', (await R('setPlanNote', qcT, DATE, '   ')).success === true &&
+    (await R('getListeningPlan', qcT, DATE)).note === null);
+
+  // журнал: сверху последний сохранённый, а не по дате звонка вперемешку
+  const jA = await R('saveEvaluation', { pin: qcT, meta: { ...META, reqId: '', callTime: '08:01', phone: '79165558801' }, answers: ans, comments: {} });
+  const jB = await R('saveEvaluation', { pin: qcT, meta: { ...META, reqId: '', callTime: '07:02', phone: '79165558802' }, answers: ans, comments: {} });
+  const jOrd = (await R('getJournal', qcT, { period: 'all' })).rows.map(r => r.id);
+  chk('в журнале сверху — последний сохранённый чек-лист',
+    jOrd[0] === jB.id && jOrd[1] === jA.id, jOrd.slice(0, 3));
+  chk('  и в журнале есть длительность звонка',
+    (await R('getJournal', qcT, { period: 'all' })).rows[0].criterion === META.criterion);
+  await R('deleteEvaluation', qcT, jA.id);
+  await R('deleteEvaluation', qcT, jB.id);
+
   head('ШАГ 10. СЕССИИ');
   await R('logoutSession', opT);
   chk('после выхода токен не работает', (await R('getOperatorStats', opT)).success === false);

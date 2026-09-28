@@ -202,13 +202,27 @@
   /* Сообщения об ошибках: одно место и один вид. Системное окно браузера
      останавливало работу и выглядело чужим, а половина кода и так
      показывала ошибку плашкой. */
-  .toasts{ position:fixed; right:18px; bottom:18px; z-index:1300; display:flex;
+  /* Сверху справа, под шапкой: внизу уведомление ложилось на панель
+     чек-листа и закрывало «Сохранить оценку» — ту самую кнопку, которую
+     после ошибки надо нажать ещё раз. И после сохранения страница уезжает
+     наверх — взгляд как раз здесь. */
+  .toasts{ position:fixed; right:18px; top:80px; z-index:1300; display:flex;
     flex-direction:column; gap:10px; max-width:min(420px, calc(100vw - 36px)); }
+  @media (max-width:600px){ .toasts{ top:12px; left:12px; right:12px; max-width:none; } }
   .toast{ display:flex; align-items:flex-start; gap:10px; padding:12px 14px;
     border-radius:var(--radius-sm); border:1px solid var(--border-strong);
     background:var(--surface); box-shadow:var(--shadow-lg); font-size:14px;
     line-height:1.45; cursor:pointer; }
   .toast i{ margin-top:2px; }
+  /* ошибку сохранения мало увидеть — её надо передать: заголовок,
+     причина и кнопки, и уведомление само не уходит */
+  .toast.sticky{ cursor:default; }
+  .toast .t-body{ display:flex; flex-direction:column; gap:4px; }
+  .toast .t-title{ font-weight:700; }
+  .toast .t-actions{ display:flex; gap:8px; margin-top:6px; flex-wrap:wrap; }
+  .toast .t-actions button{ font:inherit; font-size:13px; font-weight:600; padding:6px 12px; border-radius:8px;
+    cursor:pointer; border:1px solid currentColor; background:transparent; color:inherit; }
+  .toast .t-actions button.primary{ background:var(--bad); border-color:var(--bad); color:#fff; }
   .toast.err{ border-color:var(--bad); background:var(--bad-bg); color:var(--bad-ink); }
   .toast.ok{ border-color:var(--good); background:var(--good-bg); color:var(--good-ink); }
 
@@ -908,7 +922,6 @@
         </div>
         <button class="btn-submit" style="width:auto;padding:12px 26px;" onclick="submitEvaluation()"><i class="fas fa-save"></i> Сохранить оценку</button>
       </div>
-      <div class="message" id="evMessage"></div>
     </div>
 
     <!-- ПЛАН ПРОСЛУШКИ -->
@@ -1624,8 +1637,8 @@
     return (named[page] || page || '—') + (seg ? ' → ' + seg.textContent.trim() : '');
   }
 
-  function openBug() {
-    document.getElementById('bugBody').value = '';
+  function openBug(prefill) {
+    document.getElementById('bugBody').value = typeof prefill === 'string' ? prefill : '';
     const m = document.getElementById('bugMessage');
     m.style.display = 'none'; m.className = 'message';
     document.getElementById('bugModal').classList.add('active');
@@ -1659,18 +1672,42 @@
 
   // Плашка в углу вместо системного окна: не перехватывает управление,
   // выглядит как остальной интерфейс, снимается кликом или сама.
-  function toast(text, kind) {
+  // opts.ms — сколько держать; opts.sticky — пока не закроют;
+  // opts.title и opts.actions ([подпись, действие, главная?]) — для ошибок,
+  // которые надо не только увидеть, но и передать
+  function toast(text, kind, opts) {
+    opts = opts || {};
     const box = document.getElementById('toasts');
     if (!box) return;
     const t = document.createElement('div');
     const err = kind !== 'ok';
-    t.className = 'toast ' + (err ? 'err' : 'ok');
+    t.className = 'toast ' + (err ? 'err' : 'ok') + (opts.sticky ? ' sticky' : '');
     t.innerHTML = '<i class="fas ' + (err ? 'fa-circle-exclamation' : 'fa-circle-check') + '"></i>' +
-      '<span></span>';
-    t.lastChild.textContent = String(text).replace(/^[❌✅]\s*/, '');
-    t.onclick = function () { t.remove(); };
+      '<div class="t-body"></div>';
+    const body = t.lastChild;
+    if (opts.title) {
+      const h = document.createElement('div');
+      h.className = 't-title'; h.textContent = opts.title;
+      body.appendChild(h);
+    }
+    const msg = document.createElement('span');
+    msg.textContent = String(text).replace(/^[❌✅]\s*/, '');
+    body.appendChild(msg);
+    if (opts.actions && opts.actions.length) {
+      const row = document.createElement('div');
+      row.className = 't-actions';
+      opts.actions.forEach(function (a) {
+        const b = document.createElement('button');
+        b.type = 'button'; b.textContent = a[0];
+        if (a[2]) b.className = 'primary';
+        b.onclick = function (e) { e.stopPropagation(); t.remove(); if (a[1]) a[1](); };
+        row.appendChild(b);
+      });
+      body.appendChild(row);
+    }
+    if (!opts.sticky) t.onclick = function () { t.remove(); };
     box.appendChild(t);
-    setTimeout(function () { t.remove(); }, err ? 9000 : 5000);
+    if (!opts.sticky) setTimeout(function () { t.remove(); }, opts.ms || (err ? 9000 : 5000));
   }
 
   // Окна закрываются Escape и кликом мимо — так ведут себя все восемь,
@@ -1788,6 +1825,7 @@
       loadOperatorAll();
     }
     restoreView(user, want);
+    refreshWaiting();
     // Подложка под выбранным пунктом должна стоять до первого клика,
     // иначе он всегда перескок: раньше она создавалась только в момент
     // переключения. Касается всех полос — и разделов, и «Звонок был».
@@ -2740,7 +2778,7 @@
         b.classList.toggle('active', b.getAttribute('data-nav') === active);
       });
     });
-    segSyncAll();
+    showWaiting();
   }
 
   // ---------- ИСТОРИЯ БРАУЗЕРА ----------
@@ -3384,7 +3422,7 @@
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Сохранение...';
     const run = google.script.run
       .withSuccessHandler(function (res) {
-        if (!res.success) { evSubmitReady(); evMsg('❌ ' + res.error, 'error'); return; }
+        if (!res.success) { evSubmitReady(); evSaveFailed(res.error, payload.meta, editing); return; }
         if (editing) {
           evMsg('✅ Оценка ' + res.id + ' пересмотрена: ' + pct2(res.was) + ' → ' + pct2(res.result.score), 'success');
           cancelEdit(false);
@@ -3399,7 +3437,7 @@
       })
       .withFailureHandler(function (e) {
         evSubmitReady();
-        evMsg('❌ Ошибка: ' + e, 'error');
+        evSaveFailed(e, payload.meta, editing);
       });
     if (editing) run.updateEvaluation(payload); else run.saveEvaluation(payload);
   }
@@ -3484,10 +3522,33 @@
     if (byHand) { resetEvalForm(); evMsg('Правка отменена, оценка осталась прежней', 'error'); }
   }
 
+  // Сообщения чек-листа — всплывающими уведомлениями: строка была под
+  // чек-листом, в самом низу, а после сохранения страница уезжает наверх,
+  // и «сохранено» не видел никто.
   function evMsg(text, type) {
-    const el = document.getElementById('evMessage');
-    el.textContent = text; el.className = 'message ' + type; el.style.display = 'block';
-    if (type === 'success') setTimeout(function () { el.style.display = 'none'; }, 6000);
+    if (type === 'success') toast(text, 'ok', { ms: 8000 });
+    else toast(text, 'err');
+  }
+
+  // Оценка не сохранилась — это надо не просто увидеть, а передать.
+  // Уведомление не уходит само, а «Сообщить о проблеме» открывает форму
+  // сбоя с уже вписанными звонком и текстом ошибки: кто, где и в каком
+  // браузере, форма добавит сама.
+  function evSaveFailed(err, meta, editing) {
+    const reason = String(err || 'неизвестная ошибка').replace(/^❌\s*/, '');
+    const d = String(meta.callDate || '');
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(d) ? d.split('-').reverse().join('.') : (d || '—');
+    const details = [
+      (editing ? 'Не сохранилась правка оценки ' + editing : 'Не сохранилась оценка') + '.',
+      'Оператор: ' + (meta.operator || '—'),
+      'Звонок: ' + date + ' ' + (meta.callTime || '') + ', телефон ' + (meta.phone || '—'),
+      'Ошибка: ' + reason
+    ].join('\n');
+    toast(reason, 'err', {
+      sticky: true,
+      title: editing ? 'Правка НЕ сохранена' : 'Оценка НЕ сохранена',
+      actions: [['Сообщить о проблеме', function () { openBug(details); }, true], ['Закрыть', null]]
+    });
   }
 
   // ---------- ОТЧЁТЫ ----------
@@ -3504,7 +3565,7 @@
     // смотрит без права ответа; оператору вкладка ни к чему
     document.getElementById('repT8').classList.toggle('hidden',
       ['rgo', 'qc', 'sqc', 'srgo', 'manager', 'admin'].indexOf(u.role) < 0);
-    refreshAppealBadge();
+    refreshWaiting();
     repTab('journal');
     renderNav();
     navRecord();
@@ -4042,9 +4103,8 @@
       document.getElementById('bugOpen').textContent = r.open;
       document.getElementById('bugFixed').textContent = r.rows.filter(function (x) { return x.status === 'fixed'; }).length;
       document.getElementById('bugDeclined').textContent = r.rows.filter(function (x) { return x.status === 'declined'; }).length;
-      const badge = document.getElementById('bugBadge');
-      badge.textContent = r.open;
-      badge.classList.toggle('hidden', !r.open);
+      // цифра — тем, кто разбирает: остальным чужие сообщения не задача
+      bugBadgeSet(r.canAnswer ? r.open : 0);
 
       if (!rows.length) {
         box.innerHTML = '<div class="empty-state"><i class="fas fa-bug"></i><p>' +
@@ -4117,6 +4177,41 @@
     const el = document.getElementById('apBadge');
     el.textContent = n;
     el.classList.toggle('hidden', !n);
+    waiting.appeals = n || 0;
+    showWaiting();
+  }
+
+  // Что ждёт в «Отчётах»: сообщения о сбоях и апелляции. Цифры стоят на
+  // вкладках внутри, но их видно, только когда уже зашёл в отчёты, —
+  // админ не знал, где искать сообщения о сбоях. Поэтому их сумма висит
+  // ещё и на «Отчётах» в полосе разделов, на любой странице.
+  const waiting = { bugs: 0, appeals: 0 };
+  function showWaiting() {
+    const n = waiting.bugs + waiting.appeals;
+    document.querySelectorAll('.nav-slot button[data-nav="rep"]').forEach(function (b) {
+      let el = b.querySelector('.ap-badge');
+      if (!el) { el = document.createElement('span'); el.className = 'ap-badge'; b.appendChild(el); }
+      el.textContent = n;
+      el.classList.toggle('hidden', !n);
+      b.title = n ? 'Ждут в отчётах: сообщений о сбоях — ' + waiting.bugs + ', апелляций — ' + waiting.appeals : '';
+    });
+    segSyncAll();          // кнопка стала шире — подложка тоже
+  }
+  function bugBadgeSet(n) {
+    const el = document.getElementById('bugBadge');
+    el.textContent = n;
+    el.classList.toggle('hidden', !n);
+    waiting.bugs = n || 0;
+    showWaiting();
+  }
+  function refreshWaiting() {
+    const me = JSON.parse(sessionStorage.getItem('user') || '{}');
+    if (['sqc', 'manager', 'admin'].indexOf(me.role) >= 0) {
+      google.script.run.withSuccessHandler(function (r) {
+        if (r && r.success) bugBadgeSet(r.canAnswer ? r.open : 0);
+      }).getBugReports(sessionStorage.getItem('token'), {});
+    }
+    refreshAppealBadge();
   }
 
   function refreshAppealBadge() {

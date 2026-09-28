@@ -17,12 +17,35 @@
 
   var API_BASE = (window.__API_BASE__ || '/api');
 
+  // У части российских провайдеров один из адресов Vercel заблокирован:
+  // запрос, попавший на него, висел без ответа, и кнопка «Сохранение…»
+  // крутилась бесконечно. Ждём разумное время и говорим, что делать.
+  // Повтор безопасен: тот же звонок и ту же заявку база второй раз не
+  // примет («Этот звонок уже оценён»).
+  var TIMEOUT_MS = 40000;
+  var NO_ANSWER = 'Сайт не ответил — проверьте интернет и нажмите ещё раз';
+  var NO_LINK = 'Нет связи с сайтом — проверьте интернет и нажмите ещё раз';
+
   function callServer(fn, args) {
+    var ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+    var timedOut = false;
+    var timer = ctrl ? setTimeout(function () { timedOut = true; ctrl.abort(); }, TIMEOUT_MS) : null;
+    var done = function () { if (timer) clearTimeout(timer); };
     return fetch(API_BASE + '/' + encodeURIComponent(fn), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
-      body: JSON.stringify({ args: args })
+      body: JSON.stringify({ args: args }),
+      signal: ctrl ? ctrl.signal : undefined
+    }).then(function (r) { done(); return r; }, function () {
+      // обрыв соединения или истёкшее ожидание: вместо «TypeError: Failed
+      // to fetch» — по-человечески
+      done();
+      // страница пишет «Ошибка: » + e — без служебного «Error:» в тексте
+      var msg = timedOut ? NO_ANSWER : NO_LINK;
+      var err = new Error(msg);
+      err.toString = function () { return msg; };
+      throw err;
     }).then(function (r) {
       if (!r.ok) {
         return r.text().then(function (t) {

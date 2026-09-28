@@ -207,12 +207,22 @@
      после ошибки надо нажать ещё раз. И после сохранения страница уезжает
      наверх — взгляд как раз здесь. */
   .toasts{ position:fixed; right:18px; top:80px; z-index:1300; display:flex;
-    flex-direction:column; gap:10px; max-width:min(420px, calc(100vw - 36px)); }
+    flex-direction:column; max-width:min(420px, calc(100vw - 36px)); }
   @media (max-width:600px){ .toasts{ top:12px; left:12px; right:12px; max-width:none; } }
-  .toast{ display:flex; align-items:flex-start; gap:10px; padding:12px 14px;
+  /* промежуток — отступом, а не gap: при уходе он схлопывается вместе
+     с уведомлением, и соседи подтягиваются плавно, а не прыжком */
+  .toast{ display:flex; align-items:flex-start; gap:10px; padding:12px 14px; margin-bottom:10px;
     border-radius:var(--radius-sm); border:1px solid var(--border-strong);
     background:var(--surface); box-shadow:var(--shadow-lg); font-size:14px;
-    line-height:1.45; cursor:pointer; }
+    line-height:1.45; cursor:pointer; overflow:hidden;
+    animation:toastIn .22s var(--ease-out) both; }
+  .toast.leaving{ animation:toastOut .15s cubic-bezier(.4,0,1,1) both; pointer-events:none; }
+  .toast.gone{ height:0 !important; padding-top:0; padding-bottom:0; margin-bottom:0; border-width:0;
+    transition:height .16s var(--ease-out), padding .16s var(--ease-out), margin .16s var(--ease-out); }
+  .toast.bump{ animation:toastBump .32s var(--ease-out); }
+  @keyframes toastIn{ from{ opacity:0; transform:translateX(16px); } to{ opacity:1; transform:none; } }
+  @keyframes toastOut{ to{ opacity:0; transform:translateX(16px); } }
+  @keyframes toastBump{ 25%{ transform:translateX(-4px); } 50%{ transform:translateX(4px); } 75%{ transform:translateX(-2px); } }
   .toast i{ margin-top:2px; }
   /* ошибку сохранения мало увидеть — её надо передать: заголовок,
      причина и кнопки, и уведомление само не уходит */
@@ -1672,6 +1682,47 @@
 
   // Плашка в углу вместо системного окна: не перехватывает управление,
   // выглядит как остальной интерфейс, снимается кликом или сама.
+  // Уведомления — по тем же правилам, что у Sonner и Material Design:
+  // · живут 4–10 секунд, дольше при длинном тексте (~60 мс на знак на
+  //   чтение), ошибки — ещё на 2 секунды дольше;
+  // · пока на уведомлении мышь, время стоит; вкладка в фоне — тоже;
+  // · одинаковое второй раз не добавляется: старое вздрагивает и живёт
+  //   заново (раньше «Выберите оператора» копилось столбиком);
+  // · на экране не больше трёх, лишние уходят с самых старых;
+  // · появляется мягко, уходит быстрее, остальные подтягиваются плавно.
+  const TOAST_MAX = 3;
+
+  function toastLife(text, err) {
+    const ms = Math.max(4000, 1500 + String(text).length * 60) + (err ? 2000 : 0);
+    return Math.min(ms, 10000);
+  }
+  function toastArm(t, ms) {
+    clearTimeout(t._timer);
+    t._left = ms; t._start = Date.now();
+    t._timer = setTimeout(function () {
+      if (document.hidden) {           // в фоне никто не прочтёт — дождёмся
+        document.addEventListener('visibilitychange', function back() {
+          if (document.hidden) return;
+          document.removeEventListener('visibilitychange', back);
+          toastArm(t, 3000);
+        });
+        return;
+      }
+      toastLeave(t);
+    }, ms);
+  }
+  function toastLeave(t) {
+    if (t._leaving) return;
+    t._leaving = true;
+    clearTimeout(t._timer);
+    // сначала растворяется со сдвигом, потом схлопывается место под ним
+    t.style.height = t.offsetHeight + 'px';
+    t.classList.remove('bump');        // иначе «вздрагивание» перебьёт уход
+    t.classList.add('leaving');
+    setTimeout(function () { t.classList.add('gone'); }, 150);
+    setTimeout(function () { t.remove(); }, 320);
+  }
+
   // opts.ms — сколько держать; opts.sticky — пока не закроют;
   // opts.title и opts.actions ([подпись, действие, главная?]) — для ошибок,
   // которые надо не только увидеть, но и передать
@@ -1679,8 +1730,22 @@
     opts = opts || {};
     const box = document.getElementById('toasts');
     if (!box) return;
-    const t = document.createElement('div');
     const err = kind !== 'ok';
+    const clean = String(text).replace(/^[❌✅]\s*/, '');
+    const key = (err ? 'err' : 'ok') + '|' + (opts.title || '') + '|' + clean;
+
+    // то же самое уже на экране — не плодим копию
+    const same = [...box.children].find(function (x) { return x.dataset.key === key && !x._leaving; });
+    if (same) {
+      same.classList.remove('bump');
+      void same.offsetWidth;           // перезапуск анимации
+      same.classList.add('bump');
+      if (!opts.sticky) toastArm(same, opts.ms || toastLife(clean, err));
+      return;
+    }
+
+    const t = document.createElement('div');
+    t.dataset.key = key;
     t.className = 'toast ' + (err ? 'err' : 'ok') + (opts.sticky ? ' sticky' : '');
     t.innerHTML = '<i class="fas ' + (err ? 'fa-circle-exclamation' : 'fa-circle-check') + '"></i>' +
       '<div class="t-body"></div>';
@@ -1691,7 +1756,7 @@
       body.appendChild(h);
     }
     const msg = document.createElement('span');
-    msg.textContent = String(text).replace(/^[❌✅]\s*/, '');
+    msg.textContent = clean;
     body.appendChild(msg);
     if (opts.actions && opts.actions.length) {
       const row = document.createElement('div');
@@ -1700,14 +1765,28 @@
         const b = document.createElement('button');
         b.type = 'button'; b.textContent = a[0];
         if (a[2]) b.className = 'primary';
-        b.onclick = function (e) { e.stopPropagation(); t.remove(); if (a[1]) a[1](); };
+        b.onclick = function (e) { e.stopPropagation(); toastLeave(t); if (a[1]) a[1](); };
         row.appendChild(b);
       });
       body.appendChild(row);
     }
-    if (!opts.sticky) t.onclick = function () { t.remove(); };
+    if (!opts.sticky) {
+      t.onclick = function () { toastLeave(t); };
+      // навели мышь — читают: время стоит, отвели — досчитывает остаток
+      t.onmouseenter = function () {
+        clearTimeout(t._timer);
+        t._left = Math.max(0, t._left - (Date.now() - t._start));
+      };
+      t.onmouseleave = function () { if (!t._leaving) toastArm(t, Math.max(t._left, 1500)); };
+    }
     box.appendChild(t);
-    if (!opts.sticky) setTimeout(function () { t.remove(); }, opts.ms || (err ? 9000 : 5000));
+    if (!opts.sticky) toastArm(t, opts.ms || toastLife(clean, err));
+
+    // больше трёх — уходят самые старые из тех, что уходят сами
+    const live = [...box.children].filter(function (x) { return !x._leaving; });
+    const extra = live.length - TOAST_MAX;
+    live.filter(function (x) { return !x.classList.contains('sticky'); })
+      .slice(0, Math.max(0, extra)).forEach(toastLeave);
   }
 
   // Окна закрываются Escape и кликом мимо — так ведут себя все восемь,
@@ -2146,6 +2225,11 @@
   }
 
   window.addEventListener('DOMContentLoaded', wireFilters);
+  window.addEventListener('DOMContentLoaded', function () {
+    const tab = document.getElementById('qcEvalTab');
+    tab.addEventListener('input', draftSave, true);
+    tab.addEventListener('change', draftSave, true);
+  });
 
   function applyFilters() {
     const status = document.getElementById('filterStatus').value;
@@ -2486,6 +2570,7 @@
     if (r.callDate) document.getElementById('evDate').value = r.callDate;
     if (r.callTime) document.getElementById('evTime').value = r.callTime;
     if (r.phone) document.getElementById('evPhone').value = r.phone;
+    draftSave();
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -2493,6 +2578,7 @@
   function clearReqLink(byHand) {
     evLinkedReq = '';
     document.getElementById('evLinkBar').classList.add('hidden');
+    draftSave();
     if (byHand) evMsg('Привязка снята: заявка останется открытой', 'error');
   }
 
@@ -3133,6 +3219,7 @@
       if (!b.success) { renderCfg(b); return; }
       renderCfg(b.cfg);
       renderOps({ success: true, operators: b.operators });
+      draftRestore();
     }).getQcBootstrap(sessionStorage.getItem('token'));
   }
 
@@ -3280,6 +3367,7 @@
     if (row && evAnswers[id]) row.classList.remove('ev-missing');
     renderChecklist();
     recalcEval();
+    draftSave();
   }
 
   // Живой расчёт — та же логика, что на сервере (сервер пересчитает при сохранении)
@@ -3431,7 +3519,11 @@
           evMsg('✅ Оценка ' + res.id + ' сохранена: ' + pct2(res.result.score) + ' (' + res.week + ')', 'success');
         }
         if (evLinkedReq) { clearReqLink(false); allRequests = []; }   // заявка уже «Проверена»
+        // сохранили новую — черновик больше не нужен; сохранили правку —
+        // возвращаем начатую до неё новую оценку, если была
+        if (!editing) draftClear();
         resetEvalForm();
+        if (editing) draftRestore();
         evSubmitReady();
         window.scrollTo({ top: 0, behavior: 'smooth' });
       })
@@ -3440,6 +3532,92 @@
         evSaveFailed(e, payload.meta, editing);
       });
     if (editing) run.updateEvaluation(payload); else run.saveEvaluation(payload);
+  }
+
+  // ---------- ЧЕРНОВИК ЧЕК-ЛИСТА ----------
+  // Перезагрузили страницу посреди оценки — и всё заполненное пропадало.
+  // Черновик живёт в браузере того, кто оценивает (ключ — его логин),
+  // пишется на каждое изменение и возвращается при следующем открытии.
+  // Стирается после сохранения, а старше суток — сам. Правку старой
+  // оценки не храним: её можно открыть из журнала заново.
+  const DRAFT_TTL = 24 * 3600 * 1000;
+  let draftTimer = null;
+
+  function draftKey() {
+    const u = JSON.parse(sessionStorage.getItem('user') || '{}');
+    return u.login ? 'callaudit-draft:' + u.login : '';
+  }
+  function sameAnswers(a, b) {
+    const ka = Object.keys(a || {}), kb = Object.keys(b || {});
+    return ka.length === kb.length && ka.every(function (k) { return a[k] === b[k]; });
+  }
+  function draftEmpty(d) {
+    return !d.operator && !d.time && !d.phone && !d.criterion && !d.topic && !d.city && !d.agg &&
+      !d.control && !d.dc && sameAnswers(d.answers, defaultAnswers()) &&
+      !Object.keys(d.comments || {}).some(function (k) { return d.comments[k]; });
+  }
+  function draftClear() {
+    clearTimeout(draftTimer);
+    try { const k = draftKey(); if (k) localStorage.removeItem(k); } catch (e) {}
+  }
+  function draftSave() {
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(function () {
+      const key = draftKey();
+      if (!key || evEditing || !evCfg) return;
+      const v = function (id) { return document.getElementById(id).value; };
+      const d = {
+        at: Date.now(), operator: v('evOperator'), date: v('evDate'), time: v('evTime'), phone: v('evPhone'),
+        criterion: v('evCriterion'), topic: v('evTopic'), sub: v('evSub'), city: v('evCity'), agg: getAgg(),
+        control: document.getElementById('evControl').checked, dc: document.getElementById('evDc').checked,
+        answers: evAnswers, comments: evComments, complaintSrc: evComplaintSrc,
+        req: evLinkedReq, reqWho: evLinkedReq ? document.getElementById('evLinkWho').textContent : ''
+      };
+      try {
+        if (draftEmpty(d)) localStorage.removeItem(key);
+        else localStorage.setItem(key, JSON.stringify(d));
+      } catch (e) { /* приватное окно или запрет хранилища — просто без черновика */ }
+    }, 300);
+  }
+  function draftRestore() {
+    const key = draftKey();
+    if (!key || evEditing) return;
+    let d = null;
+    try { d = JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) { d = null; }
+    if (!d) return;
+    if (Date.now() - (d.at || 0) > DRAFT_TTL || draftEmpty(d)) { draftClear(); return; }
+
+    const set = function (id, val) {
+      const el = document.getElementById(id);
+      el.value = val || '';
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    set('evOperator', d.operator);
+    if (d.date) document.getElementById('evDate').value = d.date;
+    document.getElementById('evTime').value = d.time || '';
+    document.getElementById('evPhone').value = d.phone || '';
+    set('evCriterion', d.criterion);
+    set('evTopic', d.topic);            // подтягивает подтематики
+    set('evSub', d.sub);
+    set('evCity', d.city);
+    setAgg(d.agg);
+    document.getElementById('evControl').checked = !!d.control;
+    document.getElementById('evDc').checked = !!d.dc;
+    evAnswers = d.answers || defaultAnswers();
+    evComments = d.comments || {};
+    evComplaintSrc = d.complaintSrc || '';
+    if (d.req) {
+      evLinkedReq = d.req;
+      document.getElementById('evLinkId').textContent = d.req;
+      document.getElementById('evLinkWho').textContent = d.reqWho || '';
+      document.getElementById('evLinkBar').classList.remove('hidden');
+    }
+    renderChecklist();
+    recalcEval();
+    const at = new Date(d.at);
+    toast('Вернул незаконченный чек-лист' + (d.operator ? ' (' + d.operator + ')' : '') + ' от ' +
+      String(at.getHours()).padStart(2, '0') + ':' + String(at.getMinutes()).padStart(2, '0'), 'ok',
+      { ms: 12000, actions: [['Начать заново', function () { draftClear(); if (evLinkedReq) clearReqLink(false); resetEvalForm(); }]] });
   }
 
   function evSubmitReady() {
@@ -3519,7 +3697,7 @@
     evEditing = '';
     document.getElementById('evEditBar').classList.add('hidden');
     evSubmitReady();
-    if (byHand) { resetEvalForm(); evMsg('Правка отменена, оценка осталась прежней', 'error'); }
+    if (byHand) { resetEvalForm(); draftRestore(); evMsg('Правка отменена, оценка осталась прежней', 'error'); }
   }
 
   // Сообщения чек-листа — всплывающими уведомлениями: строка была под

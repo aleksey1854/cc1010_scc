@@ -421,6 +421,11 @@
 
   /* ===== ТАБЛИЦЫ ===== */
   .table-wrapper{ overflow-x:auto; margin:0 -4px; }
+  /* закреплённая копия шапки таблицы — под шапкой сайта (у той z-index 50) */
+  .sticky-head{ position:fixed; z-index:45; overflow:hidden; background:var(--surface);
+    box-shadow:0 8px 12px -10px rgba(15,23,42,.35); }
+  .sticky-head table{ border-collapse:collapse; background:var(--surface); }
+  @media print{ .sticky-head{ display:none !important; } }
   /* Кнопки в последней колонке не рвём по словам: лучше прокрутка, чем
      обрезанное «Изменит». */
   .table-wrapper td:last-child{ white-space:nowrap; }
@@ -3113,6 +3118,103 @@
     return h + '</div>';
   }
 
+  // ---------- ШАПКА ТАБЛИЦЫ НЕ УЕЗЖАЕТ ----------
+  // В длинных таблицах (план прослушки, журнал, отчёты) при прокрутке
+  // вниз пропадали названия столбцов. Чистый CSS тут не справляется:
+  // таблицы лежат в .table-wrapper с прокруткой вбок, и position:sticky
+  // держится за неё, а не за страницу. Поэтому, когда шапка таблицы уходит
+  // под шапку сайта, над таблицей встаёт её копия — те же ширины столбцов
+  // и та же прокрутка вбок. Касается всех таблиц сайта, и будущих тоже.
+  const stickyHeads = new Map();         // таблица → { box, inner, sig }
+  let stickyRaf = 0;
+  function stickySchedule() { if (!stickyRaf) stickyRaf = requestAnimationFrame(stickyUpdate); }
+
+  function siteHeaderBottom() {
+    let b = 0;
+    document.querySelectorAll('.header').forEach(function (h) {
+      if (h.offsetParent === null) return;
+      const r = h.getBoundingClientRect();
+      if (r.height) b = Math.max(b, r.bottom);
+    });
+    return Math.max(0, b);
+  }
+  function stickySig(table) {
+    return Math.round(table.getBoundingClientRect().width) + '|' +
+      [...table.tHead.querySelectorAll('th')].map(function (th) {
+        return Math.round(th.getBoundingClientRect().width) + th.textContent.length;
+      }).join(',');
+  }
+  function stickyBuild(table) {
+    const box = document.createElement('div');
+    box.className = 'sticky-head';
+    box.setAttribute('aria-hidden', 'true');      // для читалок шапка уже есть в таблице
+    const t = document.createElement('table');
+    const thead = table.tHead.cloneNode(true);
+    // вид ячеек — с оригинала: стили таблиц зависят от предков (.table-dense и т.п.)
+    const src = table.tHead.querySelectorAll('th'), dst = thead.querySelectorAll('th');
+    src.forEach(function (th, i) {
+      const cs = getComputedStyle(th), d = dst[i], r = th.getBoundingClientRect();
+      d.style.width = d.style.minWidth = d.style.maxWidth = r.width + 'px';
+      d.style.height = r.height + 'px';
+      d.style.boxSizing = 'border-box';
+      ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'fontSize', 'fontWeight', 'fontFamily',
+       'letterSpacing', 'textTransform', 'textAlign', 'color', 'lineHeight', 'whiteSpace', 'verticalAlign',
+       'borderBottomWidth', 'borderBottomStyle', 'borderBottomColor'].forEach(function (k) { d.style[k] = cs[k]; });
+      d.onclick = function () { th.click(); };       // если у заголовка есть действие — у оригинала
+    });
+    t.appendChild(thead);
+    t.style.width = table.getBoundingClientRect().width + 'px';
+    t.style.tableLayout = 'fixed';
+    t.style.margin = '0';
+    box.appendChild(t);
+    document.body.appendChild(box);
+    return { box: box, inner: t, sig: stickySig(table) };
+  }
+  function stickyUpdate() {
+    stickyRaf = 0;
+    const top = siteHeaderBottom();
+    const shown = new Set();
+    document.querySelectorAll('table').forEach(function (table) {
+      if (!table.tHead || table.closest('.sticky-head, .review-modal') || table.offsetParent === null) return;
+      // свёрнутая памятка (<details>) браузер всё равно раскладывает —
+      // её таблицы не видно, и шапку ей закреплять не нужно
+      if (table.closest('details:not([open])')) return;
+      if (table.checkVisibility && !table.checkVisibility()) return;
+      const r = table.getBoundingClientRect();
+      const headH = table.tHead.getBoundingClientRect().height;
+      // шапка ушла под шапку сайта, а строки таблицы ещё на экране
+      if (!(r.top < top && r.bottom > top + headH + 8)) return;
+      let s = stickyHeads.get(table);
+      const sig = stickySig(table);
+      if (!s || s.sig !== sig) {
+        if (s) s.box.remove();
+        s = stickyBuild(table);
+        stickyHeads.set(table, s);
+      }
+      const wrap = table.closest('.table-wrapper') || table.parentElement;
+      const wr = wrap.getBoundingClientRect();
+      s.box.style.display = '';
+      s.box.style.top = top + 'px';
+      s.box.style.left = wr.left + 'px';
+      s.box.style.width = wr.width + 'px';
+      s.inner.style.transform = 'translateX(' + (r.left - wr.left) + 'px)';   // та же прокрутка вбок
+      shown.add(table);
+    });
+    stickyHeads.forEach(function (s, table) {
+      if (!table.isConnected) { s.box.remove(); stickyHeads.delete(table); }   // таблицу перерисовали
+      else if (!shown.has(table)) s.box.style.display = 'none';
+    });
+  }
+  // capture — чтобы ловить и прокрутку вбок внутри самих таблиц
+  window.addEventListener('scroll', stickySchedule, { passive: true, capture: true });
+  window.addEventListener('resize', stickySchedule);
+  // таблицы перерисовываются без прокрутки (фильтры, обновление плана)
+  window.addEventListener('DOMContentLoaded', function () {
+    new MutationObserver(function (muts) {
+      if (muts.some(function (m) { return !(m.target.closest && m.target.closest('.sticky-head, #toasts')); })) stickySchedule();
+    }).observe(document.body, { childList: true, subtree: true });
+  });
+
   // где в последний раз стояла подложка полосы разделов — на любой странице
   let navIndLast = null;
 
@@ -3187,9 +3289,12 @@
   // auto = true только при открытии вкладки. Если человек сам выбрал дату,
   // на которой статистики нет, отбрасывать его назад нельзя — он именно
   // туда и шёл.
-  function loadPlan(auto) {
+  // quiet — обновить на месте: без заглушки на время загрузки. С заглушкой
+  // страница на миг становилась короткой, и после отметки «В работе» внизу
+  // таблицы браузер уносил наверх.
+  function loadPlan(auto, quiet) {
     const box = document.getElementById('planTable');
-    box.innerHTML = loadingRows();
+    if (!quiet) box.innerHTML = loadingRows();
     google.script.run.withSuccessHandler(function (r) {
       if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
       // статистику грузят не каждый день: если за выбранный день её нет,
@@ -3232,7 +3337,8 @@
         sel.onchange = function () {
           google.script.run.withSuccessHandler(function (res) {
             if (!res.success) { toast(res.error); return; }
-            loadPlan(false);
+            planScrollY = window.scrollY;      // остаёмся там, где отметили
+            loadPlan(false, true);
           }).withFailureHandler(function (e) { toast(e); })
             .setListenMark(sessionStorage.getItem('token'),
               document.getElementById('planDate').value, sel.getAttribute('data-mark'), sel.value);
@@ -3340,7 +3446,8 @@
   // что отдельной обработки мыши не нужно: popstate ловит оба.
 
   function loadEvalPage(pre) {
-    document.getElementById('evDate').value = new Date().toISOString().split('T')[0];
+    // Дату звонка не подставляем: сегодняшняя по умолчанию незаметно
+    // уезжала в оценку вчерашнего звонка. Поле пустое и обязательное.
     const renderCfg = function (res) {
       if (!res.success) { document.getElementById('evChecklist').innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + res.error + '</p></div>'; return; }
       evCfg = res;
@@ -3810,7 +3917,7 @@
     evAnswers = defaultAnswers(); evComments = {}; evCmtOpen = {}; evComplaintSrc = '';
     document.getElementById('evControl').checked = false;
     document.getElementById('evDc').checked = false;
-    ['evPhone', 'evTime', 'evCity'].forEach(function (id) { document.getElementById(id).value = ''; });
+    ['evDate', 'evPhone', 'evTime', 'evCity'].forEach(function (id) { document.getElementById(id).value = ''; });
     setAgg('');
     ['evOperator', 'evCriterion', 'evTopic'].forEach(function (id) {
       const el = document.getElementById(id);

@@ -344,8 +344,11 @@
   .new-evals .ne-actions{ margin-top:12px; }
   .kz-badge{ display:inline-block; padding:2px 8px; border-radius:6px; font-size:12px;
     font-weight:700; background:var(--kz); color:#fff; white-space:nowrap; }
-  .kz-tag{ background:var(--kz-bg); color:var(--kz); border:1px solid var(--kz); }
-  .dc-tag{ background:var(--good-bg); color:#0a6e3d; border:1px solid var(--good); }
+  .kz-tag, .fail-tag.kz-tag{ background:var(--kz-bg); color:var(--kz); border:1px solid var(--kz); }
+  .dc-tag, .fail-tag.dc-tag{ background:var(--good-bg); color:#0a6e3d; border:1px solid var(--good); }
+  /* НЖ — чек-лист по неподтверждённой жалобе: отмечен «Признак жалобы»,
+     но не «Подтверждённая жалоба». Жёлтый, как просили: не ошибка, а пометка */
+  .nj-tag, .fail-tag.nj-tag{ background:var(--mid-bg); color:var(--mid-ink); border:1px solid var(--mid); }
   .new-chip{ display:inline-block; padding:1px 7px; border-radius:6px; font-size:11px;
     font-weight:700; background:var(--accent); color:#fff; margin-left:6px; vertical-align:middle; }
   .ev-kz{ padding:5px 10px; border:1px solid var(--border-strong); border-radius:8px;
@@ -455,8 +458,12 @@
   .ev-addcmt:hover{ color:var(--accent-ink); background:var(--accent-soft); }
   .ev-src{ display:flex; align-items:center; gap:10px; margin:2px 0 8px; padding:8px 12px;
     background:var(--bad-bg); border:1px solid var(--bad); border-radius:8px; }
-  .ev-src label{ font-size:13px; font-weight:600; color:#a52020; margin:0; }
-  .ev-src select{ max-width:220px; }
+  .ev-src label, .ev-src .ev-src-label{ font-size:13px; font-weight:600; color:#a52020; margin:0; }
+  /* выбрали — строка успокаивается: красная рамка только пока не отвечено */
+  .ev-src.done{ background:var(--surface-2); border-color:var(--border); }
+  .ev-src.done .ev-src-label{ color:var(--ink-2); }
+  .ev-src .ev-src-opts{ display:flex; gap:6px; }
+  .ev-opt.on-src{ background:var(--accent-soft); border-color:var(--accent); color:var(--accent-ink); }
   .ev-editbar{ display:flex; align-items:center; justify-content:space-between; gap:16px;
     background:var(--mid-bg); border:1px solid var(--mid); color:#8a5600; }
   .ev-editbar .hint{ color:#8a5600; opacity:.8; margin-top:2px; }
@@ -3487,12 +3494,18 @@
         // Признак жалобы: сразу спрашиваем, от кого она — иначе в конце
         // недели долю клиентов и заказчиков не собрать.
         if (it.rule === 'marker' && cur === V.YES) {
+          // Два варианта — две кнопки, как у ответов чек-листа. Раньше тут
+          // был системный выпадающий список, втиснутый в строку, — выглядел
+          // чужим, и его было не заметить.
           const srcs = (evCfg.complaintSources || ['Клиент', 'Заказчик']);
-          html += '<div class="ev-src"><label>От кого жалоба *</label>' +
-                  '<select id="evComplaintSource" onchange="evComplaintSrc=this.value">' +
-                  '<option value="">— выберите —</option>' +
-                  srcs.map(function (x) { return '<option' + (evComplaintSrc === x ? ' selected' : '') + '>' + x + '</option>'; }).join('') +
-                  '</select></div>';
+          html += '<div class="ev-src' + (evComplaintSrc ? ' done' : '') + '">' +
+                  '<span class="ev-src-label">От кого жалоба' + (evComplaintSrc ? '' : ' *') + '</span>' +
+                  '<div class="ev-src-opts">' +
+                  srcs.map(function (x, i) {
+                    return '<button type="button" class="ev-opt' + (evComplaintSrc === x ? ' on-src' : '') + '"' +
+                      (i === 0 ? ' id="evComplaintSource"' : '') + ' onclick="pickComplaintSrc(\'' + x + '\')">' + x + '</button>';
+                  }).join('') +
+                  '</div></div>';
         }
 
         // Замечание пишут не только к ошибке: к выполненному пункту тоже
@@ -3517,6 +3530,12 @@
     renderChecklist();
     const el = document.getElementById('c_' + id);
     if (el) el.focus();
+  }
+
+  function pickComplaintSrc(x) {
+    evComplaintSrc = evComplaintSrc === x ? '' : x;
+    renderChecklist();
+    draftSave();
   }
 
   function pickOpt(id, val) {
@@ -4409,6 +4428,7 @@
       }
       let head = '<div class="table-wrapper table-dense"><table><thead><tr>' +
         '<th>Группа</th><th>Оператор</th><th>Оценок ДЦ</th><th>Качество ДЦ</th>' +
+        '<th title="чек-листы по неподтверждённой жалобе — видны, но в качество не идут">НЖ</th>' +
         '<th>Оценок ФСС</th><th>Качество ФСС</th><th title="его и берут на зарплату">Среднее ФСС + ДЦ</th>';
       for (let i = 0; i < r.maxDc; i++) head += '<th class="dc-col">ДЦ ' + (i + 1) + '</th>';
       let html = head + '</tr></thead><tbody>';
@@ -4416,6 +4436,7 @@
         html += '<tr><td>' + o.group + '</td><td>' + o.operator + '</td>' +
           '<td>' + o.dcCount + '</td>' +
           '<td>' + (o.dcAvg === null ? '—' : '<strong style="color:' + scoreColorHex(o.dcAvg) + '">' + pct2(o.dcAvg) + '</strong>') + '</td>' +
+          '<td>' + (o.njCount ? '<span class="fail-tag nj-tag" title="' + o.njScores.map(function (x) { return x.id + ' · ' + x.date + ' · ' + pct2(x.score); }).join('; ') + '">' + o.njCount + '</span>' : '—') + '</td>' +
           '<td>' + o.fssCount + '</td>' +
           '<td>' + (o.fssAvg === null ? '—' : '<span style="color:' + scoreColorHex(o.fssAvg) + '">' + pct2(o.fssAvg) + '</span>') + '</td>' +
           '<td>' + (o.bothAvg === null ? '—' : '<strong style="color:' + scoreColorHex(o.bothAvg) + '">' + pct2(o.bothAvg) + '</strong>') + '</td>';
@@ -4676,7 +4697,7 @@
         const errs = e.failed.length
           ? e.failed.map(function (f) { return '<div style="margin:2px 0;"><span class="fail-tag' + (f.critical ? '' : ' minor') + '">' + f.text + '</span>' + (f.comment ? '<span style="color:var(--muted);font-size:12px;"> — ' + f.comment + '</span>' : '') + '</div>'; }).join('')
           : '<span style="color:var(--good-ink);font-weight:600;">без ошибок</span>';
-        const flags = (e.violation ? ' <span class="fail-tag">НС</span>' : '') + (e.complaint ? ' <span class="fail-tag">ПЖ</span>' : '') + (e.gratitude ? ' <span class="fail-tag minor">★</span>' : '') + (e.controlCall ? ' <span class="fail-tag kz-tag" title="контрольный звонок заказчика">КЗ</span>' : '') + (e.dc ? ' <span class="fail-tag dc-tag" title="звонок по проекту ДЦ">ДЦ</span>' : '');
+        const flags = (e.violation ? ' <span class="fail-tag">НС</span>' : '') + (e.complaint ? ' <span class="fail-tag">ПЖ</span>' : '') + (e.isComplaint && !e.complaint ? ' <span class="fail-tag nj-tag" title="чек-лист по неподтверждённой жалобе: в качество не идёт">НЖ</span>' : '') + (e.gratitude ? ' <span class="fail-tag minor">★</span>' : '') + (e.controlCall ? ' <span class="fail-tag kz-tag" title="контрольный звонок заказчика">КЗ</span>' : '') + (e.dc ? ' <span class="fail-tag dc-tag" title="звонок по проекту ДЦ">ДЦ</span>' : '');
         // дату отправки вносят только у чек-листов по жалобе — их
         // оценивают одним днём, а отправляют другим
         const sent = (canEditEval && e.isComplaint)

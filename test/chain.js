@@ -356,6 +356,11 @@ const R = (fn, ...a) => api.call(fn, a);
   const opBefore = [].concat(...prodBefore.groups.map(g => g.operators)).find(o => o.name === OP[0]);
   const fssBefore = opBefore ? opBefore.scores.length : 0;
   const kkBefore = (await R('getKkReport', qcT, DATE, DATE)).rows.find(x => x.operator === OP[0]);
+  // ДЦ идёт только в свой отчёт: снимем, как всё выглядит до ДЦ-оценки
+  const rgoB = (await R('getRgoDashboard', rgoT, 'all')).summary.callsChecked;
+  const orgB = (await R('getOrgDashboard', mgrT, 'all')).summary.callsChecked;
+  const topB = JSON.stringify((await R('getTopicsReport', mgrT, 'all')).rows);
+  const myQB = (await R('getMyQuality', opT, DATE, DATE)).total;
 
   const dcAns = { ...ans, B2P1: 'Положительно' };
   const dcEv = await R('saveEvaluation', { pin: qcT,
@@ -407,6 +412,23 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('  в отчёт КК она не идёт',
     kkPj.pjCustomer === kkBefore.pjCustomer && kkPj.ko === kkBefore.ko && kkPj.count === kkBefore.count,
     [kkBefore, kkPj]);
+  // ДЦ — исключительно в «Проект ДЦ»: у РГО ИНВ-ДЦ качество группы
+  // смешивало ФСС и ДЦ
+  chk('ДЦ не идёт в качество группы в кабинете РГО', (await R('getRgoDashboard', rgoT, 'all')).summary.callsChecked === rgoB);
+  chk('  и в аналитику дивизиона', (await R('getOrgDashboard', mgrT, 'all')).summary.callsChecked === orgB);
+  chk('  и в тематики', JSON.stringify((await R('getTopicsReport', mgrT, 'all')).rows) === topB);
+  chk('  и в «Моё качество» оператора', (await R('getMyQuality', opT, DATE, DATE)).total === myQB);
+
+  // ДЦ по неподтверждённой жалобе (НЖ): в отчёте ДЦ видна, в среднее не идёт
+  const dcBeforeNj = (await R('getDcReport', qcT, DATE, DATE, '')).rows.find(x => x.operator === OP[0]).dcCount;
+  const dcNj = await R('saveEvaluation', { pin: qcT,
+    meta: { ...META, reqId: '', callTime: '16:55', phone: '79164445568', dc: true, complaintSource: 'Клиент' },
+    answers: { ...ans, B8P3: 'Обнаружено' }, comments: {} });
+  chk('ДЦ-чек-лист по НЖ сохраняется', dcNj.success === true && dcNj.result.complaintMark === true, dcNj.error || dcNj.result);
+  const dcNjRow = (await R('getDcReport', qcT, DATE, DATE, '')).rows.find(x => x.operator === OP[0]);
+  chk('  в отчёте ДЦ он виден в колонке НЖ, а в среднее ДЦ не идёт',
+    dcNjRow && dcNjRow.njCount === 1 && dcNjRow.dcCount === dcBeforeNj && dcNjRow.njScores[0].id === dcNj.id, dcNjRow);
+  await R('deleteEvaluation', qcT, dcNj.id);
   chk('  её тоже убираем', (await R('deleteEvaluation', qcT, dcPj.id)).success === true);
   chk('ДЦ-оценку убираем за собой', (await R('deleteEvaluation', qcT, dcEv.id)).success === true);
 

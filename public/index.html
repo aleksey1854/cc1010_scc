@@ -646,7 +646,11 @@
              style="width:100%;padding:10px;border:1.5px dashed var(--border-strong);border-radius:10px;font-size:13px;background:var(--surface-2);">
       <small class="hint">«ОтчетПринятыеЗвонкиПоЗадачам.xlsx» — как скачали, ничего не перекладывая. Дата возьмётся из отчёта.</small>
     </div>
-    <div class="form-group"><label for="impDate">Дата</label><input type="date" id="impDate"></div>
+    <div class="form-grid">
+      <div class="form-group"><label for="impDate">Звонки с</label><input type="date" id="impDate"></div>
+      <div class="form-group"><label for="impDateTo">по</label><input type="date" id="impDateTo">
+        <small class="hint">Если выгрузка за несколько дней. За один день — оставьте пустым.</small></div>
+    </div>
     <div class="form-group">
       <label for="impText">…или вставьте вручную: ФИО и количество принятых звонков</label>
       <textarea id="impText" rows="10" placeholder="Иванов Иван Иванович; 58&#10;Петрова Мария Сергеевна; 101&#10;..." style="width:100%;padding:11px;border:1.5px solid var(--border-strong);border-radius:10px;font-family:monospace;font-size:13px;outline:none;"></textarea>
@@ -975,6 +979,10 @@
         <div class="filter-bar" style="margin-bottom:0;">
           <label for="planDate" style="font-size:14px;color:var(--ink-2);">Дата статистики:</label>
           <input type="date" id="planDate" onchange="loadPlan(false)">
+          <span class="date-range" title="какие даты звонков входят в этот план: по ним считается «Прослушано»">
+            <label for="planFrom">звонки с</label><input type="date" id="planFrom" onchange="savePlanPeriod()">
+            <label for="planTo">по</label><input type="date" id="planTo" onchange="savePlanPeriod()">
+          </span>
           <span id="planPct" style="color:var(--muted);font-size:13px;"></span>
           <button class="btn-filter" style="margin-left:auto;" onclick="openImport()"><i class="fas fa-upload"></i> Загрузить статистику дня</button>
         </div>
@@ -3307,6 +3315,10 @@
       }
       showPlanNote(r);
       renderUploadMemo(null, 'planMemo');
+      if (r.period) {
+        document.getElementById('planFrom').value = r.period.from;
+        document.getElementById('planTo').value = r.period.to;
+      }
       document.getElementById('planOps').textContent = r.summary.operators;
       document.getElementById('planNeed').textContent = r.summary.plan;
       document.getElementById('planDone').textContent = r.summary.done;
@@ -3372,6 +3384,20 @@
       .setPlanNote(sessionStorage.getItem('token'), date, document.getElementById('planNote').value);
   }
 
+  // Период звонков плана: статистику грузят и за несколько дней сразу,
+  // и «Прослушано» считается по всем звонкам периода, а не одного дня.
+  function savePlanPeriod() {
+    const f = document.getElementById('planFrom').value, t = document.getElementById('planTo').value;
+    if (!f || !t) return;
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) { toast(r.error); loadPlan(false, true); return; }
+      toast(r.message, 'ok');
+      planScrollY = window.scrollY;
+      loadPlan(false, true);
+    }).withFailureHandler(function (e) { toast(e); })
+      .setPlanPeriod(sessionStorage.getItem('token'), document.getElementById('planDate').value, f, t);
+  }
+
   // ---------- ВОЗВРАТ НА ТО ЖЕ МЕСТО ----------
   // Из плана уходят в чек-лист и возвращаются — и листали длинный план
   // заново с самого верха. Теперь место запоминается при уходе и
@@ -3387,6 +3413,7 @@
 
   function openImport() {
     document.getElementById('impDate').value = document.getElementById('planDate').value || yesterdayStr();
+    document.getElementById('impDateTo').value = '';
     document.getElementById('impText').value = '';
     document.getElementById('impFile').value = '';
     document.getElementById('impMessage').style.display = 'none';
@@ -3397,6 +3424,7 @@
   function impFilePicked() {
     const has = !!document.getElementById('impFile').files.length;
     document.getElementById('impDate').disabled = has;
+    document.getElementById('impDateTo').disabled = has;
     document.getElementById('impText').disabled = has;
   }
 
@@ -3426,13 +3454,15 @@
 
     google.script.run.withSuccessHandler(function (r) {
       if (!r.success) { m.textContent = '❌ ' + r.error; m.className = 'message error'; m.style.display = 'block'; return; }
-      let txt = '✅ Загружено строк: ' + r.imported + ' за ' + r.date;
+      let txt = '✅ Загружено строк: ' + r.imported + ' за ' +
+        (r.period && r.period.days > 1 ? 'звонки ' + r.period.fromRu + ' — ' + r.period.toRu : r.date);
       if (r.unknown.length) txt += '. Нет в составе (' + r.unknown.length + '): ' + r.unknown.join(', ');
       m.textContent = txt; m.className = r.unknown.length ? 'message error' : 'message success'; m.style.display = 'block';
       document.getElementById('planDate').value = r.date.split('.').reverse().join('-');
       setTimeout(function () { document.getElementById('importModal').classList.remove('active'); loadPlan(false); }, r.unknown.length ? 3500 : 1200);
     }).withFailureHandler(function (e) { m.textContent = '❌ ' + e; m.className = 'message error'; m.style.display = 'block'; })
-      .importAcceptedCalls(sessionStorage.getItem('token'), date, text, base64);
+      .importAcceptedCalls(sessionStorage.getItem('token'), date, text, base64,
+        file ? '' : document.getElementById('impDateTo').value);
   }
 
   function backToQc() {
@@ -4353,6 +4383,7 @@
         '<td>' + r.submitted + '</td>' +
         '<td><strong style="color:' + (r.left ? 'var(--bad)' : 'var(--good)') + '">' + r.left + '</strong></td>' +
         '</tr></tbody></table></div>' +
+        (r.period && r.period.days > 1 ? '<div class="hint" style="margin-top:10px;">В плане звонки с ' + r.period.fromRu + ' по ' + r.period.toRu + ' — выгружать можно любые из этих дней.</div>' : '') +
         '<div class="hint" style="margin-top:10px;">Из плана в ' + r.plan + ' звонк' + (r.plan === 1 ? '' : 'а') +
           ' один СКК берёт сам, поэтому от вас — <strong>' + r.ownPlan + '</strong>.' +
         (r.left

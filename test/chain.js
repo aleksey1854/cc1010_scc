@@ -792,6 +792,31 @@ const R = (fn, ...a) => api.call(fn, a);
   await R('deleteEvaluation', qcT, jA.id);
   await R('deleteEvaluation', qcT, jB.id);
 
+  head('ШАГ 9г. ПЕРИОД ЗВОНКОВ У ПЛАНА');
+  // Статистику грузят и за несколько дней сразу. «Прослушано» считало
+  // только звонки ровно в дату плана — при объединённых днях выходил 0.
+  const ago = n => { const d = new Date(); d.setDate(d.getDate() - n); return core.isoDate(d); };
+  const P1 = ago(3), P2 = ago(2), P3 = ago(1);
+  const impP = await R('importAcceptedCalls', qcT, P1, OP[0] + ';300\n' + OP2[0] + ';250', '', P3);
+  chk('статистика за несколько дней загружается с периодом', impP.success === true && impP.period && impP.period.days === 3, impP);
+  const evP = await R('saveEvaluation', { pin: qcT,
+    meta: { ...META, operator: OP2[0], reqId: '', callDate: P2, callTime: '09:30', phone: '79165557001' }, answers: ans, comments: {} });
+  const planP = await R('getListeningPlan', qcT, P1);
+  const rowP = planP.rows.find(x => x.operator === OP2[0]);
+  chk('  оценка звонка из середины периода засчитана в «Прослушано»', evP.success && rowP && rowP.done === 1, rowP);
+  chk('  период виден в плане', planP.period.from === P1 && planP.period.to === P3, planP.period);
+  chk('СКК сужает период плана', (await R('setPlanPeriod', qcT, P1, P1, P1)).success === true);
+  chk('  звонок вне периода больше не засчитан',
+    (await R('getListeningPlan', qcT, P1)).rows.find(x => x.operator === OP2[0]).done === 0);
+  chk('конец периода раньше начала — отказ', (await R('setPlanPeriod', qcT, P1, P3, P1)).success === false);
+  chk('оператору менять период нельзя', (await R('setPlanPeriod', opT, P1, P1, P3)).code === 'forbidden');
+  await R('setPlanPeriod', qcT, P1, P1, P3);
+  const rqP = await R('createRequest', { pin: opT, hasCall: 'yes', callDate: P2, callTime: '10:40', phone: '77011239999', callType: 'СР' });
+  const upP = await R('getMyUploadPlan', opT, P1);
+  chk('у оператора в плане выгружено считается за весь период',
+    rqP.success === true && upP.submitted === 1 && upP.period.days === 3, { rq: rqP.error, submitted: upP.submitted, period: upP.period });
+  await R('deleteEvaluation', qcT, evP.id);
+
   head('ШАГ 10. СЕССИИ');
   await R('logoutSession', opT);
   chk('после выхода токен не работает', (await R('getOperatorStats', opT)).success === false);

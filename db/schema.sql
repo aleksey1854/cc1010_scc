@@ -320,3 +320,13 @@ CREATE TABLE plan_notes (
   updated_by text        NOT NULL DEFAULT '',
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- Период звонков у плана прослушки (015): статистику грузят и за несколько дней
+CREATE TABLE stat_periods (
+  stat_date   date        PRIMARY KEY,
+  period_from date        NOT NULL,
+  period_to   date        NOT NULL,
+  updated_by  text        NOT NULL DEFAULT '',
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  CHECK (period_from <= period_to)
+);

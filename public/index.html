@@ -421,6 +421,11 @@
 
   /* ===== ТАБЛИЦЫ ===== */
   .table-wrapper{ overflow-x:auto; margin:0 -4px; }
+  /* Столбец с кнопками прилипает к правому краю: на экране ноутбука
+     журнал шире окна, и «Апелляция» уезжала за край — у РГО она
+     «пропала». Теперь кнопки на виду при любой ширине и прокрутке вбок. */
+  .col-actions{ position:sticky; right:0; z-index:1; background:var(--surface);
+    box-shadow:-10px 0 10px -10px rgba(15,23,42,.25); }
   /* закреплённая копия шапки таблицы — под шапкой сайта (у той z-index 50) */
   .sticky-head{ position:fixed; z-index:45; overflow:hidden; background:var(--surface);
     box-shadow:0 8px 12px -10px rgba(15,23,42,.35); }
@@ -4830,7 +4835,7 @@
         gs.innerHTML = '<option value="">Все группы</option>' + groups.map(function (g) { return '<option>' + g + '</option>'; }).join('');
       }
       if (!r.rows.length) { box.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Оценок нет</p></div>'; return; }
-      let html = '<div class="table-wrapper table-dense"><table><thead><tr><th>Дата звонка</th><th>Дата прослушки</th><th>Оператор</th><th>Группа</th><th>СКК</th><th>Телефон</th><th>Длительность</th><th>Тематика</th><th>Подтематика</th><th>Качество</th><th>Ошибки</th><th></th></tr></thead><tbody>';
+      let html = '<div class="table-wrapper table-dense"><table><thead><tr><th>Дата звонка</th><th>Дата прослушки</th><th>Оператор</th><th>Группа</th><th>СКК</th><th>Телефон</th><th>Длительность</th><th>Тематика</th><th>Подтематика</th><th>Качество</th><th>Ошибки</th><th class="col-actions"></th></tr></thead><tbody>';
       r.rows.forEach(function (e) {
         const errs = e.failed.length
           ? e.failed.map(function (f) { return '<div style="margin:2px 0;"><span class="fail-tag' + (f.critical ? '' : ' minor') + '">' + f.text + '</span>' + (f.comment ? '<span style="color:var(--muted);font-size:12px;"> — ' + f.comment + '</span>' : '') + '</div>'; }).join('')
@@ -4857,16 +4862,18 @@
           ? '<button class="btn-small btn-warn" title="Изменить оценку по апелляции" onclick="editEvaluation(\'' + e.id + '\')"><i class="fas fa-pen-to-square"></i> Правка</button> '
           : '';
         html += '<tr><td style="white-space:nowrap;">' + e.callDate + '</td>' +
-          '<td style="white-space:nowrap;color:var(--muted);">' + (e.checkedDate || '—') +
+          // сама дата не переносится, а «отправлен …» — может: без этого
+          // столбец был вдвое шире и выталкивал кнопки за край окна
+          '<td style="color:var(--muted);"><span style="white-space:nowrap;">' + (e.checkedDate || '—') + '</span>' +
             (e.sentDate ? '<div class="hint">отправлен ' + e.sentDate + '</div>' : '') + '</td>' +
           '<td>' + e.operator + '</td><td>' + e.group + '</td><td>' + e.qc + '</td>' +
           '<td style="white-space:nowrap;">' + (e.phone || '—') + '</td>' +
           // «Длит: » в каждой строке лишнее — это и так колонка длительности
-          '<td style="white-space:nowrap;">' + (e.criterion ? escHtml(String(e.criterion).replace(/^Длит:\s*/i, '')) : '—') + '</td>' +
+          '<td>' + (e.criterion ? escHtml(String(e.criterion).replace(/^Длит:\s*/i, '')) : '—') + '</td>' +
           '<td>' + (e.topic || '—') + '</td><td>' + (e.sub || '—') + '</td>' +
           '<td><strong style="color:' + scoreColorHex(e.score) + '">' + pct2(e.score) + '</strong>' + flags + '</td>' +
           '<td style="max-width:420px;">' + errs + '</td>' +
-          '<td style="white-space:nowrap;">' + appeal + edit + sent + del +
+          '<td class="col-actions" style="white-space:nowrap;">' + appeal + edit + sent + del +
           '<button class="btn-small" title="Скачать чек-лист" onclick="downloadEval(\'' + e.id + '\')"><i class="fas fa-file-excel"></i></button></td></tr>';
       });
       html += '</tbody></table></div>';

@@ -631,6 +631,46 @@ const R = (fn, ...a) => api.call(fn, a);
     Buffer.from(sheet.contentBase64, 'base64').slice(0, 2).toString() === 'PK');
   chk('  файл назван номером оценки', sheet.filename === ev.id + '.xlsx', sheet.filename);
 
+  // журнал — по листу «Журнал» их формы: строка номеров, шапка, ответы,
+  // за ними комментарии в том же порядке, данные звонка и доли блоков
+  {
+    const ExcelJS = require('exceljs');
+    const jr = await R('exportReport', mgrT, 'journal', {});
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(Buffer.from(jr.contentBase64, 'base64'));
+    const ws = wb.worksheets[0];
+    const cfg = await db.getChecklist();
+    const n = cfg.blocks.reduce((s, b) => s + b.items.length, 0);
+    const head = c => ws.getCell(2, c).value;
+    chk('журнал: лист «Журнал», первая строка — номера столбцов',
+      ws.name === 'Журнал' && ws.getCell(1, 2).value === 2 && ws.getCell(1, 5).value === 5, ws.name);
+    chk('  шапка: Дата, ФИО, % Оценки, Оценка 1/2',
+      ['Дата', 'ФИО', '% Оценки', 'Оценка 1/2'].every((h, i) => head(i + 1) === h));
+    const first = cfg.blocks[0].items[0].text.replace(/ё/g, 'е');
+    chk('  ответы, затем комментарии к тем же пунктам',
+      head(5) === first && head(5 + n) === first, [head(5), head(5 + n)]);
+    chk('  после трёх пустых — тематика, в конце — блоки',
+      /^Тематика диалога/.test(head(5 + 2 * n + 3)) && head(5 + 2 * n + 12) !== null
+        && ws.getCell(2, 5 + 2 * n + 12 + cfg.blocks.length).value === null);
+    chk('  закреплены 4 столбца и шапка',
+      ws.views[0].xSplit === 4 && ws.views[0].ySplit === 2, ws.views[0]);
+    const rows = [];
+    for (let r = 3; r <= ws.rowCount; r++) rows.push(ws.getRow(r));
+    chk('  пункт без отклонения — «Положительно», событие — «Не обнаружено»',
+      rows.length > 0 && rows.every(r => [...Array(n).keys()].every(k => {
+        const v = r.getCell(5 + k).value; return typeof v === 'string' && v.length > 0;
+      })));
+    chk('  дата и % — числами, а не текстом',
+      rows.every(r => r.getCell(1).value instanceof Date && typeof r.getCell(3).value === 'number'));
+    const cnt = new Map();
+    chk('  «Оценка N» считает оценки оператора по порядку',
+      rows.every(r => {
+        const k = (cnt.get(r.getCell(2).value) || 0) + 1;
+        cnt.set(r.getCell(2).value, k);
+        return r.getCell(4).value === 'Оценка ' + k;
+      }));
+  }
+
   // РГО видит только свою группу — и в журнале, и в выгрузке одного чек-листа
   const foreign = await db.one(
     `SELECT public_id FROM evaluations WHERE team <> 'ИНВ-1' ORDER BY id DESC LIMIT 1`);

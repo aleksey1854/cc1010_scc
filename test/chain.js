@@ -265,6 +265,17 @@ const R = (fn, ...a) => api.call(fn, a);
     opsAfter.operators.some(o => o.fullName === fired[0] && o.dismissed), fired[0]);
   chk('  и в составе он виден как уволенный',
     (await R('getAllUsers', srgoT)).users.some(u => u.fullName === fired[0] && u.active === false));
+  // в кабинете РГО — отдельным разделом внизу, с датой, когда исчезнет
+  const rgo3 = creds.find(x => x[2] === 'rgo' && x[1] === 'ИНВ-3');
+  if (rgo3) {
+    const d3 = await R('getRgoDashboard', (await R('login', rgo3[3], rgo3[4])).token, 'all');
+    const last = d3.operators[d3.operators.length - 1];
+    chk('  у РГО уволенный — внизу списка, с датой исчезновения',
+      last && last.fullName === fired[0] && !!last.dismissed && /^\d\d\.\d\d\.\d{4}$/.test(last.goneOn),
+      last);
+    chk('  и в число операторов группы не входит',
+      d3.summary.operatorsTotal === d3.operators.filter(o => !o.dismissed).length, d3.summary);
+  }
   await db.q(`UPDATE staff SET dismissed_at = current_date - interval '4 months' WHERE full_name = $1`, [fired[0]]);
   chk('через три месяца пропадает из списков',
     !(await R('getOperatorsList', qcT)).operators.some(o => o.fullName === fired[0]));

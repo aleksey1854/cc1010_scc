@@ -349,6 +349,11 @@
   /* НЖ — чек-лист по неподтверждённой жалобе: отмечен «Признак жалобы»,
      но не «Подтверждённая жалоба». Жёлтый, как просили: не ошибка, а пометка */
   .nj-tag, .fail-tag.nj-tag{ background:var(--mid-bg); color:var(--mid-ink); border:1px solid var(--mid); }
+  /* уволенные в кабинете РГО — отдельным разделом внизу, приглушённо */
+  .gone-head td{ background:var(--surface-2); font-weight:700; color:var(--ink-2); padding-top:14px; }
+  .gone-head td span{ font-weight:400; color:var(--muted); }
+  .gone-row td{ color:var(--muted); }
+  .gone-tag, .fail-tag.gone-tag{ background:transparent; color:var(--muted); border:1px solid var(--muted); }
   .new-chip{ display:inline-block; padding:1px 7px; border-radius:6px; font-size:11px;
     font-weight:700; background:var(--accent); color:#fff; margin-left:6px; vertical-align:middle; }
   .ev-kz{ padding:5px 10px; border:1px solid var(--border-strong); border-radius:8px;
@@ -2860,8 +2865,23 @@
       const box = document.getElementById('rgoOperatorsList');
       if (!res.operators.length) { box.innerHTML = '<div class="empty-state"><i class="fas fa-user-slash"></i><p>В группе нет операторов</p></div>'; return; }
       let html = '<div class="table-wrapper"><table><thead><tr><th>Оператор</th><th>Группа</th><th>Проверок</th><th>Средний балл</th><th title="сколько ошибок набралось по чек-листам: критичные плюс некритичные">Ошибок по ч/л</th><th title="от неё считается стаж оператора">Принят</th></tr></thead><tbody>';
+      let goneHead = false;
       res.operators.forEach(function (o) {
         const scoreCell = o.avgScore === null ? '<span style="color:#bbb">нет проверок</span>' : '<strong style="color:' + scoreColorHex(o.avgScore) + '">' + pct2(o.avgScore) + '</strong>';
+        // уволенные — отдельным разделом внизу: сервер отдаёт их последними
+        if (o.dismissed) {
+          if (!goneHead) {
+            goneHead = true;
+            html += '<tr class="gone-head"><td colspan="6"><i class="fas fa-user-slash"></i> Уволен ' +
+              '<span>(исчезнет через 3 месяца)</span></td></tr>';
+          }
+          html += '<tr class="gone-row"><td>' + escHtml(o.fullName) +
+            ' <span class="fail-tag gone-tag" title="уволен ' + o.dismissed + '; в списке до ' + o.goneOn +
+            ' — на случай жалобы на его звонок">уволен ' + o.dismissed + '</span></td><td>' + escHtml(o.group) +
+            '</td><td>' + o.checkedCount + '</td><td>' + scoreCell + '</td><td>' + o.failsCount +
+            '</td><td title="исчезнет из списка ' + o.goneOn + '">' + (o.hired || '—') + '</td></tr>';
+          return;
+        }
         const h = rgoHired[o.fullName];
         // приёмку РГО ставит один раз: дальше поле только показывает дату
         const hiredCell = (h && h.hired)

@@ -438,6 +438,9 @@
      не влезают и приходится возить таблицу вбок. */
   .table-dense table{ font-size:13px; }
   .table-dense th, .table-dense td{ padding:8px 10px; }
+  /* На экране ноутбука журнал в 12 столбцов не влезал на ~70px, и
+     прилипший столбец кнопок закрывал «Ошибки». Уже поля — влезает. */
+  @media (max-width:1440px){ .table-dense th, .table-dense td{ padding:7px 6px; } }
   /* длинные заголовки вроде «Необоснованные от заказчика» переносим:
      в одну строку они распирают таблицу шире экрана */
   .table-dense th{ white-space:normal; }

@@ -369,6 +369,34 @@
   .ap-rejected{ background:var(--bad-bg); color:#a52020; }
   .ap-partial{ background:var(--mid-bg); color:#8a5600; }
   .ap-unseen td{ background:var(--accent-soft); }
+  /* картинки к апелляции: поле вставки, превью в окне и в списке, просмотр */
+  .ap-drop{ border:1.5px dashed var(--border-strong); border-radius:10px; padding:14px 12px;
+    text-align:center; color:var(--muted); font-size:13px; cursor:pointer;
+    transition:border-color .15s, background .15s; }
+  .ap-drop:hover, .ap-drop:focus-visible, .ap-drop.over{ border-color:var(--accent); background:var(--accent-soft);
+    color:var(--accent-ink); outline:none; }
+  .ap-drop b{ color:var(--ink-2); }
+  .ap-thumbs{ display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+  .ap-thumbs:empty{ display:none; }
+  .ap-thumb{ position:relative; width:92px; height:68px; border-radius:8px; overflow:hidden;
+    border:1px solid var(--border-strong); background:var(--surface-2); }
+  .ap-thumb img{ width:100%; height:100%; object-fit:cover; display:block; cursor:zoom-in; }
+  .ap-thumb .ap-x{ position:absolute; top:3px; right:3px; width:22px; height:22px; border-radius:50%;
+    border:none; background:rgba(18,23,34,.72); color:#fff; font-size:13px; line-height:22px;
+    padding:0; cursor:pointer; }
+  .ap-thumb .ap-x:hover{ background:var(--bad); }
+  .ap-thumb.busy::after{ content:''; position:absolute; inset:0; background:
+    linear-gradient(90deg, transparent, rgba(255,255,255,.6), transparent) var(--surface-2);
+    background-size:200% 100%; animation:apShine 1s linear infinite; }
+  @keyframes apShine{ from{ background-position:200% 0; } to{ background-position:-200% 0; } }
+  .ap-imgs{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+  .ap-img{ width:64px; height:46px; border-radius:6px; border:1px solid var(--border-strong);
+    background:var(--surface-2); object-fit:cover; cursor:zoom-in; display:block; }
+  #imgLightbox{ position:fixed; inset:0; z-index:10050; display:none; align-items:center; justify-content:center;
+    background:rgba(11,16,25,.86); cursor:zoom-out; padding:24px; }
+  #imgLightbox.active{ display:flex; }
+  #imgLightbox img{ max-width:100%; max-height:100%; border-radius:6px; background:#fff;
+    box-shadow:0 12px 40px rgba(0,0,0,.45); }
   .ap-actions{ display:flex; flex-direction:column; gap:6px; min-width:230px; }
   .ap-actions .row{ display:flex; gap:6px; }
   .ap-actions textarea{ width:100%; padding:7px 9px; border:1.5px solid var(--border-strong);
@@ -727,6 +755,16 @@
       <small class="hint">Её увидит старший СКК: он разберёт и ответит решением.
         <span class="kbd-hint">Ctrl+Enter — отправить</span></small>
     </div>
+    <div class="form-group">
+      <label>Картинки <span style="font-weight:400;color:var(--muted);">— если нужно, до 5 штук</span></label>
+      <div id="appealDrop" class="ap-drop" tabindex="0" role="button"
+        title="Вставить скриншот: Ctrl+V. Или перетащите картинку сюда">
+        <i class="fas fa-image"></i> Вставьте скриншот <b>Ctrl+V</b>, перетащите сюда
+        или <u>выберите файл</u>
+      </div>
+      <input type="file" id="appealFile" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" multiple hidden>
+      <div id="appealThumbs" class="ap-thumbs"></div>
+    </div>
     <div class="btn-row">
       <button type="button" class="btn-cancel" onclick="document.getElementById('appealModal').classList.remove('active')">Отмена</button>
       <button type="button" class="btn-save" data-primary onclick="submitAppeal()"><i class="fas fa-paper-plane"></i> Отправить</button>
@@ -734,6 +772,7 @@
     <div class="message" id="appealMessage"></div>
   </div>
 </div>
+<div id="imgLightbox" title="Закрыть — клик или Esc"><img alt=""></div>
 
 <!-- СМЕНА ПАРОЛЯ -->
 <div class="review-modal" id="pwModal">
@@ -4479,27 +4518,199 @@
       'Оценка <strong>' + evId + '</strong> · ' + who + ' · ' + date +
       ' · <strong>' + pct2(Number(score)) + '</strong>';
     document.getElementById('appealReason').value = '';
+    appealPics = []; appealBusy = 0; drawAppealPics();
     const m = document.getElementById('appealMessage');
     m.style.display = 'none'; m.className = 'message';
     document.getElementById('appealModal').classList.add('active');
     setTimeout(function () { document.getElementById('appealReason').focus(); }, 150);
   }
 
+  // ---------- КАРТИНКИ К АПЕЛЛЯЦИИ ----------
+  // Скриншот вставляют прямо в окно (Ctrl+V), перетаскивают или выбирают
+  // файлом. Ссылкой не получалось — картинки кидали в личку.
+  // Сжимаем здесь же, в браузере: экран 1920×1080 из PNG в 2–3 МБ
+  // становится WebP/JPEG на 100–300 КБ, и запрос укладывается в лимит
+  // Vercel (4,5 МБ) даже с пятью картинками.
+  const AP_IMG_MAX = 5;
+  const AP_IMG_SIDE = 2200;              // длинная сторона: текст на скриншоте читается
+  const AP_IMG_TARGET = 500 * 1024;      // сервер примет до 900 КБ, берём с запасом
+  let appealPics = [];                   // { data(base64), w, h, url }
+  let appealBusy = 0;                    // сколько картинок ещё сжимается
+
+  function apMsg(text, ok) {
+    const m = document.getElementById('appealMessage');
+    m.textContent = text; m.className = 'message ' + (ok ? 'success' : 'error'); m.style.display = 'block';
+  }
+
+  function canvasBlob(canvas, type, q) {
+    return new Promise(function (res) { canvas.toBlob(res, type, q); });
+  }
+
+  // любая картинка → { data, w, h, url } не тяжелее AP_IMG_TARGET
+  async function shrinkImage(file) {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise(function (res, rej) {
+        const i = new Image();
+        i.onload = function () { res(i); };
+        i.onerror = function () { rej(new Error('не картинка')); };
+        i.src = url;
+      });
+      let w = img.naturalWidth, h = img.naturalHeight;
+      if (!w || !h) throw new Error('пустая картинка');
+      let k = Math.min(1, AP_IMG_SIDE / Math.max(w, h));
+      let blob = null;
+      // сначала качество, потом размер: мелкий текст на скриншоте важнее веса
+      for (let step = 0; step < 6; step++) {
+        const cw = Math.max(1, Math.round(w * k)), ch = Math.max(1, Math.round(h * k));
+        const c = document.createElement('canvas');
+        c.width = cw; c.height = ch;
+        const g = c.getContext('2d');
+        g.fillStyle = '#fff'; g.fillRect(0, 0, cw, ch);   // прозрачное в JPEG не станет чёрным
+        g.drawImage(img, 0, 0, cw, ch);
+        const q = [0.9, 0.82, 0.72, 0.82, 0.72, 0.6][step];
+        blob = await canvasBlob(c, 'image/webp', q);
+        // браузер без WebP вернёт PNG — тогда JPEG
+        if (!blob || blob.type !== 'image/webp') blob = await canvasBlob(c, 'image/jpeg', q);
+        if (blob && blob.size <= AP_IMG_TARGET) { w = cw; h = ch; break; }
+        if (step >= 2) k *= 0.75;
+        if (step === 5) { w = cw; h = ch; }
+      }
+      if (!blob || blob.size > 880 * 1024) throw new Error('слишком большая');
+      const dataUrl = await new Promise(function (res) {
+        const fr = new FileReader(); fr.onload = function () { res(fr.result); }; fr.readAsDataURL(blob);
+      });
+      return { data: String(dataUrl).split(',')[1], w: w, h: h, url: dataUrl };
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  function addAppealFiles(files) {
+    const list = [...files].filter(function (f) { return f && /^image\//.test(f.type); });
+    if (!list.length) { apMsg('❌ Это не картинка — можно PNG, JPEG, WebP'); return; }
+    const room = AP_IMG_MAX - appealPics.length - appealBusy;
+    if (room <= 0) { apMsg('❌ Не больше ' + AP_IMG_MAX + ' картинок к одной апелляции'); return; }
+    if (list.length > room) apMsg('❌ Добавлено ' + room + ' из ' + list.length + ': не больше ' + AP_IMG_MAX + ' картинок');
+    else document.getElementById('appealMessage').style.display = 'none';
+    list.slice(0, room).forEach(function (f) {
+      appealBusy++; drawAppealPics();
+      shrinkImage(f).then(function (p) {
+        appealBusy--; appealPics.push(p); drawAppealPics();
+      }).catch(function () {
+        appealBusy--; drawAppealPics();
+        apMsg('❌ Картинку «' + (f.name || 'из буфера') + '» не удалось прочитать');
+      });
+    });
+  }
+
+  function drawAppealPics() {
+    const box = document.getElementById('appealThumbs');
+    box.innerHTML = appealPics.map(function (p, i) {
+      return '<div class="ap-thumb"><img src="' + p.url + '" alt="картинка ' + (i + 1) + '" data-i="' + i + '">' +
+        '<button type="button" class="ap-x" title="Убрать" data-x="' + i + '">×</button></div>';
+    }).join('') + Array(appealBusy + 1).join('<div class="ap-thumb busy"></div>');
+    box.querySelectorAll('img[data-i]').forEach(function (im) { im.onclick = function () { showImage(im.src); }; });
+    box.querySelectorAll('button[data-x]').forEach(function (b) {
+      b.onclick = function () { appealPics.splice(+b.getAttribute('data-x'), 1); drawAppealPics(); };
+    });
+    const btn = document.querySelector('#appealModal .btn-save');
+    if (btn) btn.title = appealBusy ? 'Картинки ещё сжимаются' : '';
+  }
+
+  (function () {
+    const drop = document.getElementById('appealDrop');
+    const file = document.getElementById('appealFile');
+    drop.onclick = function () { file.click(); };
+    drop.onkeydown = function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); file.click(); } };
+    file.onchange = function () { addAppealFiles(file.files); file.value = ''; };
+    ['dragenter', 'dragover'].forEach(function (t) {
+      drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.add('over'); });
+    });
+    ['dragleave', 'drop'].forEach(function (t) {
+      drop.addEventListener(t, function () { drop.classList.remove('over'); });
+    });
+    // stopPropagation: иначе то же событие поймает и окно ниже — картинка встанет дважды
+    drop.addEventListener('drop', function (e) { e.preventDefault(); e.stopPropagation(); addAppealFiles(e.dataTransfer.files); });
+    // картинку, брошенную мимо поля, браузер открыл бы вместо сайта
+    const modal = document.getElementById('appealModal');
+    modal.addEventListener('dragover', function (e) { e.preventDefault(); });
+    modal.addEventListener('drop', function (e) {
+      e.preventDefault();
+      if (e.dataTransfer && e.dataTransfer.files.length) addAppealFiles(e.dataTransfer.files);
+    });
+    // Ctrl+V в любом месте открытого окна. Из Excel в буфер кладётся и
+    // текст, и картинка ячеек — если вставляют в поле причины, это текст
+    document.addEventListener('paste', function (e) {
+      if (!modal.classList.contains('active') || !e.clipboardData) return;
+      const files = [...e.clipboardData.items]
+        .filter(function (it) { return it.kind === 'file' && /^image\//.test(it.type); })
+        .map(function (it) { return it.getAsFile(); }).filter(Boolean);
+      if (!files.length) return;
+      const hasText = [...e.clipboardData.types].indexOf('text/plain') >= 0;
+      if (hasText && e.target && e.target.id === 'appealReason') return;
+      e.preventDefault();
+      addAppealFiles(files);
+    });
+  })();
+
+  // Картинка на весь экран: клик или Esc закрывают
+  function showImage(src) {
+    const lb = document.getElementById('imgLightbox');
+    lb.querySelector('img').src = src;
+    lb.classList.add('active');
+  }
+  document.getElementById('imgLightbox').onclick = function () { this.classList.remove('active'); };
+  // раньше общего обработчика Esc: закрыть картинку, а не окно под ней
+  document.addEventListener('keydown', function (e) {
+    const lb = document.getElementById('imgLightbox');
+    if (e.key === 'Escape' && lb.classList.contains('active')) { e.preventDefault(); lb.classList.remove('active'); }
+  }, true);
+
+  // Картинки в списке апелляций грузим по одной и только те, что видно:
+  // в списке их может быть много, а каждая — сотни килобайт
+  const apImgCache = {};
+  let apImgObserver = null;
+  function loadAppealImg(el) {
+    const id = el.getAttribute('data-img');
+    if (apImgCache[id]) { el.src = apImgCache[id]; return; }
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) { el.title = r.error; return; }
+      apImgCache[id] = 'data:' + r.mime + ';base64,' + r.data;
+      el.src = apImgCache[id];
+    }).withFailureHandler(function () { el.title = 'Не загрузилась — обновите список'; })
+      .getAppealImage(sessionStorage.getItem('token'), id);
+  }
+  function wireAppealImgs(box) {
+    const imgs = box.querySelectorAll('img[data-img]');
+    imgs.forEach(function (el) { el.onclick = function () { if (el.src) showImage(el.src); }; });
+    if (apImgObserver) apImgObserver.disconnect();
+    if (!('IntersectionObserver' in window)) { imgs.forEach(loadAppealImg); return; }
+    apImgObserver = new IntersectionObserver(function (items) {
+      items.forEach(function (it) {
+        if (it.isIntersecting) { apImgObserver.unobserve(it.target); loadAppealImg(it.target); }
+      });
+    }, { rootMargin: '200px' });
+    imgs.forEach(function (el) { apImgObserver.observe(el); });
+  }
+
   function submitAppeal() {
     const reason = document.getElementById('appealReason').value.trim();
     const m = document.getElementById('appealMessage');
-    if (!reason) { m.textContent = '❌ Укажите причину апелляции'; m.className = 'message error'; m.style.display = 'block'; return; }
+    if (!reason) { apMsg('❌ Укажите причину апелляции'); return; }
+    if (appealBusy) { apMsg('❌ Подождите пару секунд — картинки ещё сжимаются'); return; }
     const btn = document.querySelector('#appealModal .btn-save');
     btn.disabled = true;
     google.script.run.withSuccessHandler(function (r) {
       btn.disabled = false;
-      if (!r.success) { m.textContent = '❌ ' + r.error; m.className = 'message error'; m.style.display = 'block'; return; }
-      m.textContent = '✅ ' + r.message + ' (' + r.id + ')'; m.className = 'message success'; m.style.display = 'block';
+      if (!r.success) { apMsg('❌ ' + r.error); return; }
+      apMsg('✅ ' + r.message + ' (' + r.id + ')' + (r.images ? ' · картинок: ' + r.images : ''), true);
       setTimeout(function () { document.getElementById('appealModal').classList.remove('active'); }, 1400);
     }).withFailureHandler(function (e) {
       btn.disabled = false;
       m.textContent = '❌ ' + e; m.className = 'message error'; m.style.display = 'block';
-    }).createAppeal(sessionStorage.getItem('token'), appealEv, reason);
+    }).createAppeal(sessionStorage.getItem('token'), appealEv, reason,
+      appealPics.map(function (p) { return { data: p.data, w: p.w, h: p.h }; }));
   }
 
   function loadAppeals() {
@@ -4536,7 +4747,10 @@
           '<td>' + a.operator + '</td><td>' + a.team + '</td><td>' + a.qc + '</td>' +
           '<td><strong style="color:' + scoreColorHex(a.score) + '">' + pct2(a.score) + '</strong></td>' +
           '<td style="white-space:nowrap;">' + (a.phone || '—') + '</td>' +
-          '<td style="max-width:280px;">' + a.reason + '</td>' +
+          '<td style="max-width:280px;">' + escHtml(a.reason) +
+          (a.images && a.images.length ? '<div class="ap-imgs">' + a.images.map(function (im, i) {
+            return '<img class="ap-img" data-img="' + im.id + '" alt="картинка ' + (i + 1) + '" title="Открыть картинку">';
+          }).join('') + '</div>' : '') + '</td>' +
           '<td><span class="ap-status ap-' + a.status + '">' + a.statusRu + '</span></td>';
 
         if (r.canAnswer) {
@@ -4548,17 +4762,18 @@
               '<button class="btn-small btn-partial" data-st="partial">Частично</button>' +
               '<button class="btn-small btn-rejected" data-st="rejected">Отказано</button>' +
               '</div></div>'
-            : (a.answer || '—') + '<div class="hint">' + a.answeredBy + ' · ' + a.answeredAt + '</div>') + '</td>';
+            : (escHtml(a.answer) || '—') + '<div class="hint">' + escHtml(a.answeredBy) + ' · ' + a.answeredAt + '</div>') + '</td>';
         } else {
           html += '<td>' + (a.status === 'new'
             ? '<span class="hint">ждём решения</span>'
-            : (a.answer || '—') + '<div class="hint">' + a.answeredBy + ' · ' + a.answeredAt +
+            : (escHtml(a.answer) || '—') + '<div class="hint">' + escHtml(a.answeredBy) + ' · ' + a.answeredAt +
               (unseen ? ' · <button class="btn-small" data-seen="' + a.id + '">Прочитано</button>' : '') + '</div>') + '</td>';
         }
         html += '</tr>';
       });
       html += '</tbody></table></div>';
       box.innerHTML = html;
+      wireAppealImgs(box);
 
       box.querySelectorAll('.ap-actions button[data-st]').forEach(function (b) {
         b.onclick = function () {

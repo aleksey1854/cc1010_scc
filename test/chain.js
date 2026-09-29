@@ -553,8 +553,37 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('  ответ помечен непрочитанным', apAfter.unseen === 1, apAfter.unseen);
   chk('РГО отмечает прочитанным', (await R('markAppealSeen', rgoT, ap.id)).success === true);
   chk('  счётчик погас', (await R('getAppeals', rgoT, {})).unseen === 0);
-  chk('после решения можно подать новую',
-    (await R('createAppeal', rgoT, ev.id, 'появились новые обстоятельства')).success === true);
+  // картинки к апелляции: скриншот вставляют прямо в окно
+  const PNG1 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const pngHead = Buffer.from(PNG1, 'base64').slice(0, 8);
+  chk('под видом картинки текст не пройдёт',
+    (await R('createAppeal', rgoT, ev.id, 'с картинкой', [{ data: Buffer.from('<script>').toString('base64') }])).success === false);
+  chk('больше пяти картинок не принимает',
+    (await R('createAppeal', rgoT, ev.id, 'с картинками', Array(6).fill({ data: PNG1 }))).success === false);
+  chk('слишком тяжёлую картинку не принимает',
+    (await R('createAppeal', rgoT, ev.id, 'большая',
+      [{ data: Buffer.concat([pngHead, Buffer.alloc(950 * 1024)]).toString('base64') }])).success === false);
+  chk('  и отказ не оставил полупустой апелляции',
+    (await R('getAppeals', rgoT, { onlyOpen: true })).rows.length === 0);
+  const apImg = await R('createAppeal', rgoT, ev.id, 'появились новые обстоятельства',
+    [{ data: PNG1, w: 1, h: 1 }, { data: 'data:image/png;base64,' + PNG1, w: 1, h: 1 }]);
+  chk('после решения можно подать новую — с двумя картинками',
+    apImg.success === true && apImg.images === 2, apImg);
+  const withImg = (await R('getAppeals', rgoT, {})).rows.find(x => x.id === apImg.id);
+  chk('  в списке — только номера картинок, без самих данных',
+    withImg && withImg.images.length === 2 && withImg.images.every(i => i.id && !i.data), withImg && withImg.images);
+  const pic = await R('getAppealImage', sqcT, withImg.images[0].id);
+  chk('  старший СКК открывает картинку — ровно ту, что прислали',
+    pic.success === true && pic.mime === 'image/png' && pic.data === PNG1, pic.error);
+  chk('  СКК тоже (апелляции ему видны на чтение)',
+    (await R('getAppealImage', qcT, withImg.images[1].id)).success === true);
+  chk('  оператору картинки закрыты',
+    (await R('getAppealImage', opT, withImg.images[0].id)).success === false);
+  const rgo2 = creds.find(x => x[2] === 'rgo' && x[1] === 'ИНВ-2');
+  if (rgo2) {
+    chk('  РГО чужой группы картинку не откроет',
+      (await R('getAppealImage', (await R('login', rgo2[3], rgo2[4])).token, withImg.images[0].id)).success === false);
+  }
 
   head('ШАГ 4. ОПЕРАТОР ВИДИТ РЕЗУЛЬТАТ');
   const ob = await R('getOperatorBootstrap', opT);

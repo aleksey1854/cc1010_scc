@@ -261,6 +261,19 @@ CREATE INDEX appeals_team_idx   ON appeals (team, created_at DESC);
 CREATE INDEX appeals_status_idx ON appeals (status, created_at DESC);
 CREATE UNIQUE INDEX appeals_open_uq ON appeals (evaluation_id) WHERE status = 'new';
 
+-- картинки к апелляции (016): отдельно, чтобы список не тянул мегабайты
+CREATE TABLE appeal_images (
+  id          bigserial   PRIMARY KEY,
+  appeal_id   bigint      NOT NULL REFERENCES appeals(id) ON DELETE CASCADE,
+  mime        text        NOT NULL,
+  data        bytea       NOT NULL,
+  width       int         NOT NULL DEFAULT 0,
+  height      int         NOT NULL DEFAULT 0,
+  sort_order  int         NOT NULL DEFAULT 0,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX appeal_images_appeal_idx ON appeal_images (appeal_id, sort_order);
+
 -- ---------- КТО КОГО СЛУШАЕТ ----------
 -- Двое СКК могли одновременно взять одного оператора. Отметка «в работе»
 -- рядом с ним это снимает.

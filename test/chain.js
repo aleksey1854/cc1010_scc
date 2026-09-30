@@ -186,6 +186,27 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('  комментарий убран', !after.comments.B2P1, after.comments);
   chk('  замечание тоже снято', !after.comments.B1P1, after.comments);
   chk('  ошибок не осталось', after.answers.B2P1 === 'Положительно', after.answers.B2P1);
+
+  // история правок: кто, когда и что поменял (просьба ССКК)
+  const evHist = await R('getEvaluationHistory', sqcT, cEv.id);
+  const h1 = evHist.entries && evHist.entries[0];
+  chk('история: правка записана — кто и когда', evHist.success === true && evHist.entries.length === 1 &&
+    h1.by === QC[0] && /^\d\d\.\d\d\.\d{4} \d\d:\d\d$/.test(h1.at), evHist.error || h1);
+  chk('  балл до и после', h1 && h1.scoreFrom === cEv.result.score && h1.scoreTo === upd.result.score, h1);
+  const b2 = h1 && h1.changes.find(c => c.t === 'answer' && c.to === 'Положительно');
+  chk('  какой пункт и как поменяли', b2 && b2.from !== 'Положительно' && !!b2.name, h1 && h1.changes);
+  chk('  убранные замечания — с текстом',
+    h1 && h1.changes.filter(c => c.t === 'comment' && c.from && !c.to).length >= 2,
+    h1 && h1.changes.filter(c => c.t === 'comment'));
+  chk('  создание — автор и дата', evHist.created && !!evHist.created.by && !!evHist.created.at, evHist.created);
+  const jHist = (await R('getJournal', sqcT, { period: 'all' })).rows.find(r => r.id === cEv.id);
+  chk('  в журнале у оценки видно, что её правили', jHist && jHist.edits === 1, jHist && jHist.edits);
+  chk('  оператору история закрыта', (await R('getEvaluationHistory', opT, cEv.id)).success === false);
+  const same = await R('updateEvaluation', { pin: qcT, meta: { ...cMeta, complaintSource: 'Клиент', evId: cEv.id },
+    answers: fixed, comments: {} });
+  const hist2 = await R('getEvaluationHistory', sqcT, cEv.id);
+  chk('  сохранили без изменений — так и записано',
+    same.success === true && hist2.entries.length === 2 && hist2.entries[1].changes.length === 0, hist2.entries);
   chk('оператор править не может',
     (await R('updateEvaluation', { pin: opT, meta: { ...cMeta, evId: cEv.id }, answers: fixed })).success === false);
   // правкой можно въехать в уже оценённый звонок — тот же уникальный индекс
@@ -368,6 +389,10 @@ const R = (fn, ...a) => api.call(fn, a);
     (await R('setSentDate', qcT, kz.id, '2026-09-05')).success === false);
   chk('жалобному — можно',
     (await R('setSentDate', qcT, cEv.id, '2026-09-05')).success === true);
+  const sentHist = (await R('getEvaluationHistory', sqcT, cEv.id)).entries.filter(x => x.action === 'sent');
+  chk('  и дата отправки попала в историю чек-листа',
+    sentHist.length === 1 && sentHist[0].changes[0].name === 'Дата отправки' && sentHist[0].changes[0].to === '05.09.2026',
+    sentHist);
   const sentJ = await R('getJournal', qcT, { period: 'all' });
   const sentRow = sentJ.rows.find(r => r.id === cEv.id);
   chk('  дата отправки видна в журнале', sentRow && sentRow.sentDate === '05.09.2026', sentRow && sentRow.sentDate);

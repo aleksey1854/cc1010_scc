@@ -262,6 +262,20 @@ CREATE INDEX appeals_team_idx   ON appeals (team, created_at DESC);
 CREATE INDEX appeals_status_idx ON appeals (status, created_at DESC);
 CREATE UNIQUE INDEX appeals_open_uq ON appeals (evaluation_id) WHERE status = 'new';
 
+-- история изменений оценки (018): кто, когда и что поменял
+CREATE TABLE evaluation_history (
+  id            bigserial   PRIMARY KEY,
+  evaluation_id bigint      NOT NULL REFERENCES evaluations(id) ON DELETE CASCADE,
+  at            timestamptz NOT NULL DEFAULT now(),
+  actor_id      bigint      REFERENCES staff(id) ON DELETE SET NULL,
+  actor_name    text        NOT NULL DEFAULT '',
+  action        text        NOT NULL DEFAULT 'edit',     -- edit | sent
+  score_from    numeric(6,2),
+  score_to      numeric(6,2),
+  changes       jsonb       NOT NULL DEFAULT '[]'
+);
+CREATE INDEX evaluation_history_ev_idx ON evaluation_history (evaluation_id, at);
+
 -- картинки к апелляции (016): отдельно, чтобы список не тянул мегабайты
 CREATE TABLE appeal_images (
   id          bigserial   PRIMARY KEY,

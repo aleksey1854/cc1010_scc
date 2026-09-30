@@ -252,6 +252,9 @@
 
   /* ===== ФОРМЫ ===== */
   .form-grid{ display:grid; grid-template-columns:1fr 1fr; gap:15px; }
+  /* длинная тематика («Адреса МО, График работы и приема БМ») в поле без
+     переноса распирала колонку, и на телефоне форма уезжала за край */
+  .form-grid > *{ min-width:0; }
   .form-group{ display:flex; flex-direction:column; }
   .form-group.full-width{ grid-column:1/-1; }
   .form-group label i{ color:var(--muted); display:inline-block; min-width:15px;
@@ -670,6 +673,64 @@
     .stats-grid{ grid-template-columns:1fr 1fr; }
     .login-container{ padding:32px 22px; }
     .container{ padding:16px 14px 32px; }
+  }
+  /* ===== ТЕЛЕФОН =====
+     Всё ниже — только для узких экранов; ноутбук и монитор не трогает. */
+  @media (max-width:640px){
+    /* шапка не липнет: на телефоне в ней три ряда, и прилипшая она
+       съедала пятую часть экрана при любой прокрутке */
+    .header{ position:static; padding:10px 14px; gap:8px; }
+    /* чек-лист: название пункта над ответами, а не сбоку — сбоку оно
+       сжималось до «Управлени», и кнопки налезали на текст */
+    .ev-row{ flex-direction:column; align-items:stretch; gap:8px; }
+    .ev-opts{ justify-content:flex-start; }
+    /* плашка итога внизу — узкой полосой, чтобы не закрывала чек-лист:
+       сверху балл и «Сохранить», под ними мелко счётчики и КЗ/ДЦ */
+    .ev-sticky{ bottom:6px; gap:6px 8px; padding:8px 10px; margin-bottom:10px; }
+    .ev-sticky .ev-score{ order:1; flex:1 1 auto; }
+    .ev-sticky .btn-submit{ order:2; padding:10px 16px !important; font-size:14px; }
+    .ev-sticky .ev-counts{ order:3; flex:0 1 auto; gap:5px; }
+    .ev-num{ font-size:24px; }
+    .ev-sticky .ev-lbl{ display:none; }
+    .ev-chip{ padding:3px 8px; font-size:11px; }
+    .ev-sticky .ev-kz{ padding:3px 8px; font-size:13px; }
+    /* прокрутка к полю (ошибка заполнения, «от кого жалоба») не прячет
+       его под плашку итога */
+    html{ scroll-padding-bottom:130px; }
+    /* самые узкие телефоны (320): балл и «Сохранить» всё ещё в одну строку */
+    @media (max-width:360px){
+      .ev-num{ font-size:21px; }
+      .ev-sticky .btn-submit{ padding:9px 11px !important; font-size:13px; }
+    }
+    /* закреплённые столбцы (кнопки журнала, группа и ФИО в отчётах)
+       занимали всю ширину телефона — данных за ними было не видно */
+    .col-actions{ position:static; box-shadow:none; }
+    .table-pinned th:nth-child(1), .table-pinned td:nth-child(1),
+    .table-pinned th:nth-child(2), .table-pinned td:nth-child(2){
+      position:static; box-shadow:none; width:auto; min-width:0; }
+    .table-pinned td:nth-child(2){ min-width:140px; }
+    /* iPhone увеличивает страницу, если у поля шрифт мельче 16px */
+    input:not([type=checkbox]):not([type=radio]), select, textarea{ font-size:16px !important; }
+    /* с 16px дата в 140px не влезала («09/01/202…»); строка и так переносится */
+    .date-range input[type=date]{ max-width:none; }
+    /* Журнал — карточками: 12 столбцов на телефон не влезают, а «Правка»
+       и самолётик жили в самом конце строки, до них листали вбок */
+    .m-cards thead{ display:none; }
+    .m-cards table, .m-cards tbody{ display:block; }
+    .m-cards tr{ display:grid; grid-template-columns:1fr 1fr; gap:8px 12px; padding:12px;
+      margin-bottom:10px; border:1px solid var(--border); border-radius:12px; }
+    .m-cards td{ display:block; padding:0; border:0; min-width:0; max-width:none !important;
+      white-space:normal !important; overflow-wrap:anywhere; }
+    .m-cards td[data-l]::before{ content:attr(data-l); display:block; margin-bottom:1px; font-size:10.5px;
+      font-weight:600; letter-spacing:.4px; text-transform:uppercase; color:var(--muted); }
+    .m-cards td.m-op{ order:-2; font-weight:600; color:var(--ink); }
+    .m-cards td.m-q{ order:-1; }
+    .m-cards td.m-wide{ grid-column:1/-1; }
+    .m-cards td.col-actions{ display:flex; flex-wrap:wrap; gap:6px; padding-top:8px;
+      border-top:1px dashed var(--border); background:none; }
+    .m-cards tr:hover td{ background:none; }
+    .review-modal{ padding:8px; }
+    .review-modal .modal-content{ padding:20px 16px; max-height:94vh; }
   }
   @media (prefers-reduced-motion:reduce){
     *, .login-container, .review-modal.active .modal-content{ animation:none !important; transition:none !important; }
@@ -3037,7 +3098,12 @@
     if (key === 'home') {
       if (!document.getElementById('repPage').classList.contains('hidden')) backFromReports();
       else if (home === 'org' && !document.getElementById('qcPage').classList.contains('hidden')) backToOrgPage();
-      else if (home === 'rgo') backFromReports();
+      // РГО уже в своём кабинете: возвращаться некуда. Раньше отсюда
+      // звался backFromReports с repFrom = 'org', и под кабинетом РГО
+      // вылезал экран дивизиона.
+      else if (home === 'rgo' && document.getElementById('rgoPage').classList.contains('hidden')) {
+        repFrom = 'rgo'; backFromReports();
+      }
       navRecord();
       return;
     }
@@ -3290,6 +3356,8 @@
       // её таблицы не видно, и шапку ей закреплять не нужно
       if (table.closest('details:not([open])')) return;
       if (table.checkVisibility && !table.checkVisibility()) return;
+      // у журнала-карточек на телефоне шапка скрыта — копировать нечего
+      if (!table.tHead.getClientRects().length) return;
       const r = table.getBoundingClientRect();
       const headH = table.tHead.getBoundingClientRect().height;
       // шапка ушла под шапку сайта, а строки таблицы ещё на экране
@@ -5111,7 +5179,8 @@
         gs.innerHTML = '<option value="">Все группы</option>' + groups.map(function (g) { return '<option>' + g + '</option>'; }).join('');
       }
       if (!r.rows.length) { box.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Оценок нет</p></div>'; return; }
-      let html = '<div class="table-wrapper table-dense"><table><thead><tr><th>Дата звонка</th><th>Дата прослушки</th><th>Оператор</th><th>Группа</th><th>СКК</th><th>Телефон</th><th>Длительность</th><th>Тематика</th><th>Подтематика</th><th>Качество</th><th>Ошибки</th><th class="col-actions"></th></tr></thead><tbody>';
+      // m-cards: на телефоне строка журнала — карточка, без прокрутки вбок
+      let html = '<div class="table-wrapper table-dense m-cards"><table><thead><tr><th>Дата звонка</th><th>Дата прослушки</th><th>Оператор</th><th>Группа</th><th>СКК</th><th>Телефон</th><th>Длительность</th><th>Тематика</th><th>Подтематика</th><th>Качество</th><th>Ошибки</th><th class="col-actions"></th></tr></thead><tbody>';
       r.rows.forEach(function (e) {
         const errs = e.failed.length
           ? e.failed.map(function (f) { return '<div style="margin:2px 0;"><span class="fail-tag' + (f.critical ? '' : ' minor') + '">' + escHtml(f.text) + '</span>' + (f.comment ? '<span style="color:var(--muted);font-size:12px;"> — ' + escHtml(f.comment) + '</span>' : '') + '</div>'; }).join('')
@@ -5137,19 +5206,19 @@
         const edit = canEditEval
           ? '<button class="btn-small btn-warn" title="Изменить оценку по апелляции" onclick="editEvaluation(\'' + e.id + '\')"><i class="fas fa-pen-to-square"></i> Правка</button> '
           : '';
-        html += '<tr><td style="white-space:nowrap;">' + e.callDate + '</td>' +
+        html += '<tr><td data-l="Звонок" style="white-space:nowrap;">' + e.callDate + '</td>' +
           // сама дата не переносится, а «отправлен …» — может: без этого
           // столбец был вдвое шире и выталкивал кнопки за край окна
-          '<td style="color:var(--muted);"><span style="white-space:nowrap;">' + (e.checkedDate || '—') + '</span>' +
+          '<td data-l="Прослушка" style="color:var(--muted);"><span style="white-space:nowrap;">' + (e.checkedDate || '—') + '</span>' +
             (e.sentDate ? '<div class="hint">отправлен ' + e.sentDate + '</div>' : '') + '</td>' +
-          '<td>' + e.operator + '</td><td>' + e.group + '</td><td>' + e.qc + '</td>' +
-          '<td style="white-space:nowrap;">' + (e.phone || '—') + '</td>' +
+          '<td class="m-op" data-l="Оператор">' + e.operator + '</td><td data-l="Группа">' + e.group + '</td><td data-l="СКК">' + e.qc + '</td>' +
+          '<td data-l="Телефон" style="white-space:nowrap;">' + (e.phone || '—') + '</td>' +
           // «Длит: » в каждой строке лишнее — это и так колонка длительности
-          '<td>' + (e.criterion ? escHtml(String(e.criterion).replace(/^Длит:\s*/i, '')) : '—') + '</td>' +
-          '<td>' + (e.topic || '—') + '</td><td>' + (e.sub || '—') + '</td>' +
-          '<td><strong style="color:' + scoreColorHex(e.score) + '">' + pct2(e.score) + '</strong>' + flags + '</td>' +
-          '<td style="max-width:420px;">' + errs + '</td>' +
-          '<td class="col-actions" style="white-space:nowrap;">' + appeal + edit + sent + del +
+          '<td data-l="Длительность">' + (e.criterion ? escHtml(String(e.criterion).replace(/^Длит:\s*/i, '')) : '—') + '</td>' +
+          '<td data-l="Тематика">' + (e.topic || '—') + '</td><td data-l="Подтематика">' + (e.sub || '—') + '</td>' +
+          '<td class="m-q" data-l="Качество"><strong style="color:' + scoreColorHex(e.score) + '">' + pct2(e.score) + '</strong>' + flags + '</td>' +
+          '<td class="m-wide" data-l="Ошибки" style="max-width:420px;">' + errs + '</td>' +
+          '<td class="col-actions m-wide" style="white-space:nowrap;">' + appeal + edit + sent + del +
           '<button class="btn-small" title="Скачать чек-лист" onclick="downloadEval(\'' + e.id + '\')"><i class="fas fa-file-excel"></i></button>' +
           // чек-лист правили — часики в конце ряда; по клику кто, когда и что
           (e.edits ? ' <button class="btn-small hist-btn" data-hist="' + e.id + '" title="Чек-лист правили' +

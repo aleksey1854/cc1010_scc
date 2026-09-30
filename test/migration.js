@@ -60,7 +60,7 @@ const head = t => console.log('\n━━━ ' + t + ' ━━━');
   const items = cfg.blocks.reduce((s, b) => s + b.items.length, 0);
   chk('пункты перенесены', items === crit.length, { выгрузка: crit.length, база: items });
   chk('блоков 9', cfg.blocks.length === 9, cfg.blocks.length);
-  chk('максимум 90 баллов', cfg.maxTotal === 90, cfg.maxTotal);
+  chk('максимум 91 балл', cfg.maxTotal === 91, cfg.maxTotal);
   chk('«Сомнительно» = половина «Положительно»',
     cfg.blocks.every(b => b.items.every(i => {
       const p = (i.options.find(o => o.value === 'pos') || {}).points;
@@ -77,8 +77,8 @@ const head = t => console.log('\n━━━ ' + t + ' ━━━');
   const all = {};
   cfg.blocks.forEach(b => b.items.forEach(i => { if (i.kind === 'score') all[i.code] = 'pos'; }));
   chk('всё положительно = 100,00', core.computeScore(cfg, all).score === 100);
-  chk('одна «сомнительно» = 98,33',
-    core.computeScore(cfg, Object.assign({}, all, { B2P1: 'dbt' })).score === 98.33,
+  chk('одна «сомнительно» = 98,35',
+    core.computeScore(cfg, Object.assign({}, all, { B2P1: 'dbt' })).score === 98.35,
     core.computeScore(cfg, Object.assign({}, all, { B2P1: 'dbt' })).score);
   chk('жалоба = 0,00', core.computeScore(cfg, Object.assign({}, all, { B8P2: 'yes' })).score === 0);
   chk('благодарность = 100,00', core.computeScore(cfg, Object.assign({}, all, { B8P1: 'yes' })).score === 100);

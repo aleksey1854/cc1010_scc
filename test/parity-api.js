@@ -116,7 +116,7 @@ function diff(a, b, path, out) {
   const cfgA = old.getChecklistConfig_();
   const cfgB = await api.call('getChecklistConfig', [T.qc.nw]);
   chk('9 блоков', cfgA.blocks.length === cfgB.blocks.length, { a: cfgA.blocks.length, b: cfgB.blocks.length });
-  chk('максимум 90', cfgA.maxTotal === cfgB.maxTotal, { a: cfgA.maxTotal, b: cfgB.maxTotal });
+  chk('максимум совпал', cfgA.maxTotal === cfgB.maxTotal, { a: cfgA.maxTotal, b: cfgB.maxTotal });
   chk('максимумы блоков совпали',
     cfgA.blocks.map(x => x.max).join('/') === cfgB.blocks.map(x => x.max).join('/'),
     { a: cfgA.blocks.map(x => x.max).join('/'), b: cfgB.blocks.map(x => x.max).join('/') });
@@ -203,7 +203,7 @@ function diff(a, b, path, out) {
   const evA = old.saveEvaluation({ pin: T.qc.old, meta, answers: ans, comments: { B2P1: 'перебивал клиента' } });
   const evB = await api.call('saveEvaluation', [{ pin: T.qc.nw, meta: Object.assign({}, meta, { reqId: rqB.requestId }), answers: ans, comments: { B2P1: 'перебивал клиента' } }]);
   chk('оценка сохранена в обеих', evA.success === true && evB.success === true, { a: evA.error, b: evB.error });
-  chk('балл совпал (98,33)', evA.result.score === evB.result.score && evA.result.score === 98.33,
+  chk('балл совпал (98,35)', evA.result.score === evB.result.score && evA.result.score === 98.35,
     { a: evA.result && evA.result.score, b: evB.result && evB.result.score });
   chk('неделя совпала', evA.week === evB.week, { a: evA.week, b: evB.week });
   chk('заявка помечена проверенной в обеих', evA.linkedRequest === true && evB.linkedRequest === true,

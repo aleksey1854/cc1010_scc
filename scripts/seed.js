@@ -73,7 +73,7 @@ const CHECKLIST = [
 // Чем пункт заполнен при открытии — как в оригинальной таблице:
 // лист начинается со 100% и опускается по мере отметки ошибок.
 const DEFAULTS = {
-  B1P1: 'pos', B1P2: 'pos', B1P3: 'pos', B2P1: 'pos', B2P2: 'pos',
+  B1P1: 'pos', B1P2: 'pos', B1P3: 'na', B2P1: 'pos', B2P2: 'pos',
   B2P3: 'pos', B2P4: 'pos', B2P5: 'pos', B2P6: 'pos',
   B3P1: 'na', B3P2: 'na', B4P1: 'pos', B5P1: 'pos',
   B5P2: 'pos', B5P3: 'na', B6P1: 'na', B6P2: 'pos',

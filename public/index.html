@@ -349,6 +349,8 @@
   /* НЖ — чек-лист по неподтверждённой жалобе: отмечен «Признак жалобы»,
      но не «Подтверждённая жалоба». Жёлтый, как просили: не ошибка, а пометка */
   .nj-tag, .fail-tag.nj-tag{ background:var(--mid-bg); color:var(--mid-ink); border:1px solid var(--mid); }
+  /* от кого жалоба — рядом с ПЖ/НЖ, спокойной рамкой: это справка, не оценка */
+  .src-tag, .fail-tag.src-tag{ background:transparent; color:var(--ink-2); border:1px solid var(--border); }
   /* история изменений оценки: метка в журнале и окно с правками */
   .btn-small.hist-btn{ position:relative; background:var(--kz-bg); color:var(--kz); }
   .btn-small.hist-btn:hover{ background:var(--kz); color:#fff; }
@@ -5114,7 +5116,7 @@
         const errs = e.failed.length
           ? e.failed.map(function (f) { return '<div style="margin:2px 0;"><span class="fail-tag' + (f.critical ? '' : ' minor') + '">' + escHtml(f.text) + '</span>' + (f.comment ? '<span style="color:var(--muted);font-size:12px;"> — ' + escHtml(f.comment) + '</span>' : '') + '</div>'; }).join('')
           : '<span style="color:var(--good-ink);font-weight:600;">без ошибок</span>';
-        const flags = (e.violation ? ' <span class="fail-tag">НС</span>' : '') + (e.complaint ? ' <span class="fail-tag">ПЖ</span>' : '') + (e.isComplaint && !e.complaint ? ' <span class="fail-tag nj-tag" title="чек-лист по неподтверждённой жалобе: в качество не идёт">НЖ</span>' : '') + (e.gratitude ? ' <span class="fail-tag minor">★</span>' : '') + (e.controlCall ? ' <span class="fail-tag kz-tag" title="контрольный звонок заказчика">КЗ</span>' : '') + (e.dc ? ' <span class="fail-tag dc-tag" title="звонок по проекту ДЦ">ДЦ</span>' : '');
+        const flags = (e.violation ? ' <span class="fail-tag">НС</span>' : '') + (e.complaint ? ' <span class="fail-tag">ПЖ</span>' : '') + (e.isComplaint && !e.complaint ? ' <span class="fail-tag nj-tag" title="чек-лист по неподтверждённой жалобе: в качество не идёт">НЖ</span>' : '') + (e.complaintSource ? ' <span class="fail-tag src-tag" title="от кого жалоба">' + (e.complaintSource === 'Заказчик' ? 'от заказчика' : e.complaintSource === 'Клиент' ? 'от клиента' : escHtml(e.complaintSource)) + '</span>' : '') + (e.gratitude ? ' <span class="fail-tag minor">★</span>' : '') + (e.controlCall ? ' <span class="fail-tag kz-tag" title="контрольный звонок заказчика">КЗ</span>' : '') + (e.dc ? ' <span class="fail-tag dc-tag" title="звонок по проекту ДЦ">ДЦ</span>' : '');
         // дату отправки вносят только у чек-листов по жалобе — их
         // оценивают одним днём, а отправляют другим
         const sent = (canEditEval && e.isComplaint)

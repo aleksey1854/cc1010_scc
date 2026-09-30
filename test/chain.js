@@ -45,8 +45,8 @@ const R = (fn, ...a) => api.call(fn, a);
 
   head('ШАГ 2. СКК ВИДИТ ЗАЯВКУ');
   const boot = await R('getQcBootstrap', qcT);
-  chk('чек-лист загружен: 27 пунктов, максимум 90',
-    boot.cfg.blocks.reduce((s, b) => s + b.items.length, 0) === 27 && boot.cfg.maxTotal === 90,
+  chk('чек-лист загружен: 28 пунктов, максимум 91',
+    boot.cfg.blocks.reduce((s, b) => s + b.items.length, 0) === 28 && boot.cfg.maxTotal === 91,
     { items: boot.cfg.blocks.reduce((s, b) => s + b.items.length, 0), max: boot.cfg.maxTotal });
   chk('варианты по-русски, как ждёт интерфейс',
     boot.cfg.blocks[0].items[0].options.some(o => o.value === 'Положительно'),
@@ -70,7 +70,7 @@ const R = (fn, ...a) => api.call(fn, a);
   };
   const ev = await R('saveEvaluation', { pin: qcT, meta: META, answers: ans, comments: { B2P1: 'перебивал клиента' } });
   chk('оценка сохранена', ev.success === true, ev.error);
-  chk('итог 98,33 — тот же, что в Apps Script', ev.result.score === 98.33, ev.result && ev.result.score);
+  chk('итог 98,35 (89,5 из 91)', ev.result.score === 98.35, ev.result && ev.result.score);
   chk('некритичных 1, критичных 0', ev.result.minor === 1 && ev.result.critical === 0, ev.result);
   chk('заявка привязана', ev.linkedRequest === true);
 
@@ -399,6 +399,17 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('  и она же стала отчётной', sentRow && sentRow.repDate === '05.09.2026', sentRow && sentRow.repDate);
   chk('фильтр «все жалобы» их находит',
     (await R('getJournal', qcT, { period: 'all', onlyAnyComplaint: true })).rows.length >= 1);
+  // от кого жалоба — видно прямо в журнале, без захода в каждый чек-лист
+  const srcRow = (await R('getJournal', qcT, { period: 'all', onlyAnyComplaint: true })).rows.find(r => r.id === cEv.id);
+  chk('в журнале у жалобы видно, от кого она', srcRow && srcRow.complaintSource === 'Клиент', srcRow && srcRow.complaintSource);
+  // источник пришёл, а признака жалобы нет — это не жалоба, и в журнале пусто
+  const stray = await R('saveEvaluation', { pin: qcT,
+    meta: { ...META, reqId: '', callTime: '15:25', phone: '79161112299', complaintSource: 'Заказчик' },
+    answers: ans, comments: {} });
+  const strayRow = (await R('getJournal', qcT, { period: 'all' })).rows.find(r => r.id === stray.id);
+  chk('  у обычной оценки источника нет, даже если его прислали',
+    stray.success === true && strayRow && strayRow.complaintSource === '', strayRow && strayRow.complaintSource);
+  if (stray.success) await R('deleteEvaluation', qcT, stray.id);
 
   // отметки в плане прослушки
   chk('СКК берёт оператора в работу',
@@ -646,14 +657,14 @@ const R = (fn, ...a) => api.call(fn, a);
   head('ШАГ 4. ОПЕРАТОР ВИДИТ РЕЗУЛЬТАТ');
   const ob = await R('getOperatorBootstrap', opT);
   chk('оценка видна', ob.evals.evaluations.length === 1, ob.evals.evaluations.length);
-  chk('балл 98,33', ob.evals.evaluations[0].score === 98.33, ob.evals.evaluations[0].score);
+  chk('балл 98,35', ob.evals.evaluations[0].score === 98.35, ob.evals.evaluations[0].score);
   chk('видна ошибка с комментарием СКК',
     ob.evals.evaluations[0].failed.length === 1 && ob.evals.evaluations[0].failed[0].comment === 'перебивал клиента',
     ob.evals.evaluations[0].failed);
   chk('текст пункта подставлен', /\S/.test(ob.evals.evaluations[0].failed[0].text), ob.evals.evaluations[0].failed[0]);
   chk('заявка стала «Проверена»', ob.requests.find(r => r.id === REQ_ID).status === 'Проверена',
     ob.requests.find(r => r.id === REQ_ID));
-  chk('в заявке проставлен балл', Number(ob.requests.find(r => r.id === REQ_ID).rating) === 98.33);
+  chk('в заявке проставлен балл', Number(ob.requests.find(r => r.id === REQ_ID).rating) === 98.35);
   chk('счётчик новых стал 0, проверено 1', ob.stats.new === 0 && ob.stats.checked === 1, ob.stats);
 
   head('ШАГ 5. КАБИНЕТ РГО');
@@ -747,9 +758,21 @@ const R = (fn, ...a) => api.call(fn, a);
     const first = cfg.blocks[0].items[0].text.replace(/ё/g, 'е');
     chk('  ответы, затем комментарии к тем же пунктам',
       head(5) === first && head(5 + n) === first, [head(5), head(5 + n)]);
-    chk('  после трёх пустых — тематика, в конце — блоки',
+    const srcCol = 5 + 2 * n + 12 + cfg.blocks.length;
+    chk('  после трёх пустых — тематика, за ней блоки, последним — «От кого жалоба»',
       /^Тематика диалога/.test(head(5 + 2 * n + 3)) && head(5 + 2 * n + 12) !== null
-        && ws.getCell(2, 5 + 2 * n + 12 + cfg.blocks.length).value === null);
+        && head(srcCol) === 'От кого жалоба' && head(srcCol + 1) === null,
+      [head(srcCol), head(srcCol + 1)]);
+    chk('  у «От кого жалоба» нет служебного номера — это не их столбец',
+      ws.getCell(1, srcCol).value === null, ws.getCell(1, srcCol).value);
+    const jRows = (await R('getJournal', mgrT, {})).rows;
+    const srcCells = [];
+    for (let r = 3; r <= ws.rowCount; r++) srcCells.push(ws.getCell(r, srcCol).value);
+    chk('  в нём источник у каждой жалобы и пусто у остальных',
+      srcCells.length === jRows.length && srcCells.includes('Клиент') &&
+        srcCells.filter(v => v !== null).sort().join() ===
+        jRows.filter(x => x.complaintSource).map(x => x.complaintSource).sort().join(),
+      srcCells);
     chk('  закреплены 4 столбца и шапка',
       ws.views[0].xSplit === 4 && ws.views[0].ySplit === 2, ws.views[0]);
     const rows = [];

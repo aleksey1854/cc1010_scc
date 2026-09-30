@@ -397,8 +397,14 @@
   #imgLightbox.active{ display:flex; }
   #imgLightbox img{ max-width:100%; max-height:100%; border-radius:6px; background:#fff;
     box-shadow:0 12px 40px rgba(0,0,0,.45); }
-  .ap-actions{ display:flex; flex-direction:column; gap:6px; min-width:230px; }
-  .ap-actions .row{ display:flex; gap:6px; }
+  /* причина и разбор — фиксированной ширины с переносом: длинный текст
+     растёт вниз, а не растягивает таблицу вширь */
+  .ap-reason{ min-width:200px; max-width:300px; white-space:normal; overflow-wrap:anywhere; }
+  .table-wrapper td.ap-answer, .table-wrapper td.ap-answer:last-child{ white-space:normal; }
+  .ap-answer-box{ width:300px; white-space:normal; overflow-wrap:anywhere; }
+  @media (max-width:1300px){ .ap-answer-box{ width:255px; } .ap-reason{ min-width:180px; } }
+  .ap-actions{ display:flex; flex-direction:column; gap:6px; }
+  .ap-actions .row{ display:flex; flex-wrap:wrap; gap:6px; }
   .ap-actions textarea{ width:100%; padding:7px 9px; border:1.5px solid var(--border-strong);
     border-radius:8px; font-family:inherit; font-size:13px; outline:none; resize:vertical; }
   .btn-fixed{ background:var(--good); color:#fff; }
@@ -3620,12 +3626,13 @@
     sub.innerHTML = '<option value="">—</option>' + subs.map(function (s) { return '<option>' + s + '</option>'; }).join('');
   }
 
-  // Агломерация — один из восьми округов, как их считает заказчик.
+  // Агломерация — округ, как их считает заказчик.
   // Список выпадающий, но не запертый: «Другая…» открывает поле для
   // своей. Раньше поле было подсказкой по справочнику городов (там
   // агломерации — это города, их сотни), а при сохранении вписанное
   // руками молча заменялось значением из справочника.
-  const AGGS = ['Армения', 'Дальний Восток', 'Крым', 'Москва', 'Приволжье', 'Северо-Запад', 'Сибирь', 'Урал', 'Центр', 'Юг'];
+  const AGGS = ['Армения', 'Дальний Восток', 'Крым', 'Москва', 'Приволжье', 'Северный Кавказ', 'Северо-Запад',
+                'Сибирь', 'Урал', 'Центр', 'Юг'];
 
   function setAgg(v) {
     const sel = document.getElementById('evAgg');
@@ -4747,14 +4754,16 @@
           '<td>' + a.operator + '</td><td>' + a.team + '</td><td>' + a.qc + '</td>' +
           '<td><strong style="color:' + scoreColorHex(a.score) + '">' + pct2(a.score) + '</strong></td>' +
           '<td style="white-space:nowrap;">' + (a.phone || '—') + '</td>' +
-          '<td style="max-width:280px;">' + escHtml(a.reason) +
+          '<td><div class="ap-reason">' + escHtml(a.reason) +
           (a.images && a.images.length ? '<div class="ap-imgs">' + a.images.map(function (im, i) {
             return '<img class="ap-img" data-img="' + im.id + '" alt="картинка ' + (i + 1) + '" title="Открыть картинку">';
-          }).join('') + '</div>' : '') + '</td>' +
+          }).join('') + '</div>' : '') + '</div></td>' +
           '<td><span class="ap-status ap-' + a.status + '">' + a.statusRu + '</span></td>';
 
+        // «Разбор» — последний столбец, а последний у таблиц не переносится
+        // (там обычно кнопки): длинный ответ растягивал всю таблицу в строку
         if (r.canAnswer) {
-          html += '<td>' + (a.status === 'new'
+          html += '<td class="ap-answer"><div class="ap-answer-box">' + (a.status === 'new'
             ? '<div class="ap-actions" data-ap="' + a.id + '">' +
               '<textarea rows="2" placeholder="Комментарий: почему отказ или почему частично"></textarea>' +
               '<div class="row">' +
@@ -4762,12 +4771,12 @@
               '<button class="btn-small btn-partial" data-st="partial">Частично</button>' +
               '<button class="btn-small btn-rejected" data-st="rejected">Отказано</button>' +
               '</div></div>'
-            : (escHtml(a.answer) || '—') + '<div class="hint">' + escHtml(a.answeredBy) + ' · ' + a.answeredAt + '</div>') + '</td>';
+            : (escHtml(a.answer) || '—') + '<div class="hint">' + escHtml(a.answeredBy) + ' · ' + a.answeredAt + '</div>') + '</div></td>';
         } else {
-          html += '<td>' + (a.status === 'new'
+          html += '<td class="ap-answer"><div class="ap-answer-box">' + (a.status === 'new'
             ? '<span class="hint">ждём решения</span>'
             : (escHtml(a.answer) || '—') + '<div class="hint">' + escHtml(a.answeredBy) + ' · ' + a.answeredAt +
-              (unseen ? ' · <button class="btn-small" data-seen="' + a.id + '">Прочитано</button>' : '') + '</div>') + '</td>';
+              (unseen ? ' · <button class="btn-small" data-seen="' + a.id + '">Прочитано</button>' : '') + '</div>') + '</div></td>';
         }
         html += '</tr>';
       });

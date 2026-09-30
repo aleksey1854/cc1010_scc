@@ -89,6 +89,39 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('недозаполненный чек-лист не сохраняется',
     (await R('saveEvaluation', { pin: qcT, meta: { ...META, reqId: '', callTime: '12:05' }, answers: half })).success === false);
 
+  // В чек-лист добавили пункт (как «Сверку города» в 09.26), а у СКК
+  // открыта страница со старым: нового пункта в форме нет вовсе
+  {
+    const cfg0 = await db.getChecklist(true);
+    const all = [].concat(...cfg0.blocks.map(b => b.items));
+    const fresh = all.find(i => i.kind === 'score' && i.code !== 'B2P1');
+    await db.q(`UPDATE checklist_items SET added_at = now() WHERE code = $1`, [fresh.code]);
+    db.dropChecklistCache();
+    try {
+      const stale = { ...ans }; delete stale[fresh.code];
+      const st = await R('saveEvaluation', { pin: qcT, meta: { ...META, reqId: '', callTime: '12:07' }, answers: stale });
+      chk('страница со старым чек-листом: «обновите страницу», а не «заполнен не полностью»',
+        st.success === false && st.code === 'checklist_changed' && /Обновите страницу/.test(st.error || ''), st);
+      const oldCard = await R('getEvaluationCard', qcT, ev.id);
+      chk('  у оценки до появления пункта он пустой, а не «Положительно»',
+        oldCard.answers[fresh.code] === '' && oldCard.notYet.indexOf(fresh.code) >= 0,
+        [oldCard.answers[fresh.code], oldCard.notYet]);
+      const ExcelJS = require('exceljs');
+      const jr = await R('exportReport', mgrT, 'journal', {});
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(Buffer.from(jr.contentBase64, 'base64'));
+      const ws = wb.worksheets[0];
+      const col = 5 + all.indexOf(fresh);
+      const cells = [];
+      for (let r = 3; r <= ws.rowCount; r++) cells.push(ws.getCell(r, col).value);
+      chk('  и в выгрузке журнала у старых оценок его ячейка пустая',
+        cells.length > 0 && cells.every(v => v === null), cells);
+    } finally {
+      await db.q(`UPDATE checklist_items SET added_at = NULL WHERE code = $1`, [fresh.code]);
+      db.dropChecklistCache();
+    }
+  }
+
   for (const [поле, msg] of [['callTime', 'время'], ['phone', 'телефон'], ['criterion', 'длительность'],
                              ['topic', 'тематику'], ['city', 'город'], ['sub', 'подтематику']]) {
     const meta = { ...META, reqId: '', callTime: '12:10' };

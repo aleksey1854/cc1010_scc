@@ -9,11 +9,14 @@
 //
 //   DATABASE_URL=... node scripts/apply-reference.js
 //   DATABASE_URL=... node scripts/apply-reference.js --dry
+//   ... --checklist-only    — только чек-лист: тематики и города на живой
+//                             базе не трогаем (их справочники ведут там)
 // ============================================================
 const db = require('../lib/db');
 const { CHECKLIST, TOPICS, CITIES, DEFAULTS } = require('./seed');
 
 const dry = process.argv.includes('--dry');
+const onlyChecklist = process.argv.includes('--checklist-only');
 
 async function main() {
   const stat = { блоков: 0, пунктов: 0, погашено: 0, тематик: 0, городов: 0 };
@@ -21,6 +24,10 @@ async function main() {
   await db.tx(async (t) => {
     // ---------- чек-лист ----------
     const codes = [];
+    // пункт, которого не было в уже заведённом чек-листе, получает дату
+    // появления (017): по ней старые оценки не показывают его «положительным»
+    const had = new Set((await t.q(`SELECT code FROM checklist_items`)).map(r => r.code));
+    stat.новых = 0;
     let bOrder = 0, iOrder = 0;
 
     for (const [bcode, bname, items] of CHECKLIST) {
@@ -45,6 +52,10 @@ async function main() {
             default_value = EXCLUDED.default_value`,
           [bcode, code, text, kind || 'score', rule || null, pos, dbt, neg, na, iOrder,
            DEFAULTS[code] || (kind === 'flag' ? 'no' : 'pos')]);
+        if (had.size && !had.has(code)) {
+          await t.q(`UPDATE checklist_items SET added_at = now() WHERE code = $1`, [code]);
+          stat.новых++;
+        }
         stat.пунктов++;
       }
     }
@@ -53,6 +64,11 @@ async function main() {
                             WHERE active AND NOT (code = ANY($1)) RETURNING code`, [codes]);
     stat.погашено = off.length;
     stat.погашенные = off.map(r => r.code);
+
+    if (onlyChecklist) {
+      if (dry) throw new Error('--dry: откатываем, ничего не записано');
+      return;
+    }
 
     // ---------- тематики ----------
     await t.q(`DELETE FROM topics`);

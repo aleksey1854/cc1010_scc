@@ -83,7 +83,8 @@ CREATE TABLE checklist_items (
   pts_na      numeric(6,2),
   default_value answer_value,              -- чем пункт заполнен при открытии
   active      boolean NOT NULL DEFAULT true,
-  sort_order  int     NOT NULL
+  sort_order  int     NOT NULL,
+  added_at    timestamptz                  -- (017) пусто — пункт был с самого начала
 );
 CREATE INDEX checklist_items_block_idx ON checklist_items (block_id, sort_order);
 

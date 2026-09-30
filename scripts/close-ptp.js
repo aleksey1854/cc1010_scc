@@ -14,6 +14,8 @@
 //
 //   node --env-file=.env scripts/close-ptp.js            — только показать план
 //   node --env-file=.env scripts/close-ptp.js --apply    — выполнить (с 01.10 МСК)
+//   ... --apply --now — раньше срока, по прямому решению (переводили вечером
+//                       30.09, когда прослушка за день уже закончилась)
 // ============================================================
 const db = require('../lib/db');
 
@@ -79,7 +81,8 @@ const mskToday = () => new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 
     console.log('\nПлан сходится. Выполнить: --apply (не раньше ' + DAY + ' по Москве)');
     process.exit(0);
   }
-  if (mskToday() < DAY && process.env.TEST_DB !== '1') {     // на тестовой базе — для проверки
+  const now = process.argv.includes('--now');
+  if (mskToday() < DAY && process.env.TEST_DB !== '1' && !now) {     // на тестовой базе — для проверки
     console.log('\nРано: по Москве ещё ' + mskToday() + '. Переводим утром ' + DAY + '.');
     process.exit(1);
   }

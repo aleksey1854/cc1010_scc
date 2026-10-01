@@ -482,6 +482,24 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('оператору отчёт ДЦ закрыт', (await R('getDcReport', opT, DATE, DATE, '')).success === false);
   const dcXls = await R('exportReport', qcT, 'dc', { from: DATE, to: DATE });
   chk('выгрузка ДЦ — живой xlsx', dcXls.success === true && /^UEsD/.test(dcXls.contentBase64 || ''), dcXls.error);
+  // проценты в выгрузках — настоящие: доля под '0.00%'. Было 98,35 под
+  // '0.00"%"', и смена формата в Excel на процентный давала 9835%
+  {
+    const ExcelJS = require('exceljs');
+    const prX = await R('exportReport', qcT, 'production', { from: DATE, to: DATE });
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(Buffer.from(prX.contentBase64, 'base64'));
+    const ws = wb.worksheets[0];
+    let qCol = 0, nCol = 0;
+    ws.getRow(1).eachCell((c, i) => { if (c.value === 'Качество за период') qCol = i; if (c.value === 'Оператор') nCol = i; });
+    const prOp = [].concat(...(await R('getProductionReport', qcT, DATE, DATE, '')).groups.map(g => g.operators))
+      .find(o => o.avg !== null);
+    let cell = null;
+    for (let r = 2; r <= ws.rowCount; r++) if (ws.getCell(r, nCol).value === prOp.name) { cell = ws.getCell(r, qCol); break; }
+    chk('производственные в Excel: качество — доля под процентным форматом',
+      cell && cell.numFmt === '0.00%' && cell.value === Math.round(prOp.avg * 100) / 10000,
+      cell && [cell.value, cell.numFmt, prOp.avg]);
+  }
   // по ДЦ сдают только плановую прослушку: жалоба на ДЦ-звонке в отчёт
   // КК (это ФСС) не идёт ни оценкой, ни ПЖ
   const dcPj = await R('saveEvaluation', { pin: qcT,
@@ -783,6 +801,10 @@ const R = (fn, ...a) => api.call(fn, a);
       })));
     chk('  дата и % — числами, а не текстом',
       rows.every(r => r.getCell(1).value instanceof Date && typeof r.getCell(3).value === 'number'));
+    // 0,9835, а не 0,98349999…: при смене формата в Excel хвост вылезал
+    chk('  % — ровная доля под процентным форматом',
+      rows.every(r => { const c = r.getCell(3); return c.numFmt === '0.00%' && c.value === Math.round(c.value * 10000) / 10000; }),
+      rows.map(r => r.getCell(3).value).slice(0, 3));
     const cnt = new Map();
     chk('  «Оценка N» считает оценки оператора по порядку',
       rows.every(r => {

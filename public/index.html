@@ -198,6 +198,28 @@
   .stat-card .number.checked{ color:var(--good-ink); }
   .stat-card .number.rejected{ color:var(--bad-ink); }
   .stat-card .number.rating{ color:var(--accent); }
+  /* Подсказка «что входит в показатель»: наведение мышью, на телефоне —
+     касание (плитка получает фокус). Сами о себе забывали, что считается. */
+  .stat-card[data-tip]{ overflow:visible; cursor:help; outline:none; }
+  .stat-card[data-tip] .label::after{ content:'?'; display:inline-block; width:14px; height:14px; margin-left:6px;
+    border-radius:50%; background:var(--surface-2); border:1px solid var(--border-strong); color:var(--muted);
+    font-size:10px; line-height:12px; text-align:center; letter-spacing:0; vertical-align:1px; }
+  .stat-card[data-tip]::after{ content:attr(data-tip); position:absolute; top:calc(100% + 8px); left:0; z-index:60;
+    width:max(100%, 280px); padding:11px 13px; border-radius:10px; background:#1b2333; color:#fff;
+    font-size:12.5px; line-height:1.5; font-weight:400; text-transform:none; letter-spacing:0; white-space:pre-line;
+    box-shadow:var(--shadow-lg); opacity:0; visibility:hidden; transform:translateY(-4px); pointer-events:none;
+    transition:opacity .15s var(--ease-out), transform .15s var(--ease-out), visibility .15s; }
+  /* касание даёт фокус — подсказка открыта, пока не коснулись другого места;
+     наведение — только для мыши: на телефоне оно «залипает», и подсказки
+     от разных плиток вылезали друг на друга */
+  .stat-card[data-tip]:focus{ z-index:5; border-color:var(--border-strong); }
+  .stat-card[data-tip]:focus::after{ opacity:1; visibility:visible; transform:none; }
+  @media (hover:hover) and (pointer:fine){
+    .stat-card[data-tip]:hover{ z-index:5; border-color:var(--border-strong); }
+    .stat-card[data-tip]:hover::after{ opacity:1; visibility:visible; transform:none; }
+  }
+  /* у правого края подсказка открывается влево, чтобы не уйти за экран */
+  .stat-card[data-tip]:nth-last-child(-n+2)::after{ left:auto; right:0; }
 
   /* Сообщения об ошибках: одно место и один вид. Системное окно браузера
      останавливало работу и выглядело чужим, а половина кода и так
@@ -731,6 +753,12 @@
     .m-cards tr:hover td{ background:none; }
     .m-cards tr.mark-row{ background:var(--mid-bg); border-color:var(--mid); }
     .m-cards tr.mark-row td{ background:none; }
+    /* на телефоне подсказка — во всю ширину блока плиток, под ними:
+       у плитки в правом ряду она иначе уходила бы за край экрана */
+    .stats-grid:has(> .stat-card[data-tip]){ position:relative; }
+    .stat-card[data-tip]{ position:static; }
+    .stat-card[data-tip]::after, .stat-card[data-tip]:nth-last-child(-n+2)::after{
+      left:0; right:0; width:auto; top:calc(100% + 6px); }
     .review-modal{ padding:8px; }
     .review-modal .modal-content{ padding:20px 16px; max-height:94vh; }
   }
@@ -1510,12 +1538,20 @@
     <!-- Производственные показатели -->
     <div id="repProduction" class="hidden">
       <div class="stats-grid">
-        <div class="stat-card"><div class="number" id="prOverall">—</div><div class="label">Качество за период</div></div>
-        <div class="stat-card"><div class="number new" id="prChecked">0</div><div class="label">Плановых прослушек</div></div>
-        <div class="stat-card"><div class="number rejected" id="prPj">0</div><div class="label">Подтверждённых жалоб</div></div>
-        <div class="stat-card"><div class="number" id="prKz" style="color:var(--kz);">0</div><div class="label">КЗ от заказчика</div></div>
-        <div class="stat-card"><div class="number checked" id="prOps">0</div><div class="label">Операторов</div></div>
-        <div class="stat-card"><div class="number" id="prSenior">—</div><div class="label">Без стажа менее месяца</div></div>
+        <div class="stat-card" tabindex="0" data-tip="Средний балл по всем оценкам периода: плановая прослушка (вместе с КЗ от заказчика) плюс подтверждённые жалобы.
+Подтверждённая жалоба идёт с баллом 0% и тянет показатель вниз.
+Не входят: необоснованные жалобы (НЖ) и звонки ДЦ.
+Среднее — по звонкам, а не среднее по операторам."><div class="number" id="prOverall">—</div><div class="label">Качество за период</div></div>
+        <div class="stat-card" tabindex="0" data-tip="Сколько звонков прослушано по плану за период, вместе с КЗ от заказчика.
+Жалобы и звонки ДЦ сюда не входят."><div class="number new" id="prChecked">0</div><div class="label">Плановых прослушек</div></div>
+        <div class="stat-card" tabindex="0" data-tip="Чек-листы с отметкой «Подтверждённая жалоба» за период.
+Каждая входит в «Качество за период» с баллом 0%.
+В период жалоба попадает по дате отправки чек-листа, если её внесли (самолётик), иначе — по дате прослушки."><div class="number rejected" id="prPj">0</div><div class="label">Подтверждённых жалоб</div></div>
+        <div class="stat-card" tabindex="0" data-tip="Контрольные звонки заказчика за период.
+Они уже входят в плановые прослушки и в качество наравне с ними — здесь показаны отдельно."><div class="number" id="prKz" style="color:var(--kz);">0</div><div class="label">КЗ от заказчика</div></div>
+        <div class="stat-card" tabindex="0" data-tip="Сколько операторов в отчёте, включая тех, кого за период ещё не слушали.
+Если оператора перевели в другую группу, в таблице он стоит в обеих, а здесь считается один раз."><div class="number checked" id="prOps">0</div><div class="label">Операторов</div></div>
+        <div class="stat-card" tabindex="0" data-tip="То же «Качество за период» (плановые + подтверждённые жалобы), но без новичков — операторов, у которых к концу периода меньше месяца стажа по дате приёма."><div class="number" id="prSenior">—</div><div class="label">Без стажа менее месяца</div></div>
       </div>
       <div class="card">
         <div class="filter-bar" style="margin-bottom:0;">
@@ -3296,6 +3332,13 @@
     return h + '</div>';
   }
 
+  // Подсказка плитки открывается по фокусу; Safari на iPhone не всегда
+  // ставит фокус на div по касанию — ставим сами.
+  document.addEventListener('click', function (e) {
+    const c = e.target.closest && e.target.closest('.stat-card[data-tip]');
+    if (c && document.activeElement !== c) c.focus({ preventScroll: true });
+  });
+
   // ---------- ШАПКА ТАБЛИЦЫ НЕ УЕЗЖАЕТ ----------
   // В длинных таблицах (план прослушки, журнал, отчёты) при прокрутке
   // вниз пропадали названия столбцов. Чистый CSS тут не справляется:
@@ -4391,7 +4434,11 @@
       const sen = document.getElementById('prSenior');
       sen.textContent = r.overallSenior === null ? '—' : pct2(r.overallSenior);
       sen.style.color = r.overallSenior === null ? '' : scoreColorHex(r.overallSenior);
-      sen.parentElement.title = 'Новичков в отчёте: ' + r.trainees + '; в расчёт вошло ' + r.checkedSenior + ' оценок';
+      // подробность про новичков дописываем к подсказке плитки: системный
+      // title всплывал поверх неё вторым окном
+      const st = sen.parentElement;
+      if (!st.dataset.tipBase) st.dataset.tipBase = st.dataset.tip || '';
+      st.dataset.tip = st.dataset.tipBase + '\nСейчас новичков в отчёте: ' + r.trainees + '; в расчёт вошло оценок: ' + r.checkedSenior + '.';
 
       const gs = document.getElementById('prGroup');
       if (gs.options.length <= 1) {

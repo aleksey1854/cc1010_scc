@@ -1009,6 +1009,52 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('старый пароль больше не подходит', (await R('login', QC[3], QC[4])).success === false);
   chk('новый пароль работает', (await R('login', QC[3], 'NovyyParol9')).success === true);
 
+  head('ШАГ 10а. РГО СДАЁТ ЗВОНОК ЗА ОПЕРАТОРА');
+  // у части операторов из России сайт не открывается — заявку за них
+  // подаёт РГО. Заявка — на оператора, кто сдал — в истории.
+  {
+    const rT = (await R('login', RGO[3], RGO[4])).token;
+    const mine = creds.find(x => x[2] === 'operator' && x[1] === RGO[1] && x[0] !== OP[0]);
+    const alien = creds.find(x => x[2] === 'operator' && x[1] !== RGO[1]);
+    const call = { hasCall: 'yes', callType: 'СР', callDate: DATE, callTime: '17:42', phone: '79168880011' };
+    const byRgo = await R('createRequest', { pin: rT, operator: mine[0], ...call });
+    chk('РГО сдал звонок за оператора своей группы', byRgo.success === true, byRgo.error);
+    const mineT = (await R('login', mine[3], mine[4])).token;
+    const hisReq = (await R('getOperatorRequests', mineT)).requests.find(x => x.id === byRgo.requestId);
+    chk('  заявка — у оператора, на его имя и группу',
+      hisReq && hisReq.fullName === mine[0] && hisReq.group === RGO[1], hisReq);
+    const h = await R('getRequestHistory', sqcT, byRgo.requestId);   // у СКК выше сменён пароль — его вход погашен
+    chk('  в истории видно, что сдал РГО',
+      h.success === true && h.events[0].who === RGO[0] && /за оператора: /.test(h.events[0].details), h.events);
+    chk('  у самого РГО заявок на своё имя не появилось',
+      !(await R('getOperatorRequests', rT)).requests.some(x => x.id === byRgo.requestId));
+    chk('  тот же звонок второй раз — отказ базой',
+      (await R('createRequest', { pin: rT, operator: mine[0], ...call })).success === false);
+    const noCall = await R('createRequest', { pin: rT, operator: mine[0], hasCall: 'no', comment: 'сайт не открывается' });
+    chk('  «Звонка не было» за оператора тоже сдаётся', noCall.success === true && noCall.status === 'Без звонка', noCall);
+    chk('за оператора чужой группы — отказ',
+      (await R('createRequest', { pin: rT, operator: alien[0], ...call, phone: '79168880012' })).success === false);
+    chk('оператор за другого оператора сдать не может',
+      (await R('createRequest', { pin: mineT, operator: OP[0], ...call, phone: '79168880013' })).success === false);
+    chk('за несуществующее ФИО — отказ',
+      (await R('createRequest', { pin: rT, operator: 'Никого Нет', ...call, phone: '79168880014' })).success === false);
+    // заявка из чужой группы — её РГО видеть не должен, а КК должен
+    const alienT = (await R('login', alien[3], alien[4])).token;
+    const alienReq = await R('createRequest', { pin: alienT, ...call, phone: '79168880015' });
+    chk('оператор чужой группы сдал свою заявку', alienReq.success === true, alienReq.error);
+    const rgoList = await R('getAllRequests', rT);
+    chk('РГО видит заявки своей группы — и только её',
+      rgoList.success === true && rgoList.requests.some(x => x.id === byRgo.requestId) &&
+        !rgoList.requests.some(x => x.id === alienReq.requestId) &&
+        rgoList.requests.every(x => x.group === RGO[1]),
+      rgoList.error || [...new Set(rgoList.requests.map(x => x.group))]);
+    chk('оператору общий список заявок закрыт', (await R('getAllRequests', mineT)).success === false);
+    const allQc = await R('getAllRequests', sqcT);
+    chk('у КК список заявок по-прежнему по всем группам',
+      allQc.success === true && allQc.requests.some(x => x.id === byRgo.requestId) &&
+        allQc.requests.some(x => x.id === alienReq.requestId), allQc.error);
+  }
+
   head('ШАГ 11. ИНТЕРФЕЙС ПЕРЕДАЁТ ТОКЕН');
   // Сервер тут проверяли прямыми вызовами с токеном, а кнопка смены
   // пароля в интерфейсе токен не передавала — и отвечала «Не выполнен

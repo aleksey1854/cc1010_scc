@@ -1260,6 +1260,57 @@
       <div class="stat-card"><div class="number rating" id="rgoAvg">0</div><div class="label">Средний балл</div></div>
     </div>
 
+    <!-- РГО сдаёт звонки за операторов своей группы: у части операторов
+         из России сайт не открывается, и сами они заявку не подадут -->
+    <div class="card" id="rgoReqCard">
+      <h2 class="card-title"><i class="fas fa-paper-plane"></i> Сдать звонок за оператора</h2>
+      <p class="hint" style="margin:-6px 0 14px;">Для операторов, у которых сайт не открывается. Заявка уходит на оператора — как если бы он сдал её сам и засчитывается в его выгрузку, а в истории заявки видно, что сдали вы.</p>
+      <form id="rgoReqForm" onsubmit="submitRgoRequest(event)">
+        <div class="form-group">
+          <label for="rgoReqOp"><i class="fas fa-user"></i> Оператор *</label>
+          <select id="rgoReqOp"><option value="">Выберите оператора</option></select>
+        </div>
+        <div class="seg" style="margin-top:12px;">
+          <button type="button" class="seg-btn active" id="rgoSegYes" onclick="setRgoHasCall('yes')">Звонок был</button>
+          <button type="button" class="seg-btn" id="rgoSegNo" onclick="setRgoHasCall('no')">Звонка не было</button>
+        </div>
+        <div id="rgoCallFields" class="form-grid">
+          <div class="form-group full-width">
+            <label for="rgoCallType"><i class="fas fa-list-check"></i> Тип звонка *</label>
+            <select id="rgoCallType">
+              <option value="">Выберите тип</option>
+              <option value="СР">СР</option>
+              <option value="КР">КР</option>
+            </select>
+            <small class="hint">Согласно графику выгрузки</small>
+          </div>
+          <div class="form-group"><label for="rgoCallDate"><i class="fas fa-calendar-day"></i> Дата звонка *</label><input type="date" id="rgoCallDate"></div>
+          <div class="form-group"><label for="rgoCallTime"><i class="fas fa-clock"></i> Время звонка (МСК) *</label><input type="time" id="rgoCallTime"></div>
+          <div class="form-group full-width">
+            <label for="rgoPhone"><i class="fas fa-phone"></i> Номер телефона *</label>
+            <input type="tel" id="rgoPhone" placeholder="+7 (777) 777-77-77">
+            <small class="hint">Только цифры, без + - ( ). 10 или 11 знаков — приведём к виду 7XXXXXXXXXX</small>
+          </div>
+          <div class="form-group full-width"><label for="rgoComment"><i class="fas fa-comment"></i> Комментарий (необязательно)</label><input type="text" id="rgoComment" placeholder="Напр.: тип звонка, контекст"></div>
+        </div>
+        <div id="rgoNoCallFields" class="hidden">
+          <div class="form-group full-width">
+            <label for="rgoReason"><i class="fas fa-pen"></i> Причина отсутствия звонка *</label>
+            <input type="text" id="rgoReason" placeholder="Напр.: отпуск, больничный, не было подходящих звонков">
+          </div>
+        </div>
+        <div class="form-group full-width" style="margin-top:15px;">
+          <button type="submit" class="btn-submit"><i class="fas fa-paper-plane"></i> Отправить</button>
+        </div>
+        <div class="message" id="rgoReqMsg"></div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title"><i class="fas fa-list"></i> Заявки группы <span class="hint" style="font-weight:400;">— последние 30</span></h2>
+      <div id="rgoReqList"></div>
+    </div>
+
     <div class="card">
       <h2 class="card-title"><i class="fas fa-chart-line"></i> Качество группы</h2>
       <div class="charts-2">
@@ -2207,6 +2258,7 @@
       fillHeader(user);
       renderNav();
       loadHiredDates(loadRgoDashboard);
+      loadRgoRequests();
     } else if (user.role === 'qc' || user.role === 'sqc' || user.role === 'admin') {
       document.getElementById('qcPage').classList.remove('hidden');
       fillHeader(user);
@@ -2354,6 +2406,90 @@
       .withFailureHandler(function (error) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Отправить'; showOpMessage('❌ Ошибка: ' + error, 'error'); })
       .createRequest(data);
   }
+  // ---------- РГО: заявки за операторов своей группы ----------
+  let rgoHasCall = 'yes';
+  function setRgoHasCall(v) {
+    rgoHasCall = v;
+    document.getElementById('rgoSegYes').classList.toggle('active', v === 'yes');
+    document.getElementById('rgoSegNo').classList.toggle('active', v === 'no');
+    document.getElementById('rgoCallFields').classList.toggle('hidden', v !== 'yes');
+    document.getElementById('rgoNoCallFields').classList.toggle('hidden', v !== 'no');
+    segSyncAll();
+  }
+
+  function loadRgoRequests() {
+    const token = sessionStorage.getItem('token');
+    const me = JSON.parse(sessionStorage.getItem('user') || '{}');
+    // в списке — только действующие операторы своей группы: за уволенного
+    // и за чужого сервер всё равно откажет
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) return;
+      const sel = document.getElementById('rgoReqOp');
+      const keep = sel.value;
+      sel.innerHTML = '<option value="">Выберите оператора</option>' + (r.operators || [])
+        .filter(function (o) { return o.group === me.group && !o.dismissed; })
+        .map(function (o) { return '<option>' + escHtml(o.fullName) + '</option>'; }).join('');
+      sel.value = keep;
+    }).getOperatorsList(token);
+    const box = document.getElementById('rgoReqList');
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + escHtml(r.error || 'Ошибка') + '</p></div>'; return; }
+      const list = (r.requests || []).slice(0, 30);
+      if (!list.length) { box.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Заявок пока нет</p></div>'; return; }
+      let html = '<div class="table-wrapper m-cards"><table><thead><tr><th>Заявка</th><th>Оператор</th><th>Звонок</th><th>Телефон</th><th>Статус</th><th>Оценка</th><th>Комментарий СКК</th></tr></thead><tbody>';
+      list.forEach(function (x) {
+        const noCall = x.status === 'Без звонка';
+        html += '<tr><td data-l="Заявка"><strong>' + x.id + '</strong><div class="hint">' + escHtml(x.createdAt) + '</div></td>' +
+          '<td class="m-op" data-l="Оператор">' + escHtml(x.fullName) + '</td>' +
+          '<td data-l="Звонок">' + (noCall ? '—' : formatDate(x.callDate) + ' ' + formatTime(x.callTime)) + '</td>' +
+          '<td data-l="Телефон">' + (noCall ? '—' : escHtml(x.phone)) + '</td>' +
+          '<td class="m-q" data-l="Статус"><span class="status-badge ' + x.status.replace(/ /g, '_') + '">' + x.status + '</span></td>' +
+          '<td data-l="Оценка">' + (x.rating ? pct2(Number(x.rating)) : '—') + '</td>' +
+          '<td class="m-wide" data-l="Комментарий СКК">' + (x.comment ? escHtml(x.comment) : '—') + '</td></tr>';
+      });
+      box.innerHTML = html + '</tbody></table></div>';
+    }).getAllRequests(token);
+  }
+
+  function submitRgoRequest(event) {
+    event.preventDefault();
+    const pin = sessionStorage.getItem('token');
+    const operator = document.getElementById('rgoReqOp').value;
+    const msg = function (t, type) { const el = document.getElementById('rgoReqMsg'); el.textContent = t; el.className = 'message ' + type; el.style.display = 'block'; setTimeout(function () { el.style.display = 'none'; }, 6000); };
+    if (!operator) { msg('Выберите оператора', 'error'); return; }
+    let data;
+    if (rgoHasCall === 'yes') {
+      const callType = document.getElementById('rgoCallType').value;
+      const callDate = document.getElementById('rgoCallDate').value;
+      const callTime = document.getElementById('rgoCallTime').value;
+      let d = document.getElementById('rgoPhone').value.replace(/\D/g, '');
+      if (d.length === 11 && d[0] === '8') d = '7' + d.slice(1);
+      if (d.length === 10) d = '7' + d;
+      if (!callType) { msg('Выберите тип звонка', 'error'); return; }
+      if (!callDate || !callTime) { msg('Укажите дату и время звонка', 'error'); return; }
+      if (d.length !== 11 || d[0] !== '7') { msg('Введите номер полностью: +7 (777) 777-77-77', 'error'); return; }
+      data = { pin: pin, operator: operator, hasCall: 'yes', callType: callType, callDate: callDate, callTime: callTime, phone: d, comment: document.getElementById('rgoComment').value.trim() };
+    } else {
+      const reason = document.getElementById('rgoReason').value.trim();
+      if (!reason) { msg('Укажите причину отсутствия звонка', 'error'); return; }
+      data = { pin: pin, operator: operator, hasCall: 'no', callDate: '', callTime: '', phone: '', comment: reason };
+    }
+    const btn = event.target.querySelector('.btn-submit'); btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Отправка...';
+    google.script.run
+      .withSuccessHandler(function (result) {
+        btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Отправить';
+        if (result.success) {
+          msg('✅ Отправлено за: ' + operator + (result.requestId ? ' (#' + result.requestId + ')' : ''), 'success');
+          // оператора оставляем — часто сдают несколько звонков подряд за одного
+          ['rgoPhone', 'rgoComment', 'rgoReason', 'rgoCallTime'].forEach(function (id) { document.getElementById(id).value = ''; });
+          setRgoHasCall('yes');
+          loadRgoRequests();
+        } else { msg('❌ ' + result.error, 'error'); }
+      })
+      .withFailureHandler(function (error) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Отправить'; msg('❌ Ошибка: ' + error, 'error'); })
+      .createRequest(data);
+  }
+
   function showOpMessage(text, type) { const el = document.getElementById('opFormMessage'); el.textContent = text; el.className = 'message ' + type; el.style.display = 'block'; setTimeout(function () { el.style.display = 'none'; }, 5000); }
 
   // ---------- ОПЕРАТОР: оценки КК (чек-лист v2) ----------

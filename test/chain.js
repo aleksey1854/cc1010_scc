@@ -502,10 +502,16 @@ const R = (fn, ...a) => api.call(fn, a);
   }
   // по ДЦ сдают только плановую прослушку: жалоба на ДЦ-звонке в отчёт
   // КК (это ФСС) не идёт ни оценкой, ни ПЖ
+  const cmpB = (await R('getComplaintsReport', mgrT, 'all')).summary;
   const dcPj = await R('saveEvaluation', { pin: qcT,
     meta: { ...META, reqId: '', callTime: '16:50', phone: '79164445567', dc: true, complaintSource: 'Заказчик' },
     answers: { ...ans, B8P2: 'Обнаружено' }, comments: {} });
   chk('ДЦ-жалоба заказчика сохраняется', dcPj.success === true && dcPj.result.complaint === true, dcPj.error);
+  // а в отчёт по жалобам — идёт: там жалобы и ФСС, и ДЦ, с разбивкой
+  const cmpA = (await R('getComplaintsReport', mgrT, 'all')).summary;
+  chk('  в отчёте по жалобам она есть — в колонке ДЦ',
+    cmpA.total === cmpB.total + 1 && cmpA.dc === cmpB.dc + 1 && cmpA.fss === cmpB.fss &&
+      cmpA.confCustomer === cmpB.confCustomer + 1 && cmpA.fss + cmpA.dc === cmpA.total, [cmpB, cmpA]);
   const kkPj = (await R('getKkReport', qcT, DATE, DATE)).rows.find(x => x.operator === OP[0]);
   chk('  в отчёт КК она не идёт',
     kkPj.pjCustomer === kkBefore.pjCustomer && kkPj.ko === kkBefore.ko && kkPj.count === kkBefore.count,

@@ -4608,6 +4608,8 @@
     google.script.run.withSuccessHandler(function (r) {
       if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
       document.getElementById('cmpTotal').textContent = r.summary.total;
+      document.getElementById('cmpTotal').parentElement.querySelector('.label').textContent =
+        'Всего жалоб · ФСС ' + (r.summary.fss || 0) + ', ДЦ ' + (r.summary.dc || 0);
       document.getElementById('cmpConf').textContent = r.summary.confirmed;
       document.getElementById('cmpUnconf').textContent = r.summary.unconfirmed;
       document.getElementById('cmpClient').textContent = r.summary.confClient + r.summary.unconfClient;
@@ -4620,7 +4622,9 @@
         '<th>Обосн. от клиентов</th><th>Обосн. от заказчика</th>' +
         '<th>Необосн. от клиентов</th><th>Необосн. от заказчика</th>' +
         '<th title="источник не выбрали при оценке">Источник не указан</th>' +
-        '<th>Общий % жалоб</th></tr></thead><tbody>';
+        '<th>Общий % жалоб</th>' +
+        // жалобы считаются и по ФСС, и по ДЦ — сколько чего, видно здесь
+        '<th>Из них ФСС</th><th>Из них ДЦ</th></tr></thead><tbody>';
       r.rows.forEach(function (x) {
         // источник выбирают в чек-листе; у старых записей его нет, и тогда
         // жалоба видна только в «Всего» — отсюда и отдельная колонка
@@ -4632,7 +4636,8 @@
           '<td>' + x.confClient + '</td><td>' + x.confCustomer + '</td>' +
           '<td>' + x.unconfClient + '</td><td>' + x.unconfCustomer + '</td>' +
           '<td' + (noSrc ? ' style="color:var(--mid-ink);font-weight:600;"' : ' style="color:var(--muted);"') + '>' + noSrc + '</td>' +
-          '<td><strong>' + pct2(x.weekShare) + '</strong></td></tr>';
+          '<td><strong>' + pct2(x.weekShare) + '</strong></td>' +
+          '<td>' + (x.fss || 0) + '</td><td>' + (x.dc ? '<span class="fail-tag dc-tag">' + x.dc + '</span>' : '0') + '</td></tr>';
       });
       html += '</tbody></table></div>';
       box.innerHTML = html;

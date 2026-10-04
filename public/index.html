@@ -2024,6 +2024,13 @@
     setTimeout(function () { t.remove(); }, 320);
   }
 
+  // Сервер отказал: пока страница была открыта, ту же запись поменял другой
+  // (code 'stale'). Пишем, кто и что, заметным сообщением — его не должны
+  // проморгать: своё действие человек не сохранил.
+  function staleToast(r) {
+    toast(r.error, 'err', { title: 'Пока страница была открыта, это уже изменили', ms: 15000 });
+  }
+
   // opts.ms — сколько держать; opts.sticky — пока не закроют;
   // opts.title и opts.actions ([подпись, действие, главная?]) — для ошибок,
   // которые надо не только увидеть, но и передать
@@ -2613,6 +2620,7 @@
       .withSuccessHandler(function (result) {
         btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Сохранить';
         if (result.success) { showEditMessage('✅ Обновлено!', 'success'); setTimeout(function () { closeEditModal(); loadOperatorAll(); }, 1200); }
+        else if (result.code === 'stale') { closeEditModal(); staleToast(result); loadOperatorAll(); }
         else { showEditMessage('❌ ' + result.error, 'error'); }
       })
       .withFailureHandler(function (error) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Сохранить'; showEditMessage('❌ Ошибка: ' + error, 'error'); })
@@ -2956,6 +2964,9 @@
     const was = staffAll.find(x => x.fullName === staffEditing) || {};
     google.script.run
       .withSuccessHandler(function (r) {
+        // карточку успел поменять другой — форма устарела: показываем, что
+        // изменилось, и перечитываем список
+        if (!r.success && r.code === 'stale') { failed(r.error); loadStaff(); return; }
         if (!r.success) return failed(r.error);
         const after = [];
         if (login && login !== (was.login || '')) {
@@ -2974,7 +2985,10 @@
         });
       })
       .withFailureHandler(e => failed(e))
-      .updateUser(t, staffEditing, name, group, role, hired, training, position);
+      .updateUser(t, staffEditing, name, group, role, hired, training, position,
+        // что было в форме, когда её открыли: сервер сверит, не поменял ли кто
+        { group: was.group || '', role: was.role || '', position: was.position || '',
+          hired: was.hiredIso || '', training: was.trainingIso || '' });
     return false;
   }
 
@@ -3082,10 +3096,12 @@
   }
 
   // ---------- QC: проверка с чек-листом ----------
+  let currentRequestStatus = '';   // статус, который СКК видел, открывая заявку
   function openReview(requestId) {
     currentRequestId = requestId;
     const req = allRequests.find(function (r) { return r.id === requestId; });
     if (!req) return;
+    currentRequestStatus = req.status || '';
     document.getElementById('requestDetail').innerHTML =
       '<div class="request-detail">' +
         '<div class="row"><span class="label">Заявка</span><span class="value">' + req.id + '</span></div>' +
@@ -3120,11 +3136,12 @@
       btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Сохранить';
       const msg = document.getElementById('reviewMessage');
       if (result.success) { msg.textContent = '✅ Сохранено'; msg.className = 'message success'; msg.style.display = 'block'; setTimeout(function () { closeModal(); loadAllRequests(); }, 1200); }
+      else if (result.code === 'stale') { closeModal(); staleToast(result); loadAllRequests(); }
       else { msg.textContent = '❌ ' + result.error; msg.className = 'message error'; msg.style.display = 'block'; }
     }).withFailureHandler(function (error) {
       btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Сохранить';
       const msg = document.getElementById('reviewMessage'); msg.textContent = '❌ Ошибка: ' + error; msg.className = 'message error'; msg.style.display = 'block';
-    }).reviewRequest(p, currentRequestId, status, rating, comment);
+    }).reviewRequest(p, currentRequestId, status, rating, comment, currentRequestStatus);
   }
 
   function deleteRequest(requestId) {
@@ -3154,7 +3171,10 @@
     const el = document.getElementById('hd_' + cssId(fullName));
     if (!el || !el.value) { toast('Выберите дату приёмки'); return; }
     google.script.run.withSuccessHandler(function (r) {
-      if (!r.success) { toast(r.error); return; }
+      if (!r.success) {
+        if (r.code !== 'stale') { toast(r.error); return; }
+        staleToast(r);
+      }
       loadHiredDates(loadRgoDashboard);
     }).withFailureHandler(e => toast(e))
       .setHiredDate(sessionStorage.getItem('token'), fullName, el.value);
@@ -3216,6 +3236,7 @@
   let evCmtOpen = {};        // id -> поле замечания раскрыто вручную
   let evComplaintSrc = '';   // от кого жалоба: Клиент / Заказчик
   let evEditing = '';        // правим сохранённую оценку EV-…
+  let evVersion = null;      // сколько раз её правили, когда открыли: сервер сверит
 
   const V = { POS: 'Положительно', DBT: 'Сомнительно', NEG: 'Отрицательно', NA: 'Не требуется', YES: 'Обнаружено', NO: 'Не обнаружено' };
 
@@ -3669,13 +3690,18 @@
       if (r.period) {
         document.getElementById('planFrom').value = r.period.from;
         document.getElementById('planTo').value = r.period.to;
+        planPeriodBase = { from: r.period.from, to: r.period.to };
       }
       document.getElementById('planOps').textContent = r.summary.operators;
       document.getElementById('planNeed').textContent = r.summary.plan;
       document.getElementById('planDone').textContent = r.summary.done;
       document.getElementById('planLeft').textContent = r.summary.left;
       document.getElementById('planPct').textContent = 'выборка ' + r.percent + '% от принятых';
-      if (r.noData) { box.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Нет статистики за ' + r.date + '. Нажмите «Загрузить статистику дня».</p></div>'; planScrollBack(); return; }
+      if (r.noData) { planSig = ''; box.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Нет статистики за ' + r.date + '. Нажмите «Загрузить статистику дня».</p></div>'; planScrollBack(); return; }
+      // тихое обновление и ничего не поменялось — таблицу не трогаем, не мигаем
+      const sig = JSON.stringify([document.getElementById('planDate').value, r.rows, r.percent]);
+      if (quiet && sig === planSig && box.querySelector('table')) { planScrollY = null; return; }
+      planSig = sig;
       // Отметка «в работе» слева: двое СКК не возьмут одного оператора.
       let html = '<div class="table-wrapper m-cards"><table><thead><tr>' +
         '<th title="кто уже взял оператора в работу">Разбор</th>' +
@@ -3684,7 +3710,10 @@
         '</tr></thead><tbody>';
       r.rows.forEach(function (x) {
         const leftCell = x.left === 0 ? '<span style="color:var(--good-ink);font-weight:700;">готово</span>' : '<strong style="color:var(--bad-ink);">' + x.left + '</strong>';
-        const sel = '<select class="mark-sel mark-' + (x.mark || 'none') + '" data-mark="' + x.operator.replace(/"/g, '&quot;') + '">' +
+        // что было на экране — сервер сверит: перехватить чужого оператора
+        // со старой страницы больше нельзя
+        const sel = '<select class="mark-sel mark-' + (x.mark || 'none') + '" data-mark="' + x.operator.replace(/"/g, '&quot;') + '"' +
+          ' data-was="' + (x.mark || '') + '" data-was-by="' + escHtml(x.markBy || '') + '">' +
           '<option value=""' + (x.mark ? '' : ' selected') + '>—</option>' +
           '<option value="in_progress"' + (x.mark === 'in_progress' ? ' selected' : '') + '>В работе</option>' +
           '<option value="done"' + (x.mark === 'done' ? ' selected' : '') + '>Готово</option>' +
@@ -3698,27 +3727,61 @@
       planScrollBack();
       box.querySelectorAll('select[data-mark]').forEach(function (sel) {
         sel.onchange = function () {
+          const was = sel.getAttribute('data-was'), by = sel.getAttribute('data-was-by');
+          const me = (JSON.parse(sessionStorage.getItem('user') || '{}')).fullName;
+          // чужая отметка — только сознательно
+          if (was && by && by !== me && !confirm((was === 'in_progress'
+                ? 'Этого оператора уже слушает ' + by + '.'
+                : by + ' уже отметил(а) «Готово».') + '\n\nЗабрать оператора себе / поменять отметку?')) {
+            sel.value = was;
+            return;
+          }
+          planScrollY = window.scrollY;      // остаёмся там, где отметили
           google.script.run.withSuccessHandler(function (res) {
-            if (!res.success) { toast(res.error); return; }
-            planScrollY = window.scrollY;      // остаёмся там, где отметили
+            if (!res.success) { res.code === 'stale' ? staleToast(res) : toast(res.error); }
             loadPlan(false, true);
-          }).withFailureHandler(function (e) { toast(e); })
+          }).withFailureHandler(function (e) { toast(e); loadPlan(false, true); })
             .setListenMark(sessionStorage.getItem('token'),
-              document.getElementById('planDate').value, sel.getAttribute('data-mark'), sel.value);
+              document.getElementById('planDate').value, sel.getAttribute('data-mark'), sel.value,
+              { status: was, by: by });
         };
       });
     }).getListeningPlan(sessionStorage.getItem('token'), document.getElementById('planDate').value);
   }
 
+  // ---------- ПЛАН ОБНОВЛЯЕТСЯ САМ ----------
+  // Отметку «в работе» другие СКК видели только после F5 — и брали того же
+  // оператора. Пока план на экране, раз в 20 секунд тихо перечитываем его.
+  // Не трогаем, пока человек что-то делает: открыт список, фокус в поле
+  // плана, открыто окно (загрузка статистики и т.п.).
+  let planSig = '';
+  function planTick() {
+    if (document.hidden) return;
+    const tab = document.getElementById('qcPlanTab');
+    if (!tab || tab.classList.contains('hidden') || tab.offsetParent === null) return;
+    const a = document.activeElement;
+    if (a && a !== document.body && tab.contains(a) && /^(SELECT|INPUT|TEXTAREA)$/.test(a.tagName)) return;
+    if (document.querySelector('.uisel-panel:not([hidden]), .review-modal.active')) return;
+    planScrollY = window.scrollY;
+    loadPlan(false, true);
+  }
+  setInterval(planTick, 20000);
+  // вернулись на вкладку браузера — сразу свежий план, не ждём 20 секунд
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) planTick(); });
+
   // ---------- ПРИМЕЧАНИЕ К ПЛАНУ ----------
   // Недописанное не затираем, когда план перерисовывается (например,
   // после отметки «В работе»); другую дату — показываем её примечание.
-  let planNoteDirty = false, planNoteFor = '';
+  // planNoteBase — примечание, каким оно было на экране, когда начали
+  // писать. Пока человек пишет, автообновление плана его не трогает:
+  // иначе сервер не узнал бы, что кто-то сохранил своё в это время.
+  let planNoteDirty = false, planNoteFor = '', planNoteBase = '';
   function showPlanNote(r) {
     const date = document.getElementById('planDate').value;
     document.getElementById('planNoteDate').textContent = 'за ' + r.date;
     if (!planNoteDirty || planNoteFor !== date) {
       document.getElementById('planNote').value = r.note ? r.note.text : '';
+      planNoteBase = r.note ? r.note.text : '';
       planNoteDirty = false;
     }
     planNoteFor = date;
@@ -3727,26 +3790,36 @@
   function savePlanNote() {
     const date = document.getElementById('planDate').value;
     google.script.run.withSuccessHandler(function (r) {
-      if (!r.success) { toast(r.error); return; }
+      if (!r.success) {
+        if (r.code !== 'stale') { toast(r.error); return; }
+        // чужое примечание уже на сервере: текст человека оставляем в поле,
+        // следующее «Сохранить» — уже осознанно поверх показанного
+        staleToast(r);
+        planNoteBase = r.note ? r.note.text : '';
+        document.getElementById('planNoteMeta').textContent = r.note ? 'написал(а) ' + r.note.by + ' · ' + r.note.at : '';
+        return;
+      }
       planNoteDirty = false;
+      planNoteBase = r.note ? r.note.text : '';
       document.getElementById('planNoteMeta').textContent = r.note ? 'написал(а) ' + r.note.by + ' · ' + r.note.at : '';
       toast(r.message, 'ok');
     }).withFailureHandler(function (e) { toast(e); })
-      .setPlanNote(sessionStorage.getItem('token'), date, document.getElementById('planNote').value);
+      .setPlanNote(sessionStorage.getItem('token'), date, document.getElementById('planNote').value, planNoteBase);
   }
 
   // Период звонков плана: статистику грузят и за несколько дней сразу,
   // и «Прослушано» считается по всем звонкам периода, а не одного дня.
+  let planPeriodBase = null;      // период, каким его показал последний план
   function savePlanPeriod() {
     const f = document.getElementById('planFrom').value, t = document.getElementById('planTo').value;
     if (!f || !t) return;
     google.script.run.withSuccessHandler(function (r) {
-      if (!r.success) { toast(r.error); loadPlan(false, true); return; }
+      if (!r.success) { r.code === 'stale' ? staleToast(r) : toast(r.error); loadPlan(false, true); return; }
       toast(r.message, 'ok');
       planScrollY = window.scrollY;
       loadPlan(false, true);
     }).withFailureHandler(function (e) { toast(e); })
-      .setPlanPeriod(sessionStorage.getItem('token'), document.getElementById('planDate').value, f, t);
+      .setPlanPeriod(sessionStorage.getItem('token'), document.getElementById('planDate').value, f, t, planPeriodBase);
   }
 
   // ---------- ВОЗВРАТ НА ТО ЖЕ МЕСТО ----------
@@ -3788,7 +3861,7 @@
     });
   }
 
-  async function submitImport() {
+  async function submitImport(replace) {
     const m = document.getElementById('impMessage');
     const file = document.getElementById('impFile').files[0];
     const date = document.getElementById('impDate').value;
@@ -3804,6 +3877,13 @@
     }
 
     google.script.run.withSuccessHandler(function (r) {
+      if (!r.success && r.code === 'exists' && !replace) {
+        // день уже загружен: заменить можно, но только сознательно
+        if (confirm(r.error + '\n\nЗаменить статистику за ' + r.existing.date + ' новой?')) { submitImport(true); return; }
+        m.textContent = 'Не загружено: за ' + r.existing.date + ' осталась прежняя статистика.';
+        m.className = 'message error'; m.style.display = 'block';
+        return;
+      }
       if (!r.success) { m.textContent = '❌ ' + r.error; m.className = 'message error'; m.style.display = 'block'; return; }
       let txt = '✅ Загружено строк: ' + r.imported + ' за ' +
         (r.period && r.period.days > 1 ? 'звонки ' + r.period.fromRu + ' — ' + r.period.toRu : r.date);
@@ -3813,7 +3893,7 @@
       setTimeout(function () { document.getElementById('importModal').classList.remove('active'); loadPlan(false); }, r.unknown.length ? 3500 : 1200);
     }).withFailureHandler(function (e) { m.textContent = '❌ ' + e; m.className = 'message error'; m.style.display = 'block'; })
       .importAcceptedCalls(sessionStorage.getItem('token'), date, text, base64,
-        file ? '' : document.getElementById('impDateTo').value);
+        file ? '' : document.getElementById('impDateTo').value, false, replace === true);
   }
 
   function backToQc() {
@@ -4106,7 +4186,8 @@
         complaintSource: evComplaintSrc,
         controlCall: document.getElementById('evControl').checked,
         dc: document.getElementById('evDc').checked,
-        evId: evEditing
+        evId: evEditing,
+        version: evEditing ? evVersion : null
       },
       answers: evAnswers,
       comments: evComments
@@ -4176,7 +4257,11 @@
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Сохранение...';
     const run = google.script.run
       .withSuccessHandler(function (res) {
-        if (!res.success) { evSubmitReady(); evSaveFailed(res.error, payload.meta, editing); return; }
+        if (!res.success) {
+          evSubmitReady();
+          if (res.code === 'stale') evStaleSave(res, editing); else evSaveFailed(res.error, payload.meta, editing);
+          return;
+        }
         if (editing) {
           evMsg('✅ Оценка ' + res.id + ' пересмотрена: ' + pct2(res.was) + ' → ' + pct2(res.result.score), 'success');
           cancelEdit(false);
@@ -4326,6 +4411,7 @@
       qcTab('eval');
       clearReqLink(false);
       evEditing = r.id;
+      evVersion = r.version === undefined ? null : r.version;
       document.getElementById('evEditId').textContent = r.id;
       document.getElementById('evEditWho').textContent =
         '· ' + r.meta.operator + ' · ' + formatDate(r.meta.callDate) + ' · было ' + pct2(r.score);
@@ -4378,6 +4464,19 @@
   // Уведомление не уходит само, а «Сообщить о проблеме» открывает форму
   // сбоя с уже вписанными звонком и текстом ошибки: кто, где и в каком
   // браузере, форма добавит сама.
+  // Сохранить не дали: оценку уже поправил другой или заявку уже оценили.
+  // Это не сбой сайта — «Сообщить о проблеме» тут ни к чему. Форма остаётся
+  // как есть, пока человек сам не откроет оценку заново.
+  function evStaleSave(res, editing) {
+    toast(res.error, 'err', {
+      sticky: true,
+      title: editing ? 'Правка НЕ сохранена' : 'Оценка НЕ сохранена',
+      actions: editing
+        ? [['Открыть оценку заново', function () { editEvaluation(editing); }, true], ['Закрыть', null]]
+        : [['Закрыть', null, true]]
+    });
+  }
+
   function evSaveFailed(err, meta, editing) {
     const reason = String(err || 'неизвестная ошибка').replace(/^❌\s*/, '');
     const d = String(meta.callDate || '');
@@ -4752,9 +4851,10 @@
   // чек-лист попадает в отчёты за день отправки.
   // Дату всюду в системе выбирают календариком — и здесь тоже.
   // Системное окно браузера требовало набрать ДД.ММ.ГГГГ руками.
-  let sentEv = '';
+  let sentEv = '', sentWas = '';    // sentWas — дата отправки, что была на экране
   function askSentDate(evId, current) {
     sentEv = evId;
+    sentWas = current || '';
     document.getElementById('sentWhat').innerHTML = 'Оценка <strong>' + evId + '</strong>';
     document.getElementById('sentDate').value = current || '';
     const m = document.getElementById('sentMessage');
@@ -4772,6 +4872,12 @@
       return;
     }
     google.script.run.withSuccessHandler(function (r) {
+      if (!r.success && r.code === 'stale') {
+        document.getElementById('sentModal').classList.remove('active');
+        staleToast(r);
+        loadJournal();
+        return;
+      }
       if (!r.success) {
         m.textContent = r.error; m.className = 'message error'; m.style.display = 'block';
         return;
@@ -4780,19 +4886,19 @@
       loadJournal();
     }).withFailureHandler(function (e) {
       m.textContent = String(e); m.className = 'message error'; m.style.display = 'block';
-    }).setSentDate(sessionStorage.getItem('token'), sentEv, val);
+    }).setSentDate(sessionStorage.getItem('token'), sentEv, val, sentWas);
   }
 
   // Удаление оценки: чек-лист исчезает отовсюду, заявка возвращается
   // в работу. Спрашиваем прямо, что именно удаляем.
-  function removeEvaluation(evId, who, score) {
+  function removeEvaluation(evId, who, score, edits) {
     if (!confirm('Точно удалить чек-лист ' + who + ' ' + pct2(Number(score)) + '?\n\n' +
       'Оценка ' + evId + ' пропадёт из журнала и всех отчётов. Отменить будет нельзя.')) return;
     google.script.run.withSuccessHandler(function (r) {
-      if (!r.success) { toast(r.error); return; }
+      if (!r.success) { r.code === 'stale' ? staleToast(r) : toast(r.error); loadJournal(); return; }
       loadJournal();
     }).withFailureHandler(function (e) { toast(e); })
-      .deleteEvaluation(sessionStorage.getItem('token'), evId);
+      .deleteEvaluation(sessionStorage.getItem('token'), evId, edits);
   }
 
   // ---------- АПЕЛЛЯЦИИ ----------
@@ -5070,7 +5176,7 @@
         b.onclick = function () {
           const wrap = b.closest('.ap-actions');
           answerAppeal(wrap.getAttribute('data-ap'), b.getAttribute('data-st'),
-            wrap.querySelector('textarea').value.trim(), b);
+            wrap.querySelector('textarea').value.trim(), b, 'new');
         };
       });
       box.querySelectorAll('button[data-seen]').forEach(function (b) {
@@ -5156,7 +5262,7 @@
       // вписанный в сообщение HTML выполнился бы у того, кто его читает
       const h = escHtml;
       rows.forEach(function (b) {
-        html += '<div class="fail-call" data-bug="' + h(b.id) + '">' +
+        html += '<div class="fail-call" data-bug="' + h(b.id) + '" data-bug-was="' + h(b.status) + '">' +
           '<div class="fc-head"><div><strong>' + h(b.author) + '</strong>' +
             ' <span style="color:var(--muted);">' + h(b.authorTeam || '') + '</span>' +
             ' · ' + h(b.date) + ' ' + h(b.time) + ' · ' + h(b.place) +
@@ -5184,7 +5290,8 @@
         wrap.querySelectorAll('button[data-st]').forEach(function (btn) {
           btn.onclick = function () {
             const inp = wrap.querySelector('.bug-answer');
-            answerBug(wrap.getAttribute('data-bug'), btn.getAttribute('data-st'), inp ? inp.value : '', btn);
+            answerBug(wrap.getAttribute('data-bug'), btn.getAttribute('data-st'), inp ? inp.value : '', btn,
+              wrap.getAttribute('data-bug-was'));
           };
         });
       });
@@ -5242,25 +5349,26 @@
     }).getSiteErrors(sessionStorage.getItem('token'), { days: document.getElementById('errDays').value });
   }
 
-  function answerBug(id, status, answer, btn) {
+  function answerBug(id, status, answer, btn, was) {
     btn.disabled = true;
     google.script.run.withSuccessHandler(function (r) {
       btn.disabled = false;
-      if (!r.success) { toast(r.error); return; }
+      if (!r.success) { if (r.code === 'stale') { staleToast(r); loadBugs(); } else toast(r.error); return; }
       toast(r.message, 'ok');
       loadBugs();
     }).withFailureHandler(function (e) { btn.disabled = false; toast(e); })
-      .answerBugReport(sessionStorage.getItem('token'), id, status, answer);
+      .answerBugReport(sessionStorage.getItem('token'), id, status, answer, was);
   }
 
-  function answerAppeal(id, status, answer, btn) {
+  // was — статус апелляции на экране: разобрал другой — не затираем
+  function answerAppeal(id, status, answer, btn, was) {
     btn.disabled = true;
     google.script.run.withSuccessHandler(function (r) {
       btn.disabled = false;
-      if (!r.success) { toast(r.error); return; }
+      if (!r.success) { if (r.code === 'stale') { staleToast(r); loadAppeals(); } else toast(r.error); return; }
       loadAppeals();
     }).withFailureHandler(function (e) { btn.disabled = false; toast(e); })
-      .answerAppeal(sessionStorage.getItem('token'), id, status, answer);
+      .answerAppeal(sessionStorage.getItem('token'), id, status, answer, was);
   }
 
   // счётчик на вкладке: у старшего СКК — сколько ждёт разбора,
@@ -5379,7 +5487,8 @@
           : '';
         const del = canEditEval
           ? '<button class="btn-small btn-danger" title="Удалить чек-лист" data-del="' + e.id +
-            '" data-del-who="' + e.operator.replace(/"/g, '&quot;') + '" data-del-score="' + e.score + '"><i class="fas fa-trash"></i></button> '
+            '" data-del-who="' + e.operator.replace(/"/g, '&quot;') + '" data-del-score="' + e.score +
+            '" data-del-edits="' + (e.edits || 0) + '"><i class="fas fa-trash"></i></button> '
           : '';
         // РГО не согласен с оценкой своего оператора — подаёт апелляцию
         const appeal = canFileAppeal
@@ -5420,7 +5529,8 @@
       });
       box.querySelectorAll('button[data-del]').forEach(function (b) {
         b.onclick = function () {
-          removeEvaluation(b.getAttribute('data-del'), b.getAttribute('data-del-who'), b.getAttribute('data-del-score'));
+          removeEvaluation(b.getAttribute('data-del'), b.getAttribute('data-del-who'), b.getAttribute('data-del-score'),
+            b.getAttribute('data-del-edits'));
         };
       });
       box.querySelectorAll('button[data-appeal]').forEach(function (b) {

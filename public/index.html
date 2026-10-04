@@ -198,6 +198,28 @@
   .stat-card .number.checked{ color:var(--good-ink); }
   .stat-card .number.rejected{ color:var(--bad-ink); }
   .stat-card .number.rating{ color:var(--accent); }
+  /* Подсказка «что входит в показатель»: наведение мышью, на телефоне —
+     касание (плитка получает фокус). Сами о себе забывали, что считается. */
+  .stat-card[data-tip]{ overflow:visible; cursor:help; outline:none; }
+  .stat-card[data-tip] .label::after{ content:'?'; display:inline-block; width:14px; height:14px; margin-left:6px;
+    border-radius:50%; background:var(--surface-2); border:1px solid var(--border-strong); color:var(--muted);
+    font-size:10px; line-height:12px; text-align:center; letter-spacing:0; vertical-align:1px; }
+  .stat-card[data-tip]::after{ content:attr(data-tip); position:absolute; top:calc(100% + 8px); left:0; z-index:60;
+    width:max(100%, 280px); padding:11px 13px; border-radius:10px; background:#1b2333; color:#fff;
+    font-size:12.5px; line-height:1.5; font-weight:400; text-transform:none; letter-spacing:0; white-space:pre-line;
+    box-shadow:var(--shadow-lg); opacity:0; visibility:hidden; transform:translateY(-4px); pointer-events:none;
+    transition:opacity .15s var(--ease-out), transform .15s var(--ease-out), visibility .15s; }
+  /* касание даёт фокус — подсказка открыта, пока не коснулись другого места;
+     наведение — только для мыши: на телефоне оно «залипает», и подсказки
+     от разных плиток вылезали друг на друга */
+  .stat-card[data-tip]:focus{ z-index:5; border-color:var(--border-strong); }
+  .stat-card[data-tip]:focus::after{ opacity:1; visibility:visible; transform:none; }
+  @media (hover:hover) and (pointer:fine){
+    .stat-card[data-tip]:hover{ z-index:5; border-color:var(--border-strong); }
+    .stat-card[data-tip]:hover::after{ opacity:1; visibility:visible; transform:none; }
+  }
+  /* у правого края подсказка открывается влево, чтобы не уйти за экран */
+  .stat-card[data-tip]:nth-last-child(-n+2)::after{ left:auto; right:0; }
 
   /* Сообщения об ошибках: одно место и один вид. Системное окно браузера
      останавливало работу и выглядело чужим, а половина кода и так
@@ -252,6 +274,9 @@
 
   /* ===== ФОРМЫ ===== */
   .form-grid{ display:grid; grid-template-columns:1fr 1fr; gap:15px; }
+  /* длинная тематика («Адреса МО, График работы и приема БМ») в поле без
+     переноса распирала колонку, и на телефоне форма уезжала за край */
+  .form-grid > *{ min-width:0; }
   .form-group{ display:flex; flex-direction:column; }
   .form-group.full-width{ grid-column:1/-1; }
   .form-group label i{ color:var(--muted); display:inline-block; min-width:15px;
@@ -670,6 +695,72 @@
     .stats-grid{ grid-template-columns:1fr 1fr; }
     .login-container{ padding:32px 22px; }
     .container{ padding:16px 14px 32px; }
+  }
+  /* ===== ТЕЛЕФОН =====
+     Всё ниже — только для узких экранов; ноутбук и монитор не трогает. */
+  @media (max-width:640px){
+    /* шапка не липнет: на телефоне в ней три ряда, и прилипшая она
+       съедала пятую часть экрана при любой прокрутке */
+    .header{ position:static; padding:10px 14px; gap:8px; }
+    /* чек-лист: название пункта над ответами, а не сбоку — сбоку оно
+       сжималось до «Управлени», и кнопки налезали на текст */
+    .ev-row{ flex-direction:column; align-items:stretch; gap:8px; }
+    .ev-opts{ justify-content:flex-start; }
+    /* плашка итога внизу — узкой полосой, чтобы не закрывала чек-лист:
+       сверху балл и «Сохранить», под ними мелко счётчики и КЗ/ДЦ */
+    .ev-sticky{ bottom:6px; gap:6px 8px; padding:8px 10px; margin-bottom:10px; }
+    .ev-sticky .ev-score{ order:1; flex:1 1 auto; }
+    .ev-sticky .btn-submit{ order:2; padding:10px 16px !important; font-size:14px; }
+    .ev-sticky .ev-counts{ order:3; flex:0 1 auto; gap:5px; }
+    .ev-num{ font-size:24px; }
+    .ev-sticky .ev-lbl{ display:none; }
+    .ev-chip{ padding:3px 8px; font-size:11px; }
+    .ev-sticky .ev-kz{ padding:3px 8px; font-size:13px; }
+    /* прокрутка к полю (ошибка заполнения, «от кого жалоба») не прячет
+       его под плашку итога */
+    html{ scroll-padding-bottom:130px; }
+    /* самые узкие телефоны (320): балл и «Сохранить» всё ещё в одну строку */
+    @media (max-width:360px){
+      .ev-num{ font-size:21px; }
+      .ev-sticky .btn-submit{ padding:9px 11px !important; font-size:13px; }
+    }
+    /* закреплённые столбцы (кнопки журнала, группа и ФИО в отчётах)
+       занимали всю ширину телефона — данных за ними было не видно */
+    .col-actions{ position:static; box-shadow:none; }
+    .table-pinned th:nth-child(1), .table-pinned td:nth-child(1),
+    .table-pinned th:nth-child(2), .table-pinned td:nth-child(2){
+      position:static; box-shadow:none; width:auto; min-width:0; }
+    .table-pinned td:nth-child(2){ min-width:140px; }
+    /* iPhone увеличивает страницу, если у поля шрифт мельче 16px */
+    input:not([type=checkbox]):not([type=radio]), select, textarea{ font-size:16px !important; }
+    /* с 16px дата в 140px не влезала («09/01/202…»); строка и так переносится */
+    .date-range input[type=date]{ max-width:none; }
+    /* Журнал, план прослушки и заявки — карточками: 12 столбцов на телефон не влезают, а «Правка»
+       и самолётик жили в самом конце строки, до них листали вбок */
+    .m-cards thead{ display:none; }
+    .m-cards table, .m-cards tbody{ display:block; }
+    .m-cards tr{ display:grid; grid-template-columns:1fr 1fr; gap:8px 12px; padding:12px;
+      margin-bottom:10px; border:1px solid var(--border); border-radius:12px; }
+    .m-cards td{ display:block; padding:0; border:0; min-width:0; max-width:none !important;
+      white-space:normal !important; overflow-wrap:anywhere; }
+    .m-cards td[data-l]::before{ content:attr(data-l); display:block; margin-bottom:1px; font-size:10.5px;
+      font-weight:600; letter-spacing:.4px; text-transform:uppercase; color:var(--muted); }
+    .m-cards td.m-op{ order:-2; font-weight:600; color:var(--ink); }
+    .m-cards td.m-q{ order:-1; }
+    .m-cards td.m-wide{ grid-column:1/-1; }
+    .m-cards td.col-actions, .m-cards td.m-act{ display:flex; flex-wrap:wrap; gap:6px; padding-top:8px;
+      border-top:1px dashed var(--border); background:none; }
+    .m-cards tr:hover td{ background:none; }
+    .m-cards tr.mark-row{ background:var(--mid-bg); border-color:var(--mid); }
+    .m-cards tr.mark-row td{ background:none; }
+    /* на телефоне подсказка — во всю ширину блока плиток, под ними:
+       у плитки в правом ряду она иначе уходила бы за край экрана */
+    .stats-grid:has(> .stat-card[data-tip]){ position:relative; }
+    .stat-card[data-tip]{ position:static; }
+    .stat-card[data-tip]::after, .stat-card[data-tip]:nth-last-child(-n+2)::after{
+      left:0; right:0; width:auto; top:calc(100% + 6px); }
+    .review-modal{ padding:8px; }
+    .review-modal .modal-content{ padding:20px 16px; max-height:94vh; }
   }
   @media (prefers-reduced-motion:reduce){
     *, .login-container, .review-modal.active .modal-content{ animation:none !important; transition:none !important; }
@@ -1169,6 +1260,57 @@
       <div class="stat-card"><div class="number rating" id="rgoAvg">0</div><div class="label">Средний балл</div></div>
     </div>
 
+    <!-- РГО сдаёт звонки за операторов своей группы: у части операторов
+         из России сайт не открывается, и сами они заявку не подадут -->
+    <div class="card" id="rgoReqCard">
+      <h2 class="card-title"><i class="fas fa-paper-plane"></i> Сдать звонок за оператора</h2>
+      <p class="hint" style="margin:-6px 0 14px;">Для операторов, у которых сайт не открывается. Заявка уходит на оператора — как если бы он сдал её сам и засчитывается в его выгрузку, а в истории заявки видно, что сдали вы.</p>
+      <form id="rgoReqForm" onsubmit="submitRgoRequest(event)">
+        <div class="form-group">
+          <label for="rgoReqOp"><i class="fas fa-user"></i> Оператор *</label>
+          <select id="rgoReqOp"><option value="">Выберите оператора</option></select>
+        </div>
+        <div class="seg" style="margin-top:12px;">
+          <button type="button" class="seg-btn active" id="rgoSegYes" onclick="setRgoHasCall('yes')">Звонок был</button>
+          <button type="button" class="seg-btn" id="rgoSegNo" onclick="setRgoHasCall('no')">Звонка не было</button>
+        </div>
+        <div id="rgoCallFields" class="form-grid">
+          <div class="form-group full-width">
+            <label for="rgoCallType"><i class="fas fa-list-check"></i> Тип звонка *</label>
+            <select id="rgoCallType">
+              <option value="">Выберите тип</option>
+              <option value="СР">СР</option>
+              <option value="КР">КР</option>
+            </select>
+            <small class="hint">Согласно графику выгрузки</small>
+          </div>
+          <div class="form-group"><label for="rgoCallDate"><i class="fas fa-calendar-day"></i> Дата звонка *</label><input type="date" id="rgoCallDate"></div>
+          <div class="form-group"><label for="rgoCallTime"><i class="fas fa-clock"></i> Время звонка (МСК) *</label><input type="time" id="rgoCallTime"></div>
+          <div class="form-group full-width">
+            <label for="rgoPhone"><i class="fas fa-phone"></i> Номер телефона *</label>
+            <input type="tel" id="rgoPhone" placeholder="+7 (777) 777-77-77">
+            <small class="hint">Только цифры, без + - ( ). 10 или 11 знаков — приведём к виду 7XXXXXXXXXX</small>
+          </div>
+          <div class="form-group full-width"><label for="rgoComment"><i class="fas fa-comment"></i> Комментарий (необязательно)</label><input type="text" id="rgoComment" placeholder="Напр.: тип звонка, контекст"></div>
+        </div>
+        <div id="rgoNoCallFields" class="hidden">
+          <div class="form-group full-width">
+            <label for="rgoReason"><i class="fas fa-pen"></i> Причина отсутствия звонка *</label>
+            <input type="text" id="rgoReason" placeholder="Напр.: отпуск, больничный, не было подходящих звонков">
+          </div>
+        </div>
+        <div class="form-group full-width" style="margin-top:15px;">
+          <button type="submit" class="btn-submit"><i class="fas fa-paper-plane"></i> Отправить</button>
+        </div>
+        <div class="message" id="rgoReqMsg"></div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title"><i class="fas fa-list"></i> Заявки группы <span class="hint" style="font-weight:400;">— последние 30</span></h2>
+      <div id="rgoReqList"></div>
+    </div>
+
     <div class="card">
       <h2 class="card-title"><i class="fas fa-chart-line"></i> Качество группы</h2>
       <div class="charts-2">
@@ -1447,12 +1589,20 @@
     <!-- Производственные показатели -->
     <div id="repProduction" class="hidden">
       <div class="stats-grid">
-        <div class="stat-card"><div class="number" id="prOverall">—</div><div class="label">Качество за период</div></div>
-        <div class="stat-card"><div class="number new" id="prChecked">0</div><div class="label">Плановых прослушек</div></div>
-        <div class="stat-card"><div class="number rejected" id="prPj">0</div><div class="label">Подтверждённых жалоб</div></div>
-        <div class="stat-card"><div class="number" id="prKz" style="color:var(--kz);">0</div><div class="label">КЗ от заказчика</div></div>
-        <div class="stat-card"><div class="number checked" id="prOps">0</div><div class="label">Операторов</div></div>
-        <div class="stat-card"><div class="number" id="prSenior">—</div><div class="label">Без стажа менее месяца</div></div>
+        <div class="stat-card" tabindex="0" data-tip="Средний балл по всем оценкам периода: плановая прослушка (вместе с КЗ от заказчика) плюс подтверждённые жалобы.
+Подтверждённая жалоба идёт с баллом 0% и тянет показатель вниз.
+Не входят: необоснованные жалобы (НЖ) и звонки ДЦ.
+Среднее — по звонкам, а не среднее по операторам."><div class="number" id="prOverall">—</div><div class="label">Качество за период</div></div>
+        <div class="stat-card" tabindex="0" data-tip="Сколько звонков прослушано по плану за период, вместе с КЗ от заказчика.
+Жалобы и звонки ДЦ сюда не входят."><div class="number new" id="prChecked">0</div><div class="label">Плановых прослушек</div></div>
+        <div class="stat-card" tabindex="0" data-tip="Чек-листы с отметкой «Подтверждённая жалоба» за период.
+Каждая входит в «Качество за период» с баллом 0%.
+В период жалоба попадает по дате отправки чек-листа, если её внесли (самолётик), иначе — по дате прослушки."><div class="number rejected" id="prPj">0</div><div class="label">Подтверждённых жалоб</div></div>
+        <div class="stat-card" tabindex="0" data-tip="Контрольные звонки заказчика за период.
+Они уже входят в плановые прослушки и в качество наравне с ними — здесь показаны отдельно."><div class="number" id="prKz" style="color:var(--kz);">0</div><div class="label">КЗ от заказчика</div></div>
+        <div class="stat-card" tabindex="0" data-tip="Сколько операторов в отчёте, включая тех, кого за период ещё не слушали.
+Если оператора перевели в другую группу, в таблице он стоит в обеих, а здесь считается один раз."><div class="number checked" id="prOps">0</div><div class="label">Операторов</div></div>
+        <div class="stat-card" tabindex="0" data-tip="То же «Качество за период» (плановые + подтверждённые жалобы), но без новичков — операторов, у которых к концу периода меньше месяца стажа по дате приёма."><div class="number" id="prSenior">—</div><div class="label">Без стажа менее месяца</div></div>
       </div>
       <div class="card">
         <div class="filter-bar" style="margin-bottom:0;">
@@ -1874,6 +2024,13 @@
     setTimeout(function () { t.remove(); }, 320);
   }
 
+  // Сервер отказал: пока страница была открыта, ту же запись поменял другой
+  // (code 'stale'). Пишем, кто и что, заметным сообщением — его не должны
+  // проморгать: своё действие человек не сохранил.
+  function staleToast(r) {
+    toast(r.error, 'err', { title: 'Пока страница была открыта, это уже изменили', ms: 15000 });
+  }
+
   // opts.ms — сколько держать; opts.sticky — пока не закроют;
   // opts.title и opts.actions ([подпись, действие, главная?]) — для ошибок,
   // которые надо не только увидеть, но и передать
@@ -2108,6 +2265,7 @@
       fillHeader(user);
       renderNav();
       loadHiredDates(loadRgoDashboard);
+      loadRgoRequests();
     } else if (user.role === 'qc' || user.role === 'sqc' || user.role === 'admin') {
       document.getElementById('qcPage').classList.remove('hidden');
       fillHeader(user);
@@ -2255,6 +2413,90 @@
       .withFailureHandler(function (error) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Отправить'; showOpMessage('❌ Ошибка: ' + error, 'error'); })
       .createRequest(data);
   }
+  // ---------- РГО: заявки за операторов своей группы ----------
+  let rgoHasCall = 'yes';
+  function setRgoHasCall(v) {
+    rgoHasCall = v;
+    document.getElementById('rgoSegYes').classList.toggle('active', v === 'yes');
+    document.getElementById('rgoSegNo').classList.toggle('active', v === 'no');
+    document.getElementById('rgoCallFields').classList.toggle('hidden', v !== 'yes');
+    document.getElementById('rgoNoCallFields').classList.toggle('hidden', v !== 'no');
+    segSyncAll();
+  }
+
+  function loadRgoRequests() {
+    const token = sessionStorage.getItem('token');
+    const me = JSON.parse(sessionStorage.getItem('user') || '{}');
+    // в списке — только действующие операторы своей группы: за уволенного
+    // и за чужого сервер всё равно откажет
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) return;
+      const sel = document.getElementById('rgoReqOp');
+      const keep = sel.value;
+      sel.innerHTML = '<option value="">Выберите оператора</option>' + (r.operators || [])
+        .filter(function (o) { return o.group === me.group && !o.dismissed; })
+        .map(function (o) { return '<option>' + escHtml(o.fullName) + '</option>'; }).join('');
+      sel.value = keep;
+    }).getOperatorsList(token);
+    const box = document.getElementById('rgoReqList');
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + escHtml(r.error || 'Ошибка') + '</p></div>'; return; }
+      const list = (r.requests || []).slice(0, 30);
+      if (!list.length) { box.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Заявок пока нет</p></div>'; return; }
+      let html = '<div class="table-wrapper m-cards"><table><thead><tr><th>Заявка</th><th>Оператор</th><th>Звонок</th><th>Телефон</th><th>Статус</th><th>Оценка</th><th>Комментарий СКК</th></tr></thead><tbody>';
+      list.forEach(function (x) {
+        const noCall = x.status === 'Без звонка';
+        html += '<tr><td data-l="Заявка"><strong>' + x.id + '</strong><div class="hint">' + escHtml(x.createdAt) + '</div></td>' +
+          '<td class="m-op" data-l="Оператор">' + escHtml(x.fullName) + '</td>' +
+          '<td data-l="Звонок">' + (noCall ? '—' : formatDate(x.callDate) + ' ' + formatTime(x.callTime)) + '</td>' +
+          '<td data-l="Телефон">' + (noCall ? '—' : escHtml(x.phone)) + '</td>' +
+          '<td class="m-q" data-l="Статус"><span class="status-badge ' + x.status.replace(/ /g, '_') + '">' + x.status + '</span></td>' +
+          '<td data-l="Оценка">' + (x.rating ? pct2(Number(x.rating)) : '—') + '</td>' +
+          '<td class="m-wide" data-l="Комментарий СКК">' + (x.comment ? escHtml(x.comment) : '—') + '</td></tr>';
+      });
+      box.innerHTML = html + '</tbody></table></div>';
+    }).getAllRequests(token);
+  }
+
+  function submitRgoRequest(event) {
+    event.preventDefault();
+    const pin = sessionStorage.getItem('token');
+    const operator = document.getElementById('rgoReqOp').value;
+    const msg = function (t, type) { const el = document.getElementById('rgoReqMsg'); el.textContent = t; el.className = 'message ' + type; el.style.display = 'block'; setTimeout(function () { el.style.display = 'none'; }, 6000); };
+    if (!operator) { msg('Выберите оператора', 'error'); return; }
+    let data;
+    if (rgoHasCall === 'yes') {
+      const callType = document.getElementById('rgoCallType').value;
+      const callDate = document.getElementById('rgoCallDate').value;
+      const callTime = document.getElementById('rgoCallTime').value;
+      let d = document.getElementById('rgoPhone').value.replace(/\D/g, '');
+      if (d.length === 11 && d[0] === '8') d = '7' + d.slice(1);
+      if (d.length === 10) d = '7' + d;
+      if (!callType) { msg('Выберите тип звонка', 'error'); return; }
+      if (!callDate || !callTime) { msg('Укажите дату и время звонка', 'error'); return; }
+      if (d.length !== 11 || d[0] !== '7') { msg('Введите номер полностью: +7 (777) 777-77-77', 'error'); return; }
+      data = { pin: pin, operator: operator, hasCall: 'yes', callType: callType, callDate: callDate, callTime: callTime, phone: d, comment: document.getElementById('rgoComment').value.trim() };
+    } else {
+      const reason = document.getElementById('rgoReason').value.trim();
+      if (!reason) { msg('Укажите причину отсутствия звонка', 'error'); return; }
+      data = { pin: pin, operator: operator, hasCall: 'no', callDate: '', callTime: '', phone: '', comment: reason };
+    }
+    const btn = event.target.querySelector('.btn-submit'); btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Отправка...';
+    google.script.run
+      .withSuccessHandler(function (result) {
+        btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Отправить';
+        if (result.success) {
+          msg('✅ Отправлено за: ' + operator + (result.requestId ? ' (#' + result.requestId + ')' : ''), 'success');
+          // оператора оставляем — часто сдают несколько звонков подряд за одного
+          ['rgoPhone', 'rgoComment', 'rgoReason', 'rgoCallTime'].forEach(function (id) { document.getElementById(id).value = ''; });
+          setRgoHasCall('yes');
+          loadRgoRequests();
+        } else { msg('❌ ' + result.error, 'error'); }
+      })
+      .withFailureHandler(function (error) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Отправить'; msg('❌ Ошибка: ' + error, 'error'); })
+      .createRequest(data);
+  }
+
   function showOpMessage(text, type) { const el = document.getElementById('opFormMessage'); el.textContent = text; el.className = 'message ' + type; el.style.display = 'block'; setTimeout(function () { el.style.display = 'none'; }, 5000); }
 
   // ---------- ОПЕРАТОР: оценки КК (чек-лист v2) ----------
@@ -2378,6 +2620,7 @@
       .withSuccessHandler(function (result) {
         btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Сохранить';
         if (result.success) { showEditMessage('✅ Обновлено!', 'success'); setTimeout(function () { closeEditModal(); loadOperatorAll(); }, 1200); }
+        else if (result.code === 'stale') { closeEditModal(); staleToast(result); loadOperatorAll(); }
         else { showEditMessage('❌ ' + result.error, 'error'); }
       })
       .withFailureHandler(function (error) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Сохранить'; showEditMessage('❌ Ошибка: ' + error, 'error'); })
@@ -2406,7 +2649,7 @@
     }
     const user = JSON.parse(sessionStorage.getItem('user') || '{}');
     const isAdmin = user.role === 'admin';
-    let html = '<div class="table-wrapper"><table><thead><tr><th>ID</th><th>Оператор</th><th>Группа</th><th>Дата</th><th>Время, МСК</th><th>Телефон</th><th>Статус</th><th>Оценка</th><th>Действия</th></tr></thead><tbody>';
+    let html = '<div class="table-wrapper m-cards"><table><thead><tr><th>ID</th><th>Оператор</th><th>Группа</th><th>Дата</th><th>Время, МСК</th><th>Телефон</th><th>Статус</th><th>Оценка</th><th>Действия</th></tr></thead><tbody>';
     requests.forEach(function (r) {
       const noCall = r.status === 'Без звонка';
       const canReview = r.status === 'Новая' || r.status === 'В работе';
@@ -2419,11 +2662,11 @@
       const rev = noCall ? '<span style="color:var(--muted);font-size:12px;">' + (r.opComment || '—') + '</span>' :
         (canReview ? '<button class="btn-small" onclick="openReview(\'' + r.id + '\')"><i class="fas fa-check"></i> Проверить</button>' : '<button class="btn-small btn-mute" title="Посмотреть заявку" onclick="openReview(\'' + r.id + '\')"><i class="fas fa-eye"></i></button>');
       html += '<tr>' +
-        '<td><strong>' + r.id + '</strong></td><td>' + r.fullName + '</td><td>' + r.group + '</td>' +
-        '<td>' + (noCall ? '—' : formatDate(r.callDate)) + '</td><td>' + (noCall ? '—' : formatTime(r.callTime)) + '</td><td>' + (noCall ? '—' : r.phone) + '</td>' +
-        '<td><span class="status-badge ' + r.status.replace(/ /g, '_') + '">' + r.status + '</span></td>' +
-        '<td>' + (r.rating ? pct2(Number(r.rating)) : '-') + '</td>' +
-        '<td>' + evalBtn + rev + ' ' + hist + ' ' + del + '</td>' +
+        '<td data-l="Заявка"><strong>' + r.id + '</strong></td><td class="m-op" data-l="Оператор">' + r.fullName + '</td><td data-l="Группа">' + r.group + '</td>' +
+        '<td data-l="Дата">' + (noCall ? '—' : formatDate(r.callDate)) + '</td><td data-l="Время, МСК">' + (noCall ? '—' : formatTime(r.callTime)) + '</td><td data-l="Телефон">' + (noCall ? '—' : r.phone) + '</td>' +
+        '<td class="m-q" data-l="Статус"><span class="status-badge ' + r.status.replace(/ /g, '_') + '">' + r.status + '</span></td>' +
+        '<td data-l="Оценка">' + (r.rating ? pct2(Number(r.rating)) : '-') + '</td>' +
+        '<td class="m-act m-wide">' + evalBtn + rev + ' ' + hist + ' ' + del + '</td>' +
       '</tr>';
     });
     html += '</tbody></table></div>';
@@ -2721,6 +2964,9 @@
     const was = staffAll.find(x => x.fullName === staffEditing) || {};
     google.script.run
       .withSuccessHandler(function (r) {
+        // карточку успел поменять другой — форма устарела: показываем, что
+        // изменилось, и перечитываем список
+        if (!r.success && r.code === 'stale') { failed(r.error); loadStaff(); return; }
         if (!r.success) return failed(r.error);
         const after = [];
         if (login && login !== (was.login || '')) {
@@ -2739,7 +2985,10 @@
         });
       })
       .withFailureHandler(e => failed(e))
-      .updateUser(t, staffEditing, name, group, role, hired, training, position);
+      .updateUser(t, staffEditing, name, group, role, hired, training, position,
+        // что было в форме, когда её открыли: сервер сверит, не поменял ли кто
+        { group: was.group || '', role: was.role || '', position: was.position || '',
+          hired: was.hiredIso || '', training: was.trainingIso || '' });
     return false;
   }
 
@@ -2847,10 +3096,12 @@
   }
 
   // ---------- QC: проверка с чек-листом ----------
+  let currentRequestStatus = '';   // статус, который СКК видел, открывая заявку
   function openReview(requestId) {
     currentRequestId = requestId;
     const req = allRequests.find(function (r) { return r.id === requestId; });
     if (!req) return;
+    currentRequestStatus = req.status || '';
     document.getElementById('requestDetail').innerHTML =
       '<div class="request-detail">' +
         '<div class="row"><span class="label">Заявка</span><span class="value">' + req.id + '</span></div>' +
@@ -2885,11 +3136,12 @@
       btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Сохранить';
       const msg = document.getElementById('reviewMessage');
       if (result.success) { msg.textContent = '✅ Сохранено'; msg.className = 'message success'; msg.style.display = 'block'; setTimeout(function () { closeModal(); loadAllRequests(); }, 1200); }
+      else if (result.code === 'stale') { closeModal(); staleToast(result); loadAllRequests(); }
       else { msg.textContent = '❌ ' + result.error; msg.className = 'message error'; msg.style.display = 'block'; }
     }).withFailureHandler(function (error) {
       btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Сохранить';
       const msg = document.getElementById('reviewMessage'); msg.textContent = '❌ Ошибка: ' + error; msg.className = 'message error'; msg.style.display = 'block';
-    }).reviewRequest(p, currentRequestId, status, rating, comment);
+    }).reviewRequest(p, currentRequestId, status, rating, comment, currentRequestStatus);
   }
 
   function deleteRequest(requestId) {
@@ -2919,7 +3171,10 @@
     const el = document.getElementById('hd_' + cssId(fullName));
     if (!el || !el.value) { toast('Выберите дату приёмки'); return; }
     google.script.run.withSuccessHandler(function (r) {
-      if (!r.success) { toast(r.error); return; }
+      if (!r.success) {
+        if (r.code !== 'stale') { toast(r.error); return; }
+        staleToast(r);
+      }
       loadHiredDates(loadRgoDashboard);
     }).withFailureHandler(e => toast(e))
       .setHiredDate(sessionStorage.getItem('token'), fullName, el.value);
@@ -2981,6 +3236,7 @@
   let evCmtOpen = {};        // id -> поле замечания раскрыто вручную
   let evComplaintSrc = '';   // от кого жалоба: Клиент / Заказчик
   let evEditing = '';        // правим сохранённую оценку EV-…
+  let evVersion = null;      // сколько раз её правили, когда открыли: сервер сверит
 
   const V = { POS: 'Положительно', DBT: 'Сомнительно', NEG: 'Отрицательно', NA: 'Не требуется', YES: 'Обнаружено', NO: 'Не обнаружено' };
 
@@ -3037,7 +3293,12 @@
     if (key === 'home') {
       if (!document.getElementById('repPage').classList.contains('hidden')) backFromReports();
       else if (home === 'org' && !document.getElementById('qcPage').classList.contains('hidden')) backToOrgPage();
-      else if (home === 'rgo') backFromReports();
+      // РГО уже в своём кабинете: возвращаться некуда. Раньше отсюда
+      // звался backFromReports с repFrom = 'org', и под кабинетом РГО
+      // вылезал экран дивизиона.
+      else if (home === 'rgo' && document.getElementById('rgoPage').classList.contains('hidden')) {
+        repFrom = 'rgo'; backFromReports();
+      }
       navRecord();
       return;
     }
@@ -3228,6 +3489,13 @@
     return h + '</div>';
   }
 
+  // Подсказка плитки открывается по фокусу; Safari на iPhone не всегда
+  // ставит фокус на div по касанию — ставим сами.
+  document.addEventListener('click', function (e) {
+    const c = e.target.closest && e.target.closest('.stat-card[data-tip]');
+    if (c && document.activeElement !== c) c.focus({ preventScroll: true });
+  });
+
   // ---------- ШАПКА ТАБЛИЦЫ НЕ УЕЗЖАЕТ ----------
   // В длинных таблицах (план прослушки, журнал, отчёты) при прокрутке
   // вниз пропадали названия столбцов. Чистый CSS тут не справляется:
@@ -3290,6 +3558,8 @@
       // её таблицы не видно, и шапку ей закреплять не нужно
       if (table.closest('details:not([open])')) return;
       if (table.checkVisibility && !table.checkVisibility()) return;
+      // у журнала-карточек на телефоне шапка скрыта — копировать нечего
+      if (!table.tHead.getClientRects().length) return;
       const r = table.getBoundingClientRect();
       const headH = table.tHead.getBoundingClientRect().height;
       // шапка ушла под шапку сайта, а строки таблицы ещё на экране
@@ -3420,56 +3690,98 @@
       if (r.period) {
         document.getElementById('planFrom').value = r.period.from;
         document.getElementById('planTo').value = r.period.to;
+        planPeriodBase = { from: r.period.from, to: r.period.to };
       }
       document.getElementById('planOps').textContent = r.summary.operators;
       document.getElementById('planNeed').textContent = r.summary.plan;
       document.getElementById('planDone').textContent = r.summary.done;
       document.getElementById('planLeft').textContent = r.summary.left;
       document.getElementById('planPct').textContent = 'выборка ' + r.percent + '% от принятых';
-      if (r.noData) { box.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Нет статистики за ' + r.date + '. Нажмите «Загрузить статистику дня».</p></div>'; planScrollBack(); return; }
+      if (r.noData) { planSig = ''; box.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Нет статистики за ' + r.date + '. Нажмите «Загрузить статистику дня».</p></div>'; planScrollBack(); return; }
+      // тихое обновление и ничего не поменялось — таблицу не трогаем, не мигаем
+      const sig = JSON.stringify([document.getElementById('planDate').value, r.rows, r.percent]);
+      if (quiet && sig === planSig && box.querySelector('table')) { planScrollY = null; return; }
+      planSig = sig;
       // Отметка «в работе» слева: двое СКК не возьмут одного оператора.
-      let html = '<div class="table-wrapper"><table><thead><tr>' +
+      let html = '<div class="table-wrapper m-cards"><table><thead><tr>' +
         '<th title="кто уже взял оператора в работу">Разбор</th>' +
         '<th>Оператор</th><th>Группа</th><th>Принято</th><th>План (' + r.percent + '%)</th>' +
         '<th>Прослушано</th><th>Осталось</th><th>Выгрузил оператор</th><th>СКК сам</th>' +
         '</tr></thead><tbody>';
       r.rows.forEach(function (x) {
         const leftCell = x.left === 0 ? '<span style="color:var(--good-ink);font-weight:700;">готово</span>' : '<strong style="color:var(--bad-ink);">' + x.left + '</strong>';
-        const sel = '<select class="mark-sel mark-' + (x.mark || 'none') + '" data-mark="' + x.operator.replace(/"/g, '&quot;') + '">' +
+        // что было на экране — сервер сверит: перехватить чужого оператора
+        // со старой страницы больше нельзя
+        const sel = '<select class="mark-sel mark-' + (x.mark || 'none') + '" data-mark="' + x.operator.replace(/"/g, '&quot;') + '"' +
+          ' data-was="' + (x.mark || '') + '" data-was-by="' + escHtml(x.markBy || '') + '">' +
           '<option value=""' + (x.mark ? '' : ' selected') + '>—</option>' +
           '<option value="in_progress"' + (x.mark === 'in_progress' ? ' selected' : '') + '>В работе</option>' +
           '<option value="done"' + (x.mark === 'done' ? ' selected' : '') + '>Готово</option>' +
           '</select>' + (x.markBy ? '<div class="hint">' + x.markBy + '</div>' : '');
-        html += '<tr' + (x.mark === 'in_progress' ? ' class="mark-row"' : '') + '><td>' + sel + '</td>' +
-          '<td>' + x.operator + '</td><td>' + x.group + '</td><td>' + x.accepted + '</td><td><strong>' + x.plan + '</strong></td><td>' + x.done + '</td><td>' + leftCell + '</td>' +
-          '<td>' + x.fromOperator + (x.submitted > x.fromOperator ? ' <span style="color:var(--mid-ink);font-size:12px;">(+' + (x.submitted - x.fromOperator) + ' ждут)</span>' : '') + '</td><td>' + x.bySkk + '</td></tr>';
+        html += '<tr' + (x.mark === 'in_progress' ? ' class="mark-row"' : '') + '><td class="m-q" data-l="Разбор">' + sel + '</td>' +
+          '<td class="m-op" data-l="Оператор">' + x.operator + '</td><td data-l="Группа">' + x.group + '</td><td data-l="Принято">' + x.accepted + '</td><td data-l="План (' + r.percent + '%)"><strong>' + x.plan + '</strong></td><td data-l="Прослушано">' + x.done + '</td><td data-l="Осталось">' + leftCell + '</td>' +
+          '<td data-l="Выгрузил оператор">' + x.fromOperator + (x.submitted > x.fromOperator ? ' <span style="color:var(--mid-ink);font-size:12px;">(+' + (x.submitted - x.fromOperator) + ' ждут)</span>' : '') + '</td><td data-l="СКК сам">' + x.bySkk + '</td></tr>';
       });
       html += '</tbody></table></div>';
       box.innerHTML = html;
       planScrollBack();
       box.querySelectorAll('select[data-mark]').forEach(function (sel) {
         sel.onchange = function () {
+          const was = sel.getAttribute('data-was'), by = sel.getAttribute('data-was-by');
+          const me = (JSON.parse(sessionStorage.getItem('user') || '{}')).fullName;
+          // чужая отметка — только сознательно
+          if (was && by && by !== me && !confirm((was === 'in_progress'
+                ? 'Этого оператора уже слушает ' + by + '.'
+                : by + ' уже отметил(а) «Готово».') + '\n\nЗабрать оператора себе / поменять отметку?')) {
+            sel.value = was;
+            return;
+          }
+          planScrollY = window.scrollY;      // остаёмся там, где отметили
           google.script.run.withSuccessHandler(function (res) {
-            if (!res.success) { toast(res.error); return; }
-            planScrollY = window.scrollY;      // остаёмся там, где отметили
+            if (!res.success) { res.code === 'stale' ? staleToast(res) : toast(res.error); }
             loadPlan(false, true);
-          }).withFailureHandler(function (e) { toast(e); })
+          }).withFailureHandler(function (e) { toast(e); loadPlan(false, true); })
             .setListenMark(sessionStorage.getItem('token'),
-              document.getElementById('planDate').value, sel.getAttribute('data-mark'), sel.value);
+              document.getElementById('planDate').value, sel.getAttribute('data-mark'), sel.value,
+              { status: was, by: by });
         };
       });
     }).getListeningPlan(sessionStorage.getItem('token'), document.getElementById('planDate').value);
   }
 
+  // ---------- ПЛАН ОБНОВЛЯЕТСЯ САМ ----------
+  // Отметку «в работе» другие СКК видели только после F5 — и брали того же
+  // оператора. Пока план на экране, раз в 20 секунд тихо перечитываем его.
+  // Не трогаем, пока человек что-то делает: открыт список, фокус в поле
+  // плана, открыто окно (загрузка статистики и т.п.).
+  let planSig = '';
+  function planTick() {
+    if (document.hidden) return;
+    const tab = document.getElementById('qcPlanTab');
+    if (!tab || tab.classList.contains('hidden') || tab.offsetParent === null) return;
+    const a = document.activeElement;
+    if (a && a !== document.body && tab.contains(a) && /^(SELECT|INPUT|TEXTAREA)$/.test(a.tagName)) return;
+    if (document.querySelector('.uisel-panel:not([hidden]), .review-modal.active')) return;
+    planScrollY = window.scrollY;
+    loadPlan(false, true);
+  }
+  setInterval(planTick, 20000);
+  // вернулись на вкладку браузера — сразу свежий план, не ждём 20 секунд
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) planTick(); });
+
   // ---------- ПРИМЕЧАНИЕ К ПЛАНУ ----------
   // Недописанное не затираем, когда план перерисовывается (например,
   // после отметки «В работе»); другую дату — показываем её примечание.
-  let planNoteDirty = false, planNoteFor = '';
+  // planNoteBase — примечание, каким оно было на экране, когда начали
+  // писать. Пока человек пишет, автообновление плана его не трогает:
+  // иначе сервер не узнал бы, что кто-то сохранил своё в это время.
+  let planNoteDirty = false, planNoteFor = '', planNoteBase = '';
   function showPlanNote(r) {
     const date = document.getElementById('planDate').value;
     document.getElementById('planNoteDate').textContent = 'за ' + r.date;
     if (!planNoteDirty || planNoteFor !== date) {
       document.getElementById('planNote').value = r.note ? r.note.text : '';
+      planNoteBase = r.note ? r.note.text : '';
       planNoteDirty = false;
     }
     planNoteFor = date;
@@ -3478,26 +3790,36 @@
   function savePlanNote() {
     const date = document.getElementById('planDate').value;
     google.script.run.withSuccessHandler(function (r) {
-      if (!r.success) { toast(r.error); return; }
+      if (!r.success) {
+        if (r.code !== 'stale') { toast(r.error); return; }
+        // чужое примечание уже на сервере: текст человека оставляем в поле,
+        // следующее «Сохранить» — уже осознанно поверх показанного
+        staleToast(r);
+        planNoteBase = r.note ? r.note.text : '';
+        document.getElementById('planNoteMeta').textContent = r.note ? 'написал(а) ' + r.note.by + ' · ' + r.note.at : '';
+        return;
+      }
       planNoteDirty = false;
+      planNoteBase = r.note ? r.note.text : '';
       document.getElementById('planNoteMeta').textContent = r.note ? 'написал(а) ' + r.note.by + ' · ' + r.note.at : '';
       toast(r.message, 'ok');
     }).withFailureHandler(function (e) { toast(e); })
-      .setPlanNote(sessionStorage.getItem('token'), date, document.getElementById('planNote').value);
+      .setPlanNote(sessionStorage.getItem('token'), date, document.getElementById('planNote').value, planNoteBase);
   }
 
   // Период звонков плана: статистику грузят и за несколько дней сразу,
   // и «Прослушано» считается по всем звонкам периода, а не одного дня.
+  let planPeriodBase = null;      // период, каким его показал последний план
   function savePlanPeriod() {
     const f = document.getElementById('planFrom').value, t = document.getElementById('planTo').value;
     if (!f || !t) return;
     google.script.run.withSuccessHandler(function (r) {
-      if (!r.success) { toast(r.error); loadPlan(false, true); return; }
+      if (!r.success) { r.code === 'stale' ? staleToast(r) : toast(r.error); loadPlan(false, true); return; }
       toast(r.message, 'ok');
       planScrollY = window.scrollY;
       loadPlan(false, true);
     }).withFailureHandler(function (e) { toast(e); })
-      .setPlanPeriod(sessionStorage.getItem('token'), document.getElementById('planDate').value, f, t);
+      .setPlanPeriod(sessionStorage.getItem('token'), document.getElementById('planDate').value, f, t, planPeriodBase);
   }
 
   // ---------- ВОЗВРАТ НА ТО ЖЕ МЕСТО ----------
@@ -3539,7 +3861,7 @@
     });
   }
 
-  async function submitImport() {
+  async function submitImport(replace) {
     const m = document.getElementById('impMessage');
     const file = document.getElementById('impFile').files[0];
     const date = document.getElementById('impDate').value;
@@ -3555,6 +3877,13 @@
     }
 
     google.script.run.withSuccessHandler(function (r) {
+      if (!r.success && r.code === 'exists' && !replace) {
+        // день уже загружен: заменить можно, но только сознательно
+        if (confirm(r.error + '\n\nЗаменить статистику за ' + r.existing.date + ' новой?')) { submitImport(true); return; }
+        m.textContent = 'Не загружено: за ' + r.existing.date + ' осталась прежняя статистика.';
+        m.className = 'message error'; m.style.display = 'block';
+        return;
+      }
       if (!r.success) { m.textContent = '❌ ' + r.error; m.className = 'message error'; m.style.display = 'block'; return; }
       let txt = '✅ Загружено строк: ' + r.imported + ' за ' +
         (r.period && r.period.days > 1 ? 'звонки ' + r.period.fromRu + ' — ' + r.period.toRu : r.date);
@@ -3564,7 +3893,7 @@
       setTimeout(function () { document.getElementById('importModal').classList.remove('active'); loadPlan(false); }, r.unknown.length ? 3500 : 1200);
     }).withFailureHandler(function (e) { m.textContent = '❌ ' + e; m.className = 'message error'; m.style.display = 'block'; })
       .importAcceptedCalls(sessionStorage.getItem('token'), date, text, base64,
-        file ? '' : document.getElementById('impDateTo').value);
+        file ? '' : document.getElementById('impDateTo').value, false, replace === true);
   }
 
   function backToQc() {
@@ -3857,7 +4186,8 @@
         complaintSource: evComplaintSrc,
         controlCall: document.getElementById('evControl').checked,
         dc: document.getElementById('evDc').checked,
-        evId: evEditing
+        evId: evEditing,
+        version: evEditing ? evVersion : null
       },
       answers: evAnswers,
       comments: evComments
@@ -3927,7 +4257,11 @@
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Сохранение...';
     const run = google.script.run
       .withSuccessHandler(function (res) {
-        if (!res.success) { evSubmitReady(); evSaveFailed(res.error, payload.meta, editing); return; }
+        if (!res.success) {
+          evSubmitReady();
+          if (res.code === 'stale') evStaleSave(res, editing); else evSaveFailed(res.error, payload.meta, editing);
+          return;
+        }
         if (editing) {
           evMsg('✅ Оценка ' + res.id + ' пересмотрена: ' + pct2(res.was) + ' → ' + pct2(res.result.score), 'success');
           cancelEdit(false);
@@ -4077,6 +4411,7 @@
       qcTab('eval');
       clearReqLink(false);
       evEditing = r.id;
+      evVersion = r.version === undefined ? null : r.version;
       document.getElementById('evEditId').textContent = r.id;
       document.getElementById('evEditWho').textContent =
         '· ' + r.meta.operator + ' · ' + formatDate(r.meta.callDate) + ' · было ' + pct2(r.score);
@@ -4129,6 +4464,19 @@
   // Уведомление не уходит само, а «Сообщить о проблеме» открывает форму
   // сбоя с уже вписанными звонком и текстом ошибки: кто, где и в каком
   // браузере, форма добавит сама.
+  // Сохранить не дали: оценку уже поправил другой или заявку уже оценили.
+  // Это не сбой сайта — «Сообщить о проблеме» тут ни к чему. Форма остаётся
+  // как есть, пока человек сам не откроет оценку заново.
+  function evStaleSave(res, editing) {
+    toast(res.error, 'err', {
+      sticky: true,
+      title: editing ? 'Правка НЕ сохранена' : 'Оценка НЕ сохранена',
+      actions: editing
+        ? [['Открыть оценку заново', function () { editEvaluation(editing); }, true], ['Закрыть', null]]
+        : [['Закрыть', null, true]]
+    });
+  }
+
   function evSaveFailed(err, meta, editing) {
     const reason = String(err || 'неизвестная ошибка').replace(/^❌\s*/, '');
     const d = String(meta.callDate || '');
@@ -4260,6 +4608,8 @@
     google.script.run.withSuccessHandler(function (r) {
       if (!r.success) { box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + r.error + '</p></div>'; return; }
       document.getElementById('cmpTotal').textContent = r.summary.total;
+      document.getElementById('cmpTotal').parentElement.querySelector('.label').textContent =
+        'Всего жалоб · ФСС ' + (r.summary.fss || 0) + ', ДЦ ' + (r.summary.dc || 0);
       document.getElementById('cmpConf').textContent = r.summary.confirmed;
       document.getElementById('cmpUnconf').textContent = r.summary.unconfirmed;
       document.getElementById('cmpClient').textContent = r.summary.confClient + r.summary.unconfClient;
@@ -4272,7 +4622,9 @@
         '<th>Обосн. от клиентов</th><th>Обосн. от заказчика</th>' +
         '<th>Необосн. от клиентов</th><th>Необосн. от заказчика</th>' +
         '<th title="источник не выбрали при оценке">Источник не указан</th>' +
-        '<th>Общий % жалоб</th></tr></thead><tbody>';
+        '<th>Общий % жалоб</th>' +
+        // жалобы считаются и по ФСС, и по ДЦ — сколько чего, видно здесь
+        '<th>Из них ФСС</th><th>Из них ДЦ</th></tr></thead><tbody>';
       r.rows.forEach(function (x) {
         // источник выбирают в чек-листе; у старых записей его нет, и тогда
         // жалоба видна только в «Всего» — отсюда и отдельная колонка
@@ -4284,7 +4636,8 @@
           '<td>' + x.confClient + '</td><td>' + x.confCustomer + '</td>' +
           '<td>' + x.unconfClient + '</td><td>' + x.unconfCustomer + '</td>' +
           '<td' + (noSrc ? ' style="color:var(--mid-ink);font-weight:600;"' : ' style="color:var(--muted);"') + '>' + noSrc + '</td>' +
-          '<td><strong>' + pct2(x.weekShare) + '</strong></td></tr>';
+          '<td><strong>' + pct2(x.weekShare) + '</strong></td>' +
+          '<td>' + (x.fss || 0) + '</td><td>' + (x.dc ? '<span class="fail-tag dc-tag">' + x.dc + '</span>' : '0') + '</td></tr>';
       });
       html += '</tbody></table></div>';
       box.innerHTML = html;
@@ -4321,7 +4674,11 @@
       const sen = document.getElementById('prSenior');
       sen.textContent = r.overallSenior === null ? '—' : pct2(r.overallSenior);
       sen.style.color = r.overallSenior === null ? '' : scoreColorHex(r.overallSenior);
-      sen.parentElement.title = 'Новичков в отчёте: ' + r.trainees + '; в расчёт вошло ' + r.checkedSenior + ' оценок';
+      // подробность про новичков дописываем к подсказке плитки: системный
+      // title всплывал поверх неё вторым окном
+      const st = sen.parentElement;
+      if (!st.dataset.tipBase) st.dataset.tipBase = st.dataset.tip || '';
+      st.dataset.tip = st.dataset.tipBase + '\nСейчас новичков в отчёте: ' + r.trainees + '; в расчёт вошло оценок: ' + r.checkedSenior + '.';
 
       const gs = document.getElementById('prGroup');
       if (gs.options.length <= 1) {
@@ -4499,9 +4856,10 @@
   // чек-лист попадает в отчёты за день отправки.
   // Дату всюду в системе выбирают календариком — и здесь тоже.
   // Системное окно браузера требовало набрать ДД.ММ.ГГГГ руками.
-  let sentEv = '';
+  let sentEv = '', sentWas = '';    // sentWas — дата отправки, что была на экране
   function askSentDate(evId, current) {
     sentEv = evId;
+    sentWas = current || '';
     document.getElementById('sentWhat').innerHTML = 'Оценка <strong>' + evId + '</strong>';
     document.getElementById('sentDate').value = current || '';
     const m = document.getElementById('sentMessage');
@@ -4519,6 +4877,12 @@
       return;
     }
     google.script.run.withSuccessHandler(function (r) {
+      if (!r.success && r.code === 'stale') {
+        document.getElementById('sentModal').classList.remove('active');
+        staleToast(r);
+        loadJournal();
+        return;
+      }
       if (!r.success) {
         m.textContent = r.error; m.className = 'message error'; m.style.display = 'block';
         return;
@@ -4527,19 +4891,19 @@
       loadJournal();
     }).withFailureHandler(function (e) {
       m.textContent = String(e); m.className = 'message error'; m.style.display = 'block';
-    }).setSentDate(sessionStorage.getItem('token'), sentEv, val);
+    }).setSentDate(sessionStorage.getItem('token'), sentEv, val, sentWas);
   }
 
   // Удаление оценки: чек-лист исчезает отовсюду, заявка возвращается
   // в работу. Спрашиваем прямо, что именно удаляем.
-  function removeEvaluation(evId, who, score) {
+  function removeEvaluation(evId, who, score, edits) {
     if (!confirm('Точно удалить чек-лист ' + who + ' ' + pct2(Number(score)) + '?\n\n' +
       'Оценка ' + evId + ' пропадёт из журнала и всех отчётов. Отменить будет нельзя.')) return;
     google.script.run.withSuccessHandler(function (r) {
-      if (!r.success) { toast(r.error); return; }
+      if (!r.success) { r.code === 'stale' ? staleToast(r) : toast(r.error); loadJournal(); return; }
       loadJournal();
     }).withFailureHandler(function (e) { toast(e); })
-      .deleteEvaluation(sessionStorage.getItem('token'), evId);
+      .deleteEvaluation(sessionStorage.getItem('token'), evId, edits);
   }
 
   // ---------- АПЕЛЛЯЦИИ ----------
@@ -4817,7 +5181,7 @@
         b.onclick = function () {
           const wrap = b.closest('.ap-actions');
           answerAppeal(wrap.getAttribute('data-ap'), b.getAttribute('data-st'),
-            wrap.querySelector('textarea').value.trim(), b);
+            wrap.querySelector('textarea').value.trim(), b, 'new');
         };
       });
       box.querySelectorAll('button[data-seen]').forEach(function (b) {
@@ -4903,7 +5267,7 @@
       // вписанный в сообщение HTML выполнился бы у того, кто его читает
       const h = escHtml;
       rows.forEach(function (b) {
-        html += '<div class="fail-call" data-bug="' + h(b.id) + '">' +
+        html += '<div class="fail-call" data-bug="' + h(b.id) + '" data-bug-was="' + h(b.status) + '">' +
           '<div class="fc-head"><div><strong>' + h(b.author) + '</strong>' +
             ' <span style="color:var(--muted);">' + h(b.authorTeam || '') + '</span>' +
             ' · ' + h(b.date) + ' ' + h(b.time) + ' · ' + h(b.place) +
@@ -4931,7 +5295,8 @@
         wrap.querySelectorAll('button[data-st]').forEach(function (btn) {
           btn.onclick = function () {
             const inp = wrap.querySelector('.bug-answer');
-            answerBug(wrap.getAttribute('data-bug'), btn.getAttribute('data-st'), inp ? inp.value : '', btn);
+            answerBug(wrap.getAttribute('data-bug'), btn.getAttribute('data-st'), inp ? inp.value : '', btn,
+              wrap.getAttribute('data-bug-was'));
           };
         });
       });
@@ -4989,25 +5354,26 @@
     }).getSiteErrors(sessionStorage.getItem('token'), { days: document.getElementById('errDays').value });
   }
 
-  function answerBug(id, status, answer, btn) {
+  function answerBug(id, status, answer, btn, was) {
     btn.disabled = true;
     google.script.run.withSuccessHandler(function (r) {
       btn.disabled = false;
-      if (!r.success) { toast(r.error); return; }
+      if (!r.success) { if (r.code === 'stale') { staleToast(r); loadBugs(); } else toast(r.error); return; }
       toast(r.message, 'ok');
       loadBugs();
     }).withFailureHandler(function (e) { btn.disabled = false; toast(e); })
-      .answerBugReport(sessionStorage.getItem('token'), id, status, answer);
+      .answerBugReport(sessionStorage.getItem('token'), id, status, answer, was);
   }
 
-  function answerAppeal(id, status, answer, btn) {
+  // was — статус апелляции на экране: разобрал другой — не затираем
+  function answerAppeal(id, status, answer, btn, was) {
     btn.disabled = true;
     google.script.run.withSuccessHandler(function (r) {
       btn.disabled = false;
-      if (!r.success) { toast(r.error); return; }
+      if (!r.success) { if (r.code === 'stale') { staleToast(r); loadAppeals(); } else toast(r.error); return; }
       loadAppeals();
     }).withFailureHandler(function (e) { btn.disabled = false; toast(e); })
-      .answerAppeal(sessionStorage.getItem('token'), id, status, answer);
+      .answerAppeal(sessionStorage.getItem('token'), id, status, answer, was);
   }
 
   // счётчик на вкладке: у старшего СКК — сколько ждёт разбора,
@@ -5111,7 +5477,8 @@
         gs.innerHTML = '<option value="">Все группы</option>' + groups.map(function (g) { return '<option>' + g + '</option>'; }).join('');
       }
       if (!r.rows.length) { box.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Оценок нет</p></div>'; return; }
-      let html = '<div class="table-wrapper table-dense"><table><thead><tr><th>Дата звонка</th><th>Дата прослушки</th><th>Оператор</th><th>Группа</th><th>СКК</th><th>Телефон</th><th>Длительность</th><th>Тематика</th><th>Подтематика</th><th>Качество</th><th>Ошибки</th><th class="col-actions"></th></tr></thead><tbody>';
+      // m-cards: на телефоне строка журнала — карточка, без прокрутки вбок
+      let html = '<div class="table-wrapper table-dense m-cards"><table><thead><tr><th>Дата звонка</th><th>Дата прослушки</th><th>Оператор</th><th>Группа</th><th>СКК</th><th>Телефон</th><th>Длительность</th><th>Тематика</th><th>Подтематика</th><th>Качество</th><th>Ошибки</th><th class="col-actions"></th></tr></thead><tbody>';
       r.rows.forEach(function (e) {
         const errs = e.failed.length
           ? e.failed.map(function (f) { return '<div style="margin:2px 0;"><span class="fail-tag' + (f.critical ? '' : ' minor') + '">' + escHtml(f.text) + '</span>' + (f.comment ? '<span style="color:var(--muted);font-size:12px;"> — ' + escHtml(f.comment) + '</span>' : '') + '</div>'; }).join('')
@@ -5125,7 +5492,8 @@
           : '';
         const del = canEditEval
           ? '<button class="btn-small btn-danger" title="Удалить чек-лист" data-del="' + e.id +
-            '" data-del-who="' + e.operator.replace(/"/g, '&quot;') + '" data-del-score="' + e.score + '"><i class="fas fa-trash"></i></button> '
+            '" data-del-who="' + e.operator.replace(/"/g, '&quot;') + '" data-del-score="' + e.score +
+            '" data-del-edits="' + (e.edits || 0) + '"><i class="fas fa-trash"></i></button> '
           : '';
         // РГО не согласен с оценкой своего оператора — подаёт апелляцию
         const appeal = canFileAppeal
@@ -5137,19 +5505,19 @@
         const edit = canEditEval
           ? '<button class="btn-small btn-warn" title="Изменить оценку по апелляции" onclick="editEvaluation(\'' + e.id + '\')"><i class="fas fa-pen-to-square"></i> Правка</button> '
           : '';
-        html += '<tr><td style="white-space:nowrap;">' + e.callDate + '</td>' +
+        html += '<tr><td data-l="Звонок" style="white-space:nowrap;">' + e.callDate + '</td>' +
           // сама дата не переносится, а «отправлен …» — может: без этого
           // столбец был вдвое шире и выталкивал кнопки за край окна
-          '<td style="color:var(--muted);"><span style="white-space:nowrap;">' + (e.checkedDate || '—') + '</span>' +
+          '<td data-l="Прослушка" style="color:var(--muted);"><span style="white-space:nowrap;">' + (e.checkedDate || '—') + '</span>' +
             (e.sentDate ? '<div class="hint">отправлен ' + e.sentDate + '</div>' : '') + '</td>' +
-          '<td>' + e.operator + '</td><td>' + e.group + '</td><td>' + e.qc + '</td>' +
-          '<td style="white-space:nowrap;">' + (e.phone || '—') + '</td>' +
+          '<td class="m-op" data-l="Оператор">' + e.operator + '</td><td data-l="Группа">' + e.group + '</td><td data-l="СКК">' + e.qc + '</td>' +
+          '<td data-l="Телефон" style="white-space:nowrap;">' + (e.phone || '—') + '</td>' +
           // «Длит: » в каждой строке лишнее — это и так колонка длительности
-          '<td>' + (e.criterion ? escHtml(String(e.criterion).replace(/^Длит:\s*/i, '')) : '—') + '</td>' +
-          '<td>' + (e.topic || '—') + '</td><td>' + (e.sub || '—') + '</td>' +
-          '<td><strong style="color:' + scoreColorHex(e.score) + '">' + pct2(e.score) + '</strong>' + flags + '</td>' +
-          '<td style="max-width:420px;">' + errs + '</td>' +
-          '<td class="col-actions" style="white-space:nowrap;">' + appeal + edit + sent + del +
+          '<td data-l="Длительность">' + (e.criterion ? escHtml(String(e.criterion).replace(/^Длит:\s*/i, '')) : '—') + '</td>' +
+          '<td data-l="Тематика">' + (e.topic || '—') + '</td><td data-l="Подтематика">' + (e.sub || '—') + '</td>' +
+          '<td class="m-q" data-l="Качество"><strong style="color:' + scoreColorHex(e.score) + '">' + pct2(e.score) + '</strong>' + flags + '</td>' +
+          '<td class="m-wide" data-l="Ошибки" style="max-width:420px;">' + errs + '</td>' +
+          '<td class="col-actions m-wide" style="white-space:nowrap;">' + appeal + edit + sent + del +
           '<button class="btn-small" title="Скачать чек-лист" onclick="downloadEval(\'' + e.id + '\')"><i class="fas fa-file-excel"></i></button>' +
           // чек-лист правили — часики в конце ряда; по клику кто, когда и что
           (e.edits ? ' <button class="btn-small hist-btn" data-hist="' + e.id + '" title="Чек-лист правили' +
@@ -5166,7 +5534,8 @@
       });
       box.querySelectorAll('button[data-del]').forEach(function (b) {
         b.onclick = function () {
-          removeEvaluation(b.getAttribute('data-del'), b.getAttribute('data-del-who'), b.getAttribute('data-del-score'));
+          removeEvaluation(b.getAttribute('data-del'), b.getAttribute('data-del-who'), b.getAttribute('data-del-score'),
+            b.getAttribute('data-del-edits'));
         };
       });
       box.querySelectorAll('button[data-appeal]').forEach(function (b) {

@@ -14,13 +14,25 @@
 
   var MIN_FOR_SEARCH = 8;      // короткие списки строкой поиска не захламляем
   var current = null;          // { close, wrap, panel, btn }
-  var closedAt = 0;            // чтобы клик по кнопке не открыл панель заново
 
   function norm(s) {
     return String(s == null ? '' : s).toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim();
   }
 
   function closeCurrent() { if (current) current.close(); }
+
+  // Глотаем только тот click, что браузер досылает в ту же точку сразу за
+  // касанием. Настоящее следующее касание — в другом месте, оно проходит.
+  function swallowClick(x, y) {
+    function eat(e) {
+      done();
+      if (Math.abs(e.clientX - x) > 12 || Math.abs(e.clientY - y) > 12) return;
+      e.stopPropagation(); e.preventDefault();
+    }
+    function done() { document.removeEventListener('click', eat, true); clearTimeout(t); }
+    document.addEventListener('click', eat, true);
+    var t = setTimeout(done, 500);
+  }
 
   // ---------- один сторож на всю страницу ----------
 
@@ -70,6 +82,10 @@
     if (!sel || sel.multiple || sel.dataset.uisel || sel.hasAttribute('data-uisel-skip')) return;
     sel.dataset.uisel = 'on';
     var uid = 'uisel' + (++seq);
+    // чтобы клик по кнопке не открыл панель заново. У каждого списка свой:
+    // общий на всю страницу не давал открыть соседний список сразу после
+    // того, как закрылся этот, — касание по нему считалось закрытием.
+    var closedAt = 0;
 
     var wrap = document.createElement('div');
     wrap.className = 'uisel';
@@ -144,7 +160,15 @@
       el.textContent = o.textContent.trim() || '—';
       if (o.disabled) el.classList.add('uisel-disabled');
       // на pointerup, а не на click: до click успевал вклиниться blur и панель мигала
-      el.addEventListener('pointerup', function (e) { e.preventDefault(); if (!o.disabled) pick(o); });
+      el.addEventListener('pointerup', function (e) {
+        e.preventDefault();
+        if (o.disabled) return;
+        // На телефоне за отпусканием пальца браузер шлёт ещё и click — в ту же
+        // точку, где панели уже нет. Он попадал в то, что лежало под списком:
+        // в соседнее поле, галочку «КЗ» или «Сохранить оценку». Глушим его.
+        if (e.pointerType !== 'mouse') swallowClick(e.clientX, e.clientY);
+        pick(o);
+      });
       list.appendChild(el);
       items.push({ el: el, opt: o, group: group, hay: norm(o.textContent + ' ' + (group ? group.textContent : '')) });
     }

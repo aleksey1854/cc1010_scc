@@ -482,12 +482,36 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('оператору отчёт ДЦ закрыт', (await R('getDcReport', opT, DATE, DATE, '')).success === false);
   const dcXls = await R('exportReport', qcT, 'dc', { from: DATE, to: DATE });
   chk('выгрузка ДЦ — живой xlsx', dcXls.success === true && /^UEsD/.test(dcXls.contentBase64 || ''), dcXls.error);
+  // проценты в выгрузках — настоящие: доля под '0.00%'. Было 98,35 под
+  // '0.00"%"', и смена формата в Excel на процентный давала 9835%
+  {
+    const ExcelJS = require('exceljs');
+    const prX = await R('exportReport', qcT, 'production', { from: DATE, to: DATE });
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(Buffer.from(prX.contentBase64, 'base64'));
+    const ws = wb.worksheets[0];
+    let qCol = 0, nCol = 0;
+    ws.getRow(1).eachCell((c, i) => { if (c.value === 'Качество за период') qCol = i; if (c.value === 'Оператор') nCol = i; });
+    const prOp = [].concat(...(await R('getProductionReport', qcT, DATE, DATE, '')).groups.map(g => g.operators))
+      .find(o => o.avg !== null);
+    let cell = null;
+    for (let r = 2; r <= ws.rowCount; r++) if (ws.getCell(r, nCol).value === prOp.name) { cell = ws.getCell(r, qCol); break; }
+    chk('производственные в Excel: качество — доля под процентным форматом',
+      cell && cell.numFmt === '0.00%' && cell.value === Math.round(prOp.avg * 100) / 10000,
+      cell && [cell.value, cell.numFmt, prOp.avg]);
+  }
   // по ДЦ сдают только плановую прослушку: жалоба на ДЦ-звонке в отчёт
   // КК (это ФСС) не идёт ни оценкой, ни ПЖ
+  const cmpB = (await R('getComplaintsReport', mgrT, 'all')).summary;
   const dcPj = await R('saveEvaluation', { pin: qcT,
     meta: { ...META, reqId: '', callTime: '16:50', phone: '79164445567', dc: true, complaintSource: 'Заказчик' },
     answers: { ...ans, B8P2: 'Обнаружено' }, comments: {} });
   chk('ДЦ-жалоба заказчика сохраняется', dcPj.success === true && dcPj.result.complaint === true, dcPj.error);
+  // а в отчёт по жалобам — идёт: там жалобы и ФСС, и ДЦ, с разбивкой
+  const cmpA = (await R('getComplaintsReport', mgrT, 'all')).summary;
+  chk('  в отчёте по жалобам она есть — в колонке ДЦ',
+    cmpA.total === cmpB.total + 1 && cmpA.dc === cmpB.dc + 1 && cmpA.fss === cmpB.fss &&
+      cmpA.confCustomer === cmpB.confCustomer + 1 && cmpA.fss + cmpA.dc === cmpA.total, [cmpB, cmpA]);
   const kkPj = (await R('getKkReport', qcT, DATE, DATE)).rows.find(x => x.operator === OP[0]);
   chk('  в отчёт КК она не идёт',
     kkPj.pjCustomer === kkBefore.pjCustomer && kkPj.ko === kkBefore.ko && kkPj.count === kkBefore.count,
@@ -783,6 +807,10 @@ const R = (fn, ...a) => api.call(fn, a);
       })));
     chk('  дата и % — числами, а не текстом',
       rows.every(r => r.getCell(1).value instanceof Date && typeof r.getCell(3).value === 'number'));
+    // 0,9835, а не 0,98349999…: при смене формата в Excel хвост вылезал
+    chk('  % — ровная доля под процентным форматом',
+      rows.every(r => { const c = r.getCell(3); return c.numFmt === '0.00%' && c.value === Math.round(c.value * 10000) / 10000; }),
+      rows.map(r => r.getCell(3).value).slice(0, 3));
     const cnt = new Map();
     chk('  «Оценка N» считает оценки оператора по порядку',
       rows.every(r => {
@@ -986,6 +1014,200 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('старый токен погашен', (await R('getQcBootstrap', qcT)).success === false);
   chk('старый пароль больше не подходит', (await R('login', QC[3], QC[4])).success === false);
   chk('новый пароль работает', (await R('login', QC[3], 'NovyyParol9')).success === true);
+
+  head('ШАГ 10а. РГО СДАЁТ ЗВОНОК ЗА ОПЕРАТОРА');
+  // у части операторов из России сайт не открывается — заявку за них
+  // подаёт РГО. Заявка — на оператора, кто сдал — в истории.
+  {
+    const rT = (await R('login', RGO[3], RGO[4])).token;
+    const mine = creds.find(x => x[2] === 'operator' && x[1] === RGO[1] && x[0] !== OP[0]);
+    const alien = creds.find(x => x[2] === 'operator' && x[1] !== RGO[1]);
+    const call = { hasCall: 'yes', callType: 'СР', callDate: DATE, callTime: '17:42', phone: '79168880011' };
+    const byRgo = await R('createRequest', { pin: rT, operator: mine[0], ...call });
+    chk('РГО сдал звонок за оператора своей группы', byRgo.success === true, byRgo.error);
+    const mineT = (await R('login', mine[3], mine[4])).token;
+    const hisReq = (await R('getOperatorRequests', mineT)).requests.find(x => x.id === byRgo.requestId);
+    chk('  заявка — у оператора, на его имя и группу',
+      hisReq && hisReq.fullName === mine[0] && hisReq.group === RGO[1], hisReq);
+    const h = await R('getRequestHistory', sqcT, byRgo.requestId);   // у СКК выше сменён пароль — его вход погашен
+    chk('  в истории видно, что сдал РГО',
+      h.success === true && h.events[0].who === RGO[0] && /за оператора: /.test(h.events[0].details), h.events);
+    chk('  у самого РГО заявок на своё имя не появилось',
+      !(await R('getOperatorRequests', rT)).requests.some(x => x.id === byRgo.requestId));
+    chk('  тот же звонок второй раз — отказ базой',
+      (await R('createRequest', { pin: rT, operator: mine[0], ...call })).success === false);
+    const noCall = await R('createRequest', { pin: rT, operator: mine[0], hasCall: 'no', comment: 'сайт не открывается' });
+    chk('  «Звонка не было» за оператора тоже сдаётся', noCall.success === true && noCall.status === 'Без звонка', noCall);
+    chk('за оператора чужой группы — отказ',
+      (await R('createRequest', { pin: rT, operator: alien[0], ...call, phone: '79168880012' })).success === false);
+    chk('оператор за другого оператора сдать не может',
+      (await R('createRequest', { pin: mineT, operator: OP[0], ...call, phone: '79168880013' })).success === false);
+    chk('за несуществующее ФИО — отказ',
+      (await R('createRequest', { pin: rT, operator: 'Никого Нет', ...call, phone: '79168880014' })).success === false);
+    // заявка из чужой группы — её РГО видеть не должен, а КК должен
+    const alienT = (await R('login', alien[3], alien[4])).token;
+    const alienReq = await R('createRequest', { pin: alienT, ...call, phone: '79168880015' });
+    chk('оператор чужой группы сдал свою заявку', alienReq.success === true, alienReq.error);
+    const rgoList = await R('getAllRequests', rT);
+    chk('РГО видит заявки своей группы — и только её',
+      rgoList.success === true && rgoList.requests.some(x => x.id === byRgo.requestId) &&
+        !rgoList.requests.some(x => x.id === alienReq.requestId) &&
+        rgoList.requests.every(x => x.group === RGO[1]),
+      rgoList.error || [...new Set(rgoList.requests.map(x => x.group))]);
+    chk('оператору общий список заявок закрыт', (await R('getAllRequests', mineT)).success === false);
+    const allQc = await R('getAllRequests', sqcT);
+    chk('у КК список заявок по-прежнему по всем группам',
+      allQc.success === true && allQc.requests.some(x => x.id === byRgo.requestId) &&
+        allQc.requests.some(x => x.id === alienReq.requestId), allQc.error);
+  }
+
+  head('ШАГ 10б. ДВОЕ ПРАВЯТ ОДНО — ЧУЖОЕ НЕ ЗАТИРАЕТСЯ');
+  // Устаревшая страница: человек сохраняет то, что видел, а другой уже
+  // поменял запись. Раньше последний молча затирал первого (СКК
+  // перехватывали оператора в плане, загрузка стёрла план за 30.09).
+  {
+    const qcs = creds.filter(x => x[2] === 'qc').slice(1, 3);   // у первого СКК выше сменён пароль
+    const [Q1, Q2] = qcs;
+    const q1 = (await R('login', Q1[3], Q1[4])).token, q2 = (await R('login', Q2[3], Q2[4])).token;
+    const sq = (await R('login', SQC[3], SQC[4])).token, mg = (await R('login', MGR[3], MGR[4])).token;
+    const sr = (await R('login', SRGO[3], SRGO[4])).token, rg = (await R('login', RGO[3], RGO[4])).token;
+    const PD = '2026-08-03';                                     // свой день плана, чтобы не мешать остальным
+    const ops = creds.filter(x => x[2] === 'operator' && x[1] === RGO[1] && x[0] !== OP[0]);
+    const isStale = r => r && r.success === false && r.code === 'stale';
+
+    // --- отметки «в работе» ---
+    const M1 = ops[0][0], M2 = ops[1][0];
+    chk('план: СКК-1 взял оператора в работу', (await R('setListenMark', q1, PD, M1, 'in_progress', { status: '', by: '' })).success === true);
+    const grab = await R('setListenMark', q2, PD, M1, 'in_progress', { status: '', by: '' });
+    chk('  СКК-2 со старой страницы («—») перехватить не может', isStale(grab) && grab.error.indexOf(Q1[0]) >= 0, grab);
+    const grabOld = await R('setListenMark', q2, PD, M1, 'in_progress');
+    chk('  и со страницы, что вообще не шлёт, что видела, — тоже', isStale(grabOld), grabOld);
+    chk('  СКК-2 и снять чужую отметку не может', isStale(await R('setListenMark', q2, PD, M1, '', { status: '', by: '' })));
+    const plan1 = (await R('getListeningPlan', q1, PD));
+    chk('  отметка осталась за СКК-1', ((await db.one(`SELECT qc_name FROM listening_marks m JOIN staff s ON s.id = m.operator_id
+        WHERE m.stat_date = $1 AND s.full_name = $2`, [PD, M1])) || {}).qc_name === Q1[0], plan1.error);
+    chk('  забрать сознательно — видя отметку СКК-1 — можно',
+      (await R('setListenMark', q2, PD, M1, 'in_progress', { status: 'in_progress', by: Q1[0] })).success === true);
+    chk('  а СКК-1 со старой страницы (своя отметка) уже не перезапишет',
+      isStale(await R('setListenMark', q1, PD, M1, 'done', { status: 'in_progress', by: Q1[0] })));
+    chk('  старший СКК поправит любую', (await R('setListenMark', sq, PD, M1, '')).success === true);
+    const race = await Promise.all([q1, q2].map(t => R('setListenMark', t, PD, M2, 'in_progress', { status: '', by: '' })));
+    chk('  двое одновременно на свободного — берёт ровно один',
+      race.filter(r => r.success).length === 1 && race.filter(isStale).length === 1, race);
+
+    // --- примечание и период плана ---
+    chk('примечание: СКК-1 сохранил', (await R('setPlanNote', q1, PD, 'звонки за 01.08 и 02.08', '')).success === true);
+    const n2 = await R('setPlanNote', q2, PD, 'другое', '');
+    chk('  СКК-2, начавший писать до этого, его не затирает', isStale(n2) && n2.note && n2.note.text === 'звонки за 01.08 и 02.08', n2);
+    chk('  увидел чужое — сохраняет осознанно', (await R('setPlanNote', q2, PD, 'другое', 'звонки за 01.08 и 02.08')).success === true);
+    chk('  старая страница без «что видела» — как раньше', (await R('setPlanNote', q1, PD, 'итог')).success === true);
+    chk('период: СКК-1 поменял', (await R('setPlanPeriod', q1, PD, '2026-08-01', '2026-08-03', { from: PD, to: PD })).success === true);
+    chk('  СКК-2 со старым периодом на экране — не затирает',
+      isStale(await R('setPlanPeriod', q2, PD, '2026-08-02', '2026-08-03', { from: PD, to: PD })));
+    chk('  период остался от СКК-1', (await R('getListeningPlan', q1, PD)).period.from === '2026-08-01');
+
+    // --- загрузка статистики поверх загруженного дня ---
+    chk('загрузка за день', (await R('importAcceptedCalls', q1, PD, M1 + ';100\n' + M2 + ';50')).success === true);
+    const again = await R('importAcceptedCalls', q2, PD, M1 + ';7');
+    chk('  повторная за тот же день без подтверждения — отказ, с тем, кто и сколько',
+      again.success === false && again.code === 'exists' && (again.existing || {}).operators === 2 && (again.existing || {}).by === Q1[0], again);
+    chk('  прежние цифры целы', (await db.one(`SELECT sum(accepted)::int AS s FROM accepted_calls WHERE stat_date = $1`, [PD])).s === 150);
+    chk('  с подтверждением — заменяет', (await R('importAcceptedCalls', q2, PD, M1 + ';7', '', '', false, true)).imported === 1);
+
+    // --- правка оценки ---
+    const evMeta = (op, tm, ph, extra) => ({ ...META, operator: op, reqId: '', callTime: tm, phone: ph, ...(extra || {}) });
+    const e1 = await R('saveEvaluation', { pin: q1, meta: evMeta(M1, '09:01', '79160009001'), answers: ans, comments: {} });
+    const card = await R('getEvaluationCard', q1, e1.id);
+    chk('оценка: карточка отдаёт версию', e1.success === true && card.version === 0, [e1.error, card.version]);
+    const okEdit = await R('updateEvaluation', { pin: q1, meta: { ...evMeta(M1, '09:01', '79160009001'), evId: e1.id, version: 0 },
+      answers: { ...ans, B2P2: 'Сомнительно' }, comments: {} });
+    const lateEdit = await R('updateEvaluation', { pin: q2, meta: { ...evMeta(M1, '09:01', '79160009001'), evId: e1.id, version: 0 },
+      answers: { ...ans, B2P3: 'Отрицательно' }, comments: {} });
+    chk('  правка СКК-1 прошла', okEdit.success === true, okEdit.error);
+    chk('  правка СКК-2 по старой карточке — отказ с именем', isStale(lateEdit) && lateEdit.error.indexOf(Q1[0]) >= 0, lateEdit);
+    const card2 = await R('getEvaluationCard', q2, e1.id);
+    chk('  в оценке — правка СКК-1, а не СКК-2',
+      (card2.answers || {}).B2P2 === 'Сомнительно' && (card2.answers || {}).B2P3 === 'Положительно' && card2.version === 1, card2.answers);
+    const both = await Promise.all([q1, q2].map((t, i) => R('updateEvaluation', { pin: t,
+      meta: { ...evMeta(M1, '09:01', '79160009001'), evId: e1.id, version: 1 },
+      answers: { ...ans, B2P4: i ? 'Отрицательно' : 'Сомнительно' }, comments: {} })));
+    chk('  двое одновременно по одной карточке — проходит ровно один',
+      both.filter(r => r.success).length === 1 && both.filter(isStale).length === 1, both.map(r => r.error || 'ok'));
+    chk('  страница без версии (открыта до обновления) — как раньше',
+      (await R('updateEvaluation', { pin: q1, meta: { ...evMeta(M1, '09:01', '79160009001'), evId: e1.id },
+        answers: ans, comments: {} })).success === true);
+
+    // --- удаление оценки ---
+    const del0 = await R('deleteEvaluation', q2, e1.id, 0);
+    chk('удаление по журналу, где правок ещё не было, — отказ', isStale(del0) && !!(await R('getEvaluationCard', q2, e1.id)).success, del0);
+    chk('  по свежему журналу — удаляется', (await R('deleteEvaluation', q2, e1.id, 3)).success === true);
+
+    // --- дата отправки ---
+    const ce = await R('saveEvaluation', { pin: q1, meta: evMeta(M1, '09:05', '79160009005', { complaintSource: 'Клиент' }),
+      answers: { ...ans, B8P3: 'Обнаружено' }, comments: {} });
+    chk('дата отправки: СКК-1 внёс', (await R('setSentDate', q1, ce.id, '2026-09-05', '')).success === true);
+    const s2 = await R('setSentDate', q2, ce.id, '2026-09-06', '');
+    chk('  СКК-2 со старым журналом не перезапишет', isStale(s2) && s2.sent === '05.09.2026', s2);
+    chk('  та же дата — не спор', (await R('setSentDate', q2, ce.id, '2026-09-05', '')).success === true);
+
+    // --- «Оценить» из заявки ---
+    const opT2 = (await R('login', ops[2][3], ops[2][4])).token;
+    const rq = await R('createRequest', { pin: opT2, hasCall: 'yes', callDate: DATE, callTime: '09:10', phone: '79160009010', callType: 'СР' });
+    const r1 = await R('saveEvaluation', { pin: q1, meta: evMeta(ops[2][0], '09:10', '79160009010', { reqId: rq.requestId }), answers: ans, comments: {} });
+    const r2 = await R('saveEvaluation', { pin: q2, meta: evMeta(ops[2][0], '09:11', '79160009011', { reqId: rq.requestId }), answers: ans, comments: {} });
+    chk('заявка: вторая оценка к уже оценённой заявке не цепляется',
+      r1.success === true && isStale(r2) && (r2.error || '').indexOf(r1.id) >= 0, r2);
+    const rq2 = await R('createRequest', { pin: opT2, hasCall: 'yes', callDate: DATE, callTime: '09:20', phone: '79160009020', callType: 'СР' });
+    const rr = await Promise.all([['09:20', '79160009020'], ['09:21', '79160009021']].map(([tm, ph], i) =>
+      R('saveEvaluation', { pin: [q1, q2][i], meta: evMeta(ops[2][0], tm, ph, { reqId: rq2.requestId }), answers: ans, comments: {} })));
+    chk('  двое одновременно «Оценить» одну заявку — оценка одна',
+      rr.filter(r => r.success).length === 1 && rr.filter(isStale).length === 1, rr.map(r => r.error || 'ok'));
+
+    // --- разбор заявки ---
+    const rq3 = await R('createRequest', { pin: opT2, hasCall: 'yes', callDate: DATE, callTime: '09:30', phone: '79160009030', callType: 'СР' });
+    chk('разбор: СКК-1 взял заявку в работу', (await R('reviewRequest', q1, rq3.requestId, 'В работе', '', '', 'Новая')).success === true);
+    const rv2 = await R('reviewRequest', q2, rq3.requestId, 'Отклонена', '', 'не тот звонок', 'Новая');
+    chk('  СКК-2 со старым списком решение не затирает', isStale(rv2) && rv2.status === 'В работе', rv2);
+    chk('  отклонённую заявку чужой оценкой «Проверенной» не сделать', await (async () => {
+      const rq4 = await R('createRequest', { pin: opT2, hasCall: 'yes', callDate: DATE, callTime: '09:40', phone: '79160009040', callType: 'СР' });
+      await R('reviewRequest', q1, rq4.requestId, 'Отклонена', '', 'нет записи', 'Новая');
+      return isStale(await R('saveEvaluation', { pin: q2, meta: evMeta(ops[2][0], '09:40', '79160009040', { reqId: rq4.requestId }), answers: ans, comments: {} }));
+    })());
+
+    // --- правка заявки оператором ---
+    const ra = await R('createRequest', { pin: opT2, hasCall: 'yes', callDate: DATE, callTime: '09:50', phone: '79160009050', callType: 'СР' });
+    const rb = await R('createRequest', { pin: opT2, hasCall: 'yes', callDate: DATE, callTime: '09:51', phone: '79160009051', callType: 'СР' });
+    const dupEdit = await R('updateRequest', { pin: opT2, requestId: rb.requestId, callDate: DATE, callTime: '09:50', phone: '79160009050' });
+    chk('правка заявки в уже сданный звонок — понятный отказ, а не сбой сервера',
+      ra.success && dupEdit.success === false && /уже существует/.test(dupEdit.error || ''), dupEdit);
+
+    // --- апелляция и сообщение о проблеме ---
+    const ae = await R('saveEvaluation', { pin: q1, meta: evMeta(ops[3][0], '09:55', '79160009055'), answers: { ...ans, B2P1: 'Отрицательно' }, comments: {} });
+    const apl = await R('createAppeal', rg, ae.id, 'пункт снят несправедливо');
+    const aRes = await Promise.all([[sq, 'fixed', ''], [mg, 'rejected', 'всё верно']].map(([t, st, tx]) =>
+      R('answerAppeal', t, apl.id, st, tx, 'new')));
+    chk('апелляция: двое разбирают одновременно — решение одно',
+      apl.success && aRes.filter(r => r.success).length === 1 && aRes.filter(isStale).length === 1, aRes.map(r => r.error || 'ok'));
+    const bug = await R('createBugReport', q1, 'план прослушки не грузится с утра', 'План', '');
+    const bRes = await Promise.all([[sq, 'in_work'], [mg, 'declined']].map(([t, st]) => R('answerBugReport', t, bug.id, st, '', 'new')));
+    chk('сообщение о проблеме: двое отвечают одновременно — ответ один',
+      bug.success && bRes.filter(r => r.success).length === 1 && bRes.filter(isStale).length === 1, bRes.map(r => r.error || 'ok'));
+
+    // --- карточка сотрудника и дата приёмки ---
+    const who = ops[4];
+    const card0 = (await R('getAllUsers', sq)).users.find(x => x.fullName === who[0]);
+    chk('сотрудник: старший РГО перевёл в другую группу',
+      (await R('updateUser', sr, who[0], who[0], 'ИНВ-2', card0.role, '', '', card0.position)).success === true);
+    const back = await R('updateUser', sq, who[0], who[0], card0.group, card0.role, '', '', 'новая должность',
+      { group: card0.group, role: card0.role, position: card0.position, hired: card0.hiredIso, training: card0.trainingIso });
+    chk('  форма ССКК, открытая раньше, перевод не откатывает', isStale(back) && /группа/.test(back.error), back);
+    chk('  оператор остался в новой группе',
+      (await R('getAllUsers', sq)).users.find(x => x.fullName === who[0]).group === 'ИНВ-2');
+    const hd = ops[5];
+    await db.q(`UPDATE staff SET hired_at = NULL WHERE full_name = $1`, [hd[0]]);
+    const hRes = await Promise.all(['2026-03-01', '2026-03-02'].map(d => R('setHiredDate', rg, hd[0], d)));
+    chk('  РГО дважды одновременно ставит дату приёмки — встаёт одна', hRes.filter(r => r.success).length === 1, hRes.map(r => r.error || 'ok'));
+  }
 
   head('ШАГ 11. ИНТЕРФЕЙС ПЕРЕДАЁТ ТОКЕН');
   // Сервер тут проверяли прямыми вызовами с токеном, а кнопка смены

@@ -1006,6 +1006,35 @@ const R = (fn, ...a) => api.call(fn, a);
     rqP.success === true && upP.submitted === 1 && upP.period.days === 3, { rq: rqP.error, submitted: upP.submitted, period: upP.period });
   await R('deleteEvaluation', qcT, evP.id);
 
+  head('ШАГ 9д. КРИТЕРИИ: «НЕ ТРЕБУЕТСЯ» НЕ В СЧЁТ');
+  {
+    // четыре чек-листа в отдельной неделе: по пункту X — два «Не требуется»,
+    // один «Отрицательно», один «Положительно». Верно: 1 из 2 = 50%.
+    // Раньше «Не требуется» шли в выполненные: 3 из 4 = 75%.
+    // По пункту Z везде «Не требуется» — процента нет вовсе.
+    const naItems = [];
+    boot.cfg.blocks.forEach(b => b.items.forEach(i => {
+      if (i.type === 'score' && i.options.some(o => o.value === 'Не требуется')) naItems.push(i);
+    }));
+    chk('в чек-листе есть хотя бы два пункта с «Не требуется»', naItems.length >= 2, naItems.length);
+    const [X, Z] = naItems;
+    const ids = [];
+    for (const [k, xv] of [['1', 'Не требуется'], ['2', 'Не требуется'], ['3', 'Отрицательно'], ['4', 'Положительно']]) {
+      const a = { ...ans, B2P1: 'Положительно', [X.id]: xv, [Z.id]: 'Не требуется' };
+      const r = await R('saveEvaluation', { pin: qcT, meta: { ...META, reqId: '', callTime: '16:0' + k, phone: '7916555020' + k },
+        answers: a, comments: { [X.id]: 'проверка' } });
+      if (r.success) ids.push(r.id); else chk('чек-лист для критериев сохранён', false, r.error);
+    }
+    await db.q(`UPDATE evaluations SET sent_at = '2025-01-08' WHERE public_id = ANY($1::text[])`, [ids]);
+    const cr = await R('getCriteriaReport', mgrT, 'all', '2025-01-06', '2025-01-12');
+    const cell = it => { const row = cr.items.find(x => x.text === it.text); return row ? row.cells[0] : 'нет строки'; };
+    chk('одна неделя', cr.success === true && cr.weeks.length === 1 && cr.weeks[0] === '2025-W02', cr.weeks);
+    chk('пункт с «Не требуется»: 1 из 2 = 50%, а не 75%', cell(X) === 50, cell(X));
+    chk('везде «Не требуется» — процента нет', cell(Z) === null, cell(Z));
+    chk('остальные пункты — 100%', cell(boot.cfg.blocks[0].items.find(i => i.type === 'score' && i !== X && i !== Z)) === 100);
+    for (const id of ids) await R('deleteEvaluation', qcT, id);
+  }
+
   head('ШАГ 10. СЕССИИ');
   await R('logoutSession', opT);
   chk('после выхода токен не работает', (await R('getOperatorStats', opT)).success === false);

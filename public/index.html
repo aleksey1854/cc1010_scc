@@ -1157,10 +1157,6 @@
         <div class="filter-bar" style="margin-bottom:0;">
           <label for="planDate" style="font-size:14px;color:var(--ink-2);">Дата статистики:</label>
           <input type="date" id="planDate" onchange="loadPlan(false)">
-          <span class="date-range" title="какие даты звонков входят в этот план: по ним считается «Прослушано»">
-            <label for="planFrom">звонки с</label><input type="date" id="planFrom" onchange="savePlanPeriod()">
-            <label for="planTo">по</label><input type="date" id="planTo" onchange="savePlanPeriod()">
-          </span>
           <span id="planPct" style="color:var(--muted);font-size:13px;"></span>
           <button class="btn-filter" style="margin-left:auto;" onclick="openImport()"><i class="fas fa-upload"></i> Загрузить статистику дня</button>
         </div>
@@ -3687,11 +3683,6 @@
       }
       showPlanNote(r);
       renderUploadMemo(null, 'planMemo');
-      if (r.period) {
-        document.getElementById('planFrom').value = r.period.from;
-        document.getElementById('planTo').value = r.period.to;
-        planPeriodBase = { from: r.period.from, to: r.period.to };
-      }
       document.getElementById('planOps').textContent = r.summary.operators;
       document.getElementById('planNeed').textContent = r.summary.plan;
       document.getElementById('planDone').textContent = r.summary.done;
@@ -3805,21 +3796,6 @@
       toast(r.message, 'ok');
     }).withFailureHandler(function (e) { toast(e); })
       .setPlanNote(sessionStorage.getItem('token'), date, document.getElementById('planNote').value, planNoteBase);
-  }
-
-  // Период звонков плана: статистику грузят и за несколько дней сразу,
-  // и «Прослушано» считается по всем звонкам периода, а не одного дня.
-  let planPeriodBase = null;      // период, каким его показал последний план
-  function savePlanPeriod() {
-    const f = document.getElementById('planFrom').value, t = document.getElementById('planTo').value;
-    if (!f || !t) return;
-    google.script.run.withSuccessHandler(function (r) {
-      if (!r.success) { r.code === 'stale' ? staleToast(r) : toast(r.error); loadPlan(false, true); return; }
-      toast(r.message, 'ok');
-      planScrollY = window.scrollY;
-      loadPlan(false, true);
-    }).withFailureHandler(function (e) { toast(e); })
-      .setPlanPeriod(sessionStorage.getItem('token'), document.getElementById('planDate').value, f, t, planPeriodBase);
   }
 
   // ---------- ВОЗВРАТ НА ТО ЖЕ МЕСТО ----------

@@ -4549,10 +4549,18 @@
       if (!r.weeks.length) { box.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Нет данных за период</p></div>'; return; }
       let html = '<div class="table-wrapper"><table><thead><tr><th>Критерий</th>' + r.weeks.map(function (w) { return '<th>' + w + '</th>'; }).join('') + '</tr></thead><tbody>';
       let prevB = null;
+      const cell = function (c) { return '<td>' + (c == null ? '<span style="color:#ccc">—</span>' : '<strong style="color:' + scoreColorHex(c) + '">' + pct2(c) + '</strong>') + '</td>'; };
+      // у блока — среднее процентов его пунктов (как в их отчёте)
+      const blockCells = {};
+      (r.blocks || []).forEach(function (b) { blockCells[b.block] = b.cells; });
       r.items.forEach(function (it) {
-        if (it.block !== prevB) { html += '<tr><td colspan="' + (r.weeks.length + 1) + '" style="background:var(--surface-2);font-weight:700;">' + it.block + '</td></tr>'; prevB = it.block; }
-        html += '<tr><td style="max-width:340px;">' + it.text + '</td>' +
-          it.cells.map(function (c) { return '<td>' + (c === null ? '<span style="color:#ccc">—</span>' : '<strong style="color:' + scoreColorHex(c) + '">' + pct2(c) + '</strong>') + '</td>'; }).join('') + '</tr>';
+        if (it.block !== prevB) {
+          const bc = blockCells[it.block];
+          html += '<tr style="background:var(--surface-2);font-weight:700;"><td>' + it.block + '</td>' +
+            (bc ? bc.map(cell).join('') : '<td colspan="' + r.weeks.length + '"></td>') + '</tr>';
+          prevB = it.block;
+        }
+        html += '<tr><td style="max-width:340px;padding-left:22px;">' + it.text + '</td>' + it.cells.map(cell).join('') + '</tr>';
       });
       html += '</tbody></table></div>';
       box.innerHTML = html;

@@ -1042,7 +1042,9 @@ const R = (fn, ...a) => api.call(fn, a);
     const ids = [];
     for (const [k, xv] of [['1', 'Не требуется'], ['2', 'Не требуется'], ['3', 'Отрицательно'], ['4', 'Положительно']]) {
       const a = { ...ans, B2P1: 'Положительно', [X.id]: xv, [Z.id]: 'Не требуется' };
-      const r = await R('saveEvaluation', { pin: qcT, meta: { ...META, reqId: '', callTime: '16:0' + k, phone: '7916555020' + k },
+      if (k === '4') a.B8P3 = 'Обнаружено';     // признак жалобы в одном из четырёх
+      const r = await R('saveEvaluation', { pin: qcT, meta: { ...META, reqId: '', callTime: '16:0' + k, phone: '7916555020' + k,
+                                                            complaintSource: k === '4' ? 'Клиент' : '' },
         answers: a, comments: { [X.id]: 'проверка' } });
       if (r.success) ids.push(r.id); else chk('чек-лист для критериев сохранён', false, r.error);
     }
@@ -1053,6 +1055,27 @@ const R = (fn, ...a) => api.call(fn, a);
     chk('пункт с «Не требуется»: 1 из 2 = 50%, а не 75%', cell(X) === 50, cell(X));
     chk('везде «Не требуется» — процента нет', cell(Z) === null, cell(Z));
     chk('остальные пункты — 100%', cell(boot.cfg.blocks[0].items.find(i => i.type === 'score' && i !== X && i !== Z)) === 100);
+    // блок — среднее процентов его пунктов, пустые не в счёт (их отчёт:
+    // «Работа с конфликтом» 0,375 = (0 + 0,75) / 2)
+    const bX = boot.cfg.blocks.find(b => b.items.indexOf(X) >= 0);
+    const vals = bX.items.map(cell).filter(v => v !== null);
+    const want = Math.round(vals.reduce((a, v) => a + v, 0) / vals.length * 100) / 100;
+    const bRow = (cr.blocks || []).find(b => b.block === bX.name);
+    chk('у блока процент — среднее его пунктов', !!bRow && bRow.cells[0] === want, { блок: bRow, ждём: want, пункты: vals });
+    chk('  среди них 50%, значит не 100', vals.indexOf(50) >= 0 && want < 100, vals);
+    const fl = code => { let t; boot.cfg.blocks.forEach(b => b.items.forEach(i => { if (i.id === code) t = i; })); return cell(t); };
+    chk('признак жалобы в 1 из 4 — 75%', fl('B8P3') === 75, fl('B8P3'));
+    chk('благодарность ошибкой не считается — 100%', fl('B8P1') === 100, fl('B8P1'));
+    chk('недопустимых событий нет — 100%', fl('B9P1') === 100, fl('B9P1'));
+    {
+      const ExcelJS = require('exceljs');
+      const x = await R('exportReport', mgrT, 'criteria', { period: 'all', from: '2025-01-06', to: '2025-01-12' });
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(Buffer.from(x.contentBase64, 'base64'));
+      const ws = wb.worksheets[0];
+      const found = []; ws.eachRow(r => { if (r.getCell(1).value === bX.name) found.push(r.getCell(2).value); });
+      chk('в выгрузке строка блока с тем же процентом', found.length === 1 && Math.abs(found[0] - want / 100) < 1e-9, found);
+    }
     for (const id of ids) await R('deleteEvaluation', qcT, id);
   }
 

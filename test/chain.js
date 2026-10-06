@@ -678,6 +678,27 @@ const R = (fn, ...a) => api.call(fn, a);
       (await R('getAppealImage', (await R('login', rgo2[3], rgo2[4])).token, withImg.images[0].id)).success === false);
   }
 
+  // ответили не на ту апелляцию — решение снимают, апелляция снова ждёт
+  chk('вернуть на рассмотрение: РГО нельзя', (await R('reopenAppeal', rgoT, ap.id, 'partial')).success === false);
+  chk('  СКК тоже нельзя', (await R('reopenAppeal', qcT, ap.id, 'partial')).success === false);
+  const reBusy = await R('reopenAppeal', sqcT, ap.id, 'partial');
+  chk('  по той же оценке уже открыта другая — вернуть нельзя, база не даёт двух',
+    reBusy.success === false && /другая апелляция/.test(reBusy.error || ''), reBusy);
+  await R('answerAppeal', sqcT, apImg.id, 'rejected', 'ответ не на ту', 'new');
+  chk('  страница видела старое решение — не трогаем',
+    (await R('reopenAppeal', sqcT, apImg.id, 'fixed')).code === 'stale');
+  const re = await R('reopenAppeal', sqcT, apImg.id, 'rejected');
+  chk('старший СКК вернул апелляцию на рассмотрение', re.success === true, re.error);
+  const reRow = (await R('getAppeals', rgoT, {})).rows.find(x => x.id === apImg.id);
+  chk('  она снова «На рассмотрении», решение и ответ сняты',
+    reRow.status === 'new' && reRow.answer === '' && reRow.answeredBy === '' && reRow.answeredAt === '', reRow);
+  chk('  вернуть второй раз — уже на рассмотрении', (await R('reopenAppeal', sqcT, apImg.id)).code === 'stale');
+  chk('  в журнале — кто вернул и какое решение было',
+    !!(await db.one(`SELECT 1 FROM audit_log WHERE event = 'Апелляция возвращена на рассмотрение'
+                      AND details LIKE $1 AND details LIKE '%ответ не на ту%'`, [apImg.id + '%'])));
+  chk('  и на неё можно ответить заново',
+    (await R('answerAppeal', sqcT, apImg.id, 'fixed', '', 'new')).success === true);
+
   head('ШАГ 4. ОПЕРАТОР ВИДИТ РЕЗУЛЬТАТ');
   const ob = await R('getOperatorBootstrap', opT);
   chk('оценка видна', ob.evals.evaluations.length === 1, ob.evals.evaluations.length);
@@ -1005,6 +1026,58 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('у оператора в плане выгружено считается за весь период',
     rqP.success === true && upP.submitted === 1 && upP.period.days === 3, { rq: rqP.error, submitted: upP.submitted, period: upP.period });
   await R('deleteEvaluation', qcT, evP.id);
+
+  head('ШАГ 9д. КРИТЕРИИ: «НЕ ТРЕБУЕТСЯ» НЕ В СЧЁТ');
+  {
+    // четыре чек-листа в отдельной неделе: по пункту X — два «Не требуется»,
+    // один «Отрицательно», один «Положительно». Верно: 1 из 2 = 50%.
+    // Раньше «Не требуется» шли в выполненные: 3 из 4 = 75%.
+    // По пункту Z везде «Не требуется» — процента нет вовсе.
+    const naItems = [];
+    boot.cfg.blocks.forEach(b => b.items.forEach(i => {
+      if (i.type === 'score' && i.options.some(o => o.value === 'Не требуется')) naItems.push(i);
+    }));
+    chk('в чек-листе есть хотя бы два пункта с «Не требуется»', naItems.length >= 2, naItems.length);
+    const [X, Z] = naItems;
+    const ids = [];
+    for (const [k, xv] of [['1', 'Не требуется'], ['2', 'Не требуется'], ['3', 'Отрицательно'], ['4', 'Положительно']]) {
+      const a = { ...ans, B2P1: 'Положительно', [X.id]: xv, [Z.id]: 'Не требуется' };
+      if (k === '4') a.B8P3 = 'Обнаружено';     // признак жалобы в одном из четырёх
+      const r = await R('saveEvaluation', { pin: qcT, meta: { ...META, reqId: '', callTime: '16:0' + k, phone: '7916555020' + k,
+                                                            complaintSource: k === '4' ? 'Клиент' : '' },
+        answers: a, comments: { [X.id]: 'проверка' } });
+      if (r.success) ids.push(r.id); else chk('чек-лист для критериев сохранён', false, r.error);
+    }
+    await db.q(`UPDATE evaluations SET sent_at = '2025-01-08' WHERE public_id = ANY($1::text[])`, [ids]);
+    const cr = await R('getCriteriaReport', mgrT, 'all', '2025-01-06', '2025-01-12');
+    const cell = it => { const row = cr.items.find(x => x.text === it.text); return row ? row.cells[0] : 'нет строки'; };
+    chk('одна неделя', cr.success === true && cr.weeks.length === 1 && cr.weeks[0] === '2025-W02', cr.weeks);
+    chk('пункт с «Не требуется»: 1 из 2 = 50%, а не 75%', cell(X) === 50, cell(X));
+    chk('везде «Не требуется» — процента нет', cell(Z) === null, cell(Z));
+    chk('остальные пункты — 100%', cell(boot.cfg.blocks[0].items.find(i => i.type === 'score' && i !== X && i !== Z)) === 100);
+    // блок — среднее процентов его пунктов, пустые не в счёт (их отчёт:
+    // «Работа с конфликтом» 0,375 = (0 + 0,75) / 2)
+    const bX = boot.cfg.blocks.find(b => b.items.indexOf(X) >= 0);
+    const vals = bX.items.map(cell).filter(v => v !== null);
+    const want = Math.round(vals.reduce((a, v) => a + v, 0) / vals.length * 100) / 100;
+    const bRow = (cr.blocks || []).find(b => b.block === bX.name);
+    chk('у блока процент — среднее его пунктов', !!bRow && bRow.cells[0] === want, { блок: bRow, ждём: want, пункты: vals });
+    chk('  среди них 50%, значит не 100', vals.indexOf(50) >= 0 && want < 100, vals);
+    const fl = code => { let t; boot.cfg.blocks.forEach(b => b.items.forEach(i => { if (i.id === code) t = i; })); return cell(t); };
+    chk('признак жалобы в 1 из 4 — 75%', fl('B8P3') === 75, fl('B8P3'));
+    chk('благодарность ошибкой не считается — 100%', fl('B8P1') === 100, fl('B8P1'));
+    chk('недопустимых событий нет — 100%', fl('B9P1') === 100, fl('B9P1'));
+    {
+      const ExcelJS = require('exceljs');
+      const x = await R('exportReport', mgrT, 'criteria', { period: 'all', from: '2025-01-06', to: '2025-01-12' });
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(Buffer.from(x.contentBase64, 'base64'));
+      const ws = wb.worksheets[0];
+      const found = []; ws.eachRow(r => { if (r.getCell(1).value === bX.name) found.push(r.getCell(2).value); });
+      chk('в выгрузке строка блока с тем же процентом', found.length === 1 && Math.abs(found[0] - want / 100) < 1e-9, found);
+    }
+    for (const id of ids) await R('deleteEvaluation', qcT, id);
+  }
 
   head('ШАГ 10. СЕССИИ');
   await R('logoutSession', opT);

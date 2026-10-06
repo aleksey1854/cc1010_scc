@@ -1157,10 +1157,6 @@
         <div class="filter-bar" style="margin-bottom:0;">
           <label for="planDate" style="font-size:14px;color:var(--ink-2);">Дата статистики:</label>
           <input type="date" id="planDate" onchange="loadPlan(false)">
-          <span class="date-range" title="какие даты звонков входят в этот план: по ним считается «Прослушано»">
-            <label for="planFrom">звонки с</label><input type="date" id="planFrom" onchange="savePlanPeriod()">
-            <label for="planTo">по</label><input type="date" id="planTo" onchange="savePlanPeriod()">
-          </span>
           <span id="planPct" style="color:var(--muted);font-size:13px;"></span>
           <button class="btn-filter" style="margin-left:auto;" onclick="openImport()"><i class="fas fa-upload"></i> Загрузить статистику дня</button>
         </div>
@@ -3687,11 +3683,6 @@
       }
       showPlanNote(r);
       renderUploadMemo(null, 'planMemo');
-      if (r.period) {
-        document.getElementById('planFrom').value = r.period.from;
-        document.getElementById('planTo').value = r.period.to;
-        planPeriodBase = { from: r.period.from, to: r.period.to };
-      }
       document.getElementById('planOps').textContent = r.summary.operators;
       document.getElementById('planNeed').textContent = r.summary.plan;
       document.getElementById('planDone').textContent = r.summary.done;
@@ -3805,21 +3796,6 @@
       toast(r.message, 'ok');
     }).withFailureHandler(function (e) { toast(e); })
       .setPlanNote(sessionStorage.getItem('token'), date, document.getElementById('planNote').value, planNoteBase);
-  }
-
-  // Период звонков плана: статистику грузят и за несколько дней сразу,
-  // и «Прослушано» считается по всем звонкам периода, а не одного дня.
-  let planPeriodBase = null;      // период, каким его показал последний план
-  function savePlanPeriod() {
-    const f = document.getElementById('planFrom').value, t = document.getElementById('planTo').value;
-    if (!f || !t) return;
-    google.script.run.withSuccessHandler(function (r) {
-      if (!r.success) { r.code === 'stale' ? staleToast(r) : toast(r.error); loadPlan(false, true); return; }
-      toast(r.message, 'ok');
-      planScrollY = window.scrollY;
-      loadPlan(false, true);
-    }).withFailureHandler(function (e) { toast(e); })
-      .setPlanPeriod(sessionStorage.getItem('token'), document.getElementById('planDate').value, f, t, planPeriodBase);
   }
 
   // ---------- ВОЗВРАТ НА ТО ЖЕ МЕСТО ----------
@@ -4573,10 +4549,18 @@
       if (!r.weeks.length) { box.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Нет данных за период</p></div>'; return; }
       let html = '<div class="table-wrapper"><table><thead><tr><th>Критерий</th>' + r.weeks.map(function (w) { return '<th>' + w + '</th>'; }).join('') + '</tr></thead><tbody>';
       let prevB = null;
+      const cell = function (c) { return '<td>' + (c == null ? '<span style="color:#ccc">—</span>' : '<strong style="color:' + scoreColorHex(c) + '">' + pct2(c) + '</strong>') + '</td>'; };
+      // у блока — среднее процентов его пунктов (как в их отчёте)
+      const blockCells = {};
+      (r.blocks || []).forEach(function (b) { blockCells[b.block] = b.cells; });
       r.items.forEach(function (it) {
-        if (it.block !== prevB) { html += '<tr><td colspan="' + (r.weeks.length + 1) + '" style="background:var(--surface-2);font-weight:700;">' + it.block + '</td></tr>'; prevB = it.block; }
-        html += '<tr><td style="max-width:340px;">' + it.text + '</td>' +
-          it.cells.map(function (c) { return '<td>' + (c === null ? '<span style="color:#ccc">—</span>' : '<strong style="color:' + scoreColorHex(c) + '">' + pct2(c) + '</strong>') + '</td>'; }).join('') + '</tr>';
+        if (it.block !== prevB) {
+          const bc = blockCells[it.block];
+          html += '<tr style="background:var(--surface-2);font-weight:700;"><td>' + it.block + '</td>' +
+            (bc ? bc.map(cell).join('') : '<td colspan="' + r.weeks.length + '"></td>') + '</tr>';
+          prevB = it.block;
+        }
+        html += '<tr><td style="max-width:340px;padding-left:22px;">' + it.text + '</td>' + it.cells.map(cell).join('') + '</tr>';
       });
       html += '</tbody></table></div>';
       box.innerHTML = html;
@@ -5164,7 +5148,10 @@
               '<button class="btn-small btn-partial" data-st="partial">Частично</button>' +
               '<button class="btn-small btn-rejected" data-st="rejected">Отказано</button>' +
               '</div></div>'
-            : (escHtml(a.answer) || '—') + '<div class="hint">' + escHtml(a.answeredBy) + ' · ' + a.answeredAt + '</div>') + '</div></td>';
+            : (escHtml(a.answer) || '—') + '<div class="hint">' + escHtml(a.answeredBy) + ' · ' + a.answeredAt + '</div>' +
+              // ответили не на ту — решение снимается, апелляция снова ждёт разбора
+              '<button class="btn-small" style="margin-top:6px;" data-reopen="' + a.id + '" data-was="' + a.status + '">' +
+              '<i class="fas fa-rotate-left"></i> Вернуть на рассмотрение</button>') + '</div></td>';
         } else {
           html += '<td class="ap-answer"><div class="ap-answer-box">' + (a.status === 'new'
             ? '<span class="hint">ждём решения</span>'
@@ -5182,6 +5169,21 @@
           const wrap = b.closest('.ap-actions');
           answerAppeal(wrap.getAttribute('data-ap'), b.getAttribute('data-st'),
             wrap.querySelector('textarea').value.trim(), b, 'new');
+        };
+      });
+      box.querySelectorAll('button[data-reopen]').forEach(function (b) {
+        b.onclick = function () {
+          const id = b.getAttribute('data-reopen');
+          if (!confirm('Вернуть апелляцию ' + id + ' на рассмотрение?\n\nРешение и комментарий будут сняты, ' +
+                       'апелляция снова попадёт в список на разбор.')) return;
+          b.disabled = true;
+          google.script.run.withSuccessHandler(function (r) {
+            b.disabled = false;
+            if (!r.success) { if (r.code === 'stale') staleToast(r); else toast(r.error); loadAppeals(); return; }
+            toast(r.message, 'ok');
+            loadAppeals();
+          }).withFailureHandler(function (e) { b.disabled = false; toast(e); })
+            .reopenAppeal(sessionStorage.getItem('token'), id, b.getAttribute('data-was'));
         };
       });
       box.querySelectorAll('button[data-seen]').forEach(function (b) {

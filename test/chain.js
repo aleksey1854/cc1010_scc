@@ -678,6 +678,27 @@ const R = (fn, ...a) => api.call(fn, a);
       (await R('getAppealImage', (await R('login', rgo2[3], rgo2[4])).token, withImg.images[0].id)).success === false);
   }
 
+  // ответили не на ту апелляцию — решение снимают, апелляция снова ждёт
+  chk('вернуть на рассмотрение: РГО нельзя', (await R('reopenAppeal', rgoT, ap.id, 'partial')).success === false);
+  chk('  СКК тоже нельзя', (await R('reopenAppeal', qcT, ap.id, 'partial')).success === false);
+  const reBusy = await R('reopenAppeal', sqcT, ap.id, 'partial');
+  chk('  по той же оценке уже открыта другая — вернуть нельзя, база не даёт двух',
+    reBusy.success === false && /другая апелляция/.test(reBusy.error || ''), reBusy);
+  await R('answerAppeal', sqcT, apImg.id, 'rejected', 'ответ не на ту', 'new');
+  chk('  страница видела старое решение — не трогаем',
+    (await R('reopenAppeal', sqcT, apImg.id, 'fixed')).code === 'stale');
+  const re = await R('reopenAppeal', sqcT, apImg.id, 'rejected');
+  chk('старший СКК вернул апелляцию на рассмотрение', re.success === true, re.error);
+  const reRow = (await R('getAppeals', rgoT, {})).rows.find(x => x.id === apImg.id);
+  chk('  она снова «На рассмотрении», решение и ответ сняты',
+    reRow.status === 'new' && reRow.answer === '' && reRow.answeredBy === '' && reRow.answeredAt === '', reRow);
+  chk('  вернуть второй раз — уже на рассмотрении', (await R('reopenAppeal', sqcT, apImg.id)).code === 'stale');
+  chk('  в журнале — кто вернул и какое решение было',
+    !!(await db.one(`SELECT 1 FROM audit_log WHERE event = 'Апелляция возвращена на рассмотрение'
+                      AND details LIKE $1 AND details LIKE '%ответ не на ту%'`, [apImg.id + '%'])));
+  chk('  и на неё можно ответить заново',
+    (await R('answerAppeal', sqcT, apImg.id, 'fixed', '', 'new')).success === true);
+
   head('ШАГ 4. ОПЕРАТОР ВИДИТ РЕЗУЛЬТАТ');
   const ob = await R('getOperatorBootstrap', opT);
   chk('оценка видна', ob.evals.evaluations.length === 1, ob.evals.evaluations.length);

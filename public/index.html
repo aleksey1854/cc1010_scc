@@ -5140,7 +5140,10 @@
               '<button class="btn-small btn-partial" data-st="partial">Частично</button>' +
               '<button class="btn-small btn-rejected" data-st="rejected">Отказано</button>' +
               '</div></div>'
-            : (escHtml(a.answer) || '—') + '<div class="hint">' + escHtml(a.answeredBy) + ' · ' + a.answeredAt + '</div>') + '</div></td>';
+            : (escHtml(a.answer) || '—') + '<div class="hint">' + escHtml(a.answeredBy) + ' · ' + a.answeredAt + '</div>' +
+              // ответили не на ту — решение снимается, апелляция снова ждёт разбора
+              '<button class="btn-small" style="margin-top:6px;" data-reopen="' + a.id + '" data-was="' + a.status + '">' +
+              '<i class="fas fa-rotate-left"></i> Вернуть на рассмотрение</button>') + '</div></td>';
         } else {
           html += '<td class="ap-answer"><div class="ap-answer-box">' + (a.status === 'new'
             ? '<span class="hint">ждём решения</span>'
@@ -5158,6 +5161,21 @@
           const wrap = b.closest('.ap-actions');
           answerAppeal(wrap.getAttribute('data-ap'), b.getAttribute('data-st'),
             wrap.querySelector('textarea').value.trim(), b, 'new');
+        };
+      });
+      box.querySelectorAll('button[data-reopen]').forEach(function (b) {
+        b.onclick = function () {
+          const id = b.getAttribute('data-reopen');
+          if (!confirm('Вернуть апелляцию ' + id + ' на рассмотрение?\n\nРешение и комментарий будут сняты, ' +
+                       'апелляция снова попадёт в список на разбор.')) return;
+          b.disabled = true;
+          google.script.run.withSuccessHandler(function (r) {
+            b.disabled = false;
+            if (!r.success) { if (r.code === 'stale') staleToast(r); else toast(r.error); loadAppeals(); return; }
+            toast(r.message, 'ok');
+            loadAppeals();
+          }).withFailureHandler(function (e) { b.disabled = false; toast(e); })
+            .reopenAppeal(sessionStorage.getItem('token'), id, b.getAttribute('data-was'));
         };
       });
       box.querySelectorAll('button[data-seen]').forEach(function (b) {

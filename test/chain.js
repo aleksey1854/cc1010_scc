@@ -1102,6 +1102,31 @@ const R = (fn, ...a) => api.call(fn, a);
     for (const id of ids) await R('deleteEvaluation', qcT, id);
   }
 
+  head('ШАГ 9е. ПОДТВЕРЖДЁННАЯ ЖАЛОБА — В ПОКАЗАТЕЛИ ТОЛЬКО С ДАТОЙ ОТПРАВКИ');
+  {
+    const pjOf = async (d) => {
+      const pr = await R('getProductionReport', qcT, d, d, '');
+      const o = [].concat(...pr.groups.map(g => g.operators)).find(x => x.name === OP2[0]);
+      return { op: o ? o.pjConfirmed : 0, grp: pr.groups.find(g => g.name === 'ИНВ-1').pjConfirmed,
+               ids: o ? o.pj.map(x => x.id) : [] };
+    };
+    const SENT = '2026-08-17';
+    const before = await pjOf(DATE), sentBefore = await pjOf(SENT);
+    const pjEv = await R('saveEvaluation', { pin: qcT,
+      meta: { ...META, operator: OP2[0], reqId: '', callTime: '17:10', phone: '79165550301', complaintSource: 'Клиент' },
+      answers: { ...ans, B8P2: 'Обнаружено' }, comments: {} });
+    chk('подтверждённая жалоба сохранена', pjEv.success === true && pjEv.result.score === 0, pjEv.error || pjEv.result);
+    const noSent = await pjOf(DATE);
+    chk('  без даты отправки её нет в показателях',
+      noSent.op === before.op && noSent.grp === before.grp && noSent.ids.indexOf(pjEv.id) < 0, [before, noSent]);
+    chk('  самолётик: СКК внёс дату отправки', (await R('setSentDate', qcT, pjEv.id, SENT)).success === true);
+    const onSent = await pjOf(SENT), onDay = await pjOf(DATE);
+    chk('  теперь она в показателях — в день отправки',
+      onSent.op === sentBefore.op + 1 && onSent.grp === sentBefore.grp + 1 && onSent.ids.indexOf(pjEv.id) >= 0, [sentBefore, onSent]);
+    chk('  а не в день прослушки', onDay.ids.indexOf(pjEv.id) < 0 && onDay.op === before.op, onDay);
+    await R('deleteEvaluation', qcT, pjEv.id);
+  }
+
   head('ШАГ 10. СЕССИИ');
   await R('logoutSession', opT);
   chk('после выхода токен не работает', (await R('getOperatorStats', opT)).success === false);

@@ -1025,6 +1025,29 @@ const R = (fn, ...a) => api.call(fn, a);
   const upP = await R('getMyUploadPlan', opT, P1);
   chk('у оператора в плане выгружено считается за весь период',
     rqP.success === true && upP.submitted === 1 && upP.period.days === 3, { rq: rqP.error, submitted: upP.submitted, period: upP.period });
+
+  // Чек-лист по жалобе — не плановая прослушка. План считал его в
+  // «Прослушано»: у оператора стояло «готово», хотя планово его никто не
+  // слушал и отметки не было (Клеван, 07.10).
+  const pjAns = { ...ans, B8P2: 'Обнаружено', B8P3: 'Обнаружено' };
+  const pjP = await R('saveEvaluation', { pin: qcT,
+    meta: { ...META, operator: OP[0], reqId: '', callDate: P2, callTime: '09:40', phone: '79165557002', complaintSource: 'Заказчик' },
+    answers: pjAns, comments: {} });
+  const pjP2 = await R('saveEvaluation', { pin: qcT,
+    meta: { ...META, operator: OP2[0], reqId: '', callDate: P2, callTime: '09:45', phone: '79165557003', complaintSource: 'Клиент' },
+    answers: pjAns, comments: {} });
+  const planPJ = await R('getListeningPlan', qcT, P1);
+  const rowPJ = planPJ.rows.find(x => x.operator === OP[0]);
+  const rowPJ2 = planPJ.rows.find(x => x.operator === OP2[0]);
+  chk('жалоба в плане: не «прослушано» и не «готово», а отдельно',
+    pjP.success && rowPJ && rowPJ.done === 0 && rowPJ.left === rowPJ.plan && rowPJ.complaints === 1, pjP.error || rowPJ);
+  chk('  плановая оценка рядом с жалобой считается как была',
+    pjP2.success && rowPJ2 && rowPJ2.done === 1 && rowPJ2.complaints === 1, pjP2.error || rowPJ2);
+  chk('  и в итоге плана жалобы не в «Прослушано»',
+    planPJ.summary.done === planPJ.rows.reduce((a, x) => a + x.done, 0) &&
+    planPJ.rows.every(x => x.fromOperator + x.bySkk === x.done), planPJ.summary);
+  await R('deleteEvaluation', qcT, pjP.id);
+  await R('deleteEvaluation', qcT, pjP2.id);
   await R('deleteEvaluation', qcT, evP.id);
 
   head('ШАГ 9д. КРИТЕРИИ: «НЕ ТРЕБУЕТСЯ» НЕ В СЧЁТ');

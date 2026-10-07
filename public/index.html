@@ -3710,7 +3710,9 @@
           '<option value="done"' + (x.mark === 'done' ? ' selected' : '') + '>Готово</option>' +
           '</select>' + (x.markBy ? '<div class="hint">' + x.markBy + '</div>' : '');
         html += '<tr' + (x.mark === 'in_progress' ? ' class="mark-row"' : '') + '><td class="m-q" data-l="Разбор">' + sel + '</td>' +
-          '<td class="m-op" data-l="Оператор">' + x.operator + '</td><td data-l="Группа">' + x.group + '</td><td data-l="Принято">' + x.accepted + '</td><td data-l="План (' + r.percent + '%)"><strong>' + x.plan + '</strong></td><td data-l="Прослушано">' + x.done + '</td><td data-l="Осталось">' + leftCell + '</td>' +
+          '<td class="m-op" data-l="Оператор">' + x.operator + '</td><td data-l="Группа">' + x.group + '</td><td data-l="Принято">' + x.accepted + '</td><td data-l="План (' + r.percent + '%)"><strong>' + x.plan + '</strong></td><td data-l="Прослушано">' + x.done +
+          // чек-лист по жалобе — не плановая прослушка: виден, но в план не идёт
+          (x.complaints ? ' <span class="hint" style="white-space:nowrap;" title="чек-листы по жалобам в план не входят">+' + x.complaints + ' по жалобе</span>' : '') + '</td><td data-l="Осталось">' + leftCell + '</td>' +
           '<td data-l="Выгрузил оператор">' + x.fromOperator + (x.submitted > x.fromOperator ? ' <span style="color:var(--mid-ink);font-size:12px;">(+' + (x.submitted - x.fromOperator) + ' ждут)</span>' : '') + '</td><td data-l="СКК сам">' + x.bySkk + '</td></tr>';
       });
       html += '</tbody></table></div>';

@@ -1111,6 +1111,15 @@ const R = (fn, ...a) => api.call(fn, a);
                ids: o ? o.pj.map(x => x.id) : [] };
     };
     const SENT = '2026-08-17';
+    // у оператора есть ДЦ — значит, он стоит и в отчёте «Проект ДЦ» (там ФСС рядом)
+    const dcEv = await R('saveEvaluation', { pin: qcT,
+      meta: { ...META, operator: OP2[0], reqId: '', callTime: '17:05', phone: '79165550300', dc: true },
+      answers: ans, comments: {} });
+    const fssOf = async () => {
+      const row = (await R('getDcReport', qcT, DATE, DATE, '')).rows.find(x => x.operator === OP2[0]);
+      return row ? row.fssCount : -1;
+    };
+    const fssBefore = await fssOf();
     const before = await pjOf(DATE), sentBefore = await pjOf(SENT);
     const pjEv = await R('saveEvaluation', { pin: qcT,
       meta: { ...META, operator: OP2[0], reqId: '', callTime: '17:10', phone: '79165550301', complaintSource: 'Клиент' },
@@ -1119,12 +1128,16 @@ const R = (fn, ...a) => api.call(fn, a);
     const noSent = await pjOf(DATE);
     chk('  без даты отправки её нет в показателях',
       noSent.op === before.op && noSent.grp === before.grp && noSent.ids.indexOf(pjEv.id) < 0, [before, noSent]);
+    const fssNoSent = await fssOf();
+    chk('  и в «Проекте ДЦ» (ФСС) её тоже нет', dcEv.success === true && fssBefore >= 0 && fssNoSent === fssBefore,
+      [dcEv.error, fssBefore, fssNoSent]);
     chk('  самолётик: СКК внёс дату отправки', (await R('setSentDate', qcT, pjEv.id, SENT)).success === true);
     const onSent = await pjOf(SENT), onDay = await pjOf(DATE);
     chk('  теперь она в показателях — в день отправки',
       onSent.op === sentBefore.op + 1 && onSent.grp === sentBefore.grp + 1 && onSent.ids.indexOf(pjEv.id) >= 0, [sentBefore, onSent]);
     chk('  а не в день прослушки', onDay.ids.indexOf(pjEv.id) < 0 && onDay.op === before.op, onDay);
     await R('deleteEvaluation', qcT, pjEv.id);
+    if (dcEv.success) await R('deleteEvaluation', qcT, dcEv.id);
   }
 
   head('ШАГ 10. СЕССИИ');

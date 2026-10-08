@@ -3902,6 +3902,7 @@
     const info = document.getElementById('impFileInfo');
     const box = document.getElementById('impCallsBox');
     document.getElementById('impText').disabled = !!file;
+    document.getElementById('impMessage').style.display = 'none';      // прошлая ошибка уже не про этот файл
     impFilePeriod = null;
     if (!file) { info.classList.add('hidden'); box.classList.remove('hidden'); return; }
     info.className = 'imp-info'; info.textContent = 'Читаю файл…';

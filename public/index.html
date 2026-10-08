@@ -201,6 +201,12 @@
   /* Подсказка «что входит в показатель»: наведение мышью, на телефоне —
      касание (плитка получает фокус). Сами о себе забывали, что считается. */
   .stat-card[data-tip]{ overflow:visible; cursor:help; outline:none; }
+  /* пояснение к столбцам таблицы: подсказка над таблицей обрезалась бы прокруткой */
+  .col-legend{ margin:0 0 12px; font-size:13px; color:var(--ink-2); }
+  .col-legend summary{ cursor:pointer; color:var(--accent); font-weight:600; list-style:none; }
+  .col-legend summary::-webkit-details-marker{ display:none; }
+  .col-legend ul{ margin:8px 0 0; padding-left:18px; line-height:1.5; }
+  .col-legend li{ margin:3px 0; }
   .stat-card[data-tip] .label::after{ content:'?'; display:inline-block; width:14px; height:14px; margin-left:6px;
     border-radius:50%; background:var(--surface-2); border:1px solid var(--border-strong); color:var(--muted);
     font-size:10px; line-height:12px; text-align:center; letter-spacing:0; vertical-align:1px; }
@@ -1266,10 +1272,10 @@
       </div>
     </div>
     <div class="stats-grid">
-      <div class="stat-card"><div class="number" id="rgoOpsTotal">0</div><div class="label">Операторов</div></div>
-      <div class="stat-card"><div class="number checked" id="rgoOpsChecked">0</div><div class="label">С проверками</div></div>
-      <div class="stat-card"><div class="number new" id="rgoCalls">0</div><div class="label">Проверено звонков</div></div>
-      <div class="stat-card"><div class="number rating" id="rgoAvg">0</div><div class="label">Средний балл</div></div>
+      <div class="stat-card" tabindex="0" data-tip="Работающие операторы вашей группы сейчас. Уволенные (они внизу списка ещё 3 месяца) не считаются."><div class="number" id="rgoOpsTotal">0</div><div class="label">Операторов</div></div>
+      <div class="stat-card" tabindex="0" data-tip="Сколько операторов группы получили хотя бы одну оценку за выбранный период. Проект ДЦ не считается."><div class="number checked" id="rgoOpsChecked">0</div><div class="label">С проверками</div></div>
+      <div class="stat-card" tabindex="0" data-tip="Все оценки группы за период: плановые, КЗ от заказчика и чек-листы по жалобам — и подтверждённым, и нет. Без проекта ДЦ. Период — по дню, когда чек-лист сохранили, а у жалоб с внесённой датой отправки — по ней."><div class="number new" id="rgoCalls">0</div><div class="label">Проверено звонков</div></div>
+      <div class="stat-card" tabindex="0" data-tip="Средний балл этих же оценок, по звонкам. Чек-листы по жалобам входят со своим баллом (подтверждённая — 0%), поэтому цифра может отличаться от «Производственных показателей»."><div class="number rating" id="rgoAvg">0</div><div class="label">Средний балл</div></div>
     </div>
 
     <!-- РГО сдаёт звонки за операторов своей группы: у части операторов
@@ -1484,7 +1490,20 @@
           <button class="btn-filter" style="margin-left:auto;background:var(--good);" onclick="downloadReport('kk')"><i class="fas fa-download"></i> Скачать</button>
         </div>
       </div>
-      <div class="card"><div id="kkTable"></div></div>
+      <div class="card">
+        <details class="col-legend">
+          <summary><i class="fas fa-circle-question"></i> Что значат столбцы</summary>
+          <ul>
+            <li><b>Стаж, мес</b> — от даты приёма, её вносит РГО; «—» — дата не внесена.</li>
+            <li><b>Оценок</b> — все оценки оператора за период без проекта ДЦ: плановые, КЗ от заказчика и чек-листы по жалобам (и подтверждённым, и нет).</li>
+            <li><b>% без КО</b> — средний балл этих оценок. Оценки с недопустимым событием или подтверждённой жалобой входят в него с 0%.</li>
+            <li><b>Недоп. событий</b> — сколько оценок с отметкой хотя бы одного недопустимого события.</li>
+            <li><b>Жалоб: заказчик / клиент</b> — подтверждённые жалобы по источнику; «клиент» — всё, где источник не «Заказчик».</li>
+            <li>Период — по дню, когда чек-лист сохранили, а у жалоб с датой отправки — по ней. Переведённый в другую группу оператор стоит двумя строками.</li>
+          </ul>
+        </details>
+        <div id="kkTable"></div>
+      </div>
     </div>
 
     <!-- Критерии по неделям -->
@@ -1525,10 +1544,10 @@
     <!-- Апелляции -->
     <div id="repDc" class="hidden">
       <div class="stats-grid">
-        <div class="stat-card"><div class="number checked" id="dcAvg">—</div><div class="label">Качество по ДЦ</div></div>
-        <div class="stat-card"><div class="number new" id="dcCount">0</div><div class="label">Оценок ДЦ</div></div>
-        <div class="stat-card"><div class="number rating" id="dcBoth">—</div><div class="label">Среднее ФСС + ДЦ</div></div>
-        <div class="stat-card"><div class="number" id="dcOps">0</div><div class="label">Операторов на ДЦ</div></div>
+        <div class="stat-card" tabindex="0" data-tip="Средний балл чек-листов по проекту ДЦ (галочка «ДЦ» в чек-листе) за период. Чек-листы по неподтверждённой жалобе (НЖ) не входят, подтверждённая жалоба — только после даты отправки."><div class="number checked" id="dcAvg">—</div><div class="label">Качество по ДЦ</div></div>
+        <div class="stat-card" tabindex="0" data-tip="Сколько чек-листов по ДЦ за период, без НЖ — они в таблице отдельным столбцом."><div class="number new" id="dcCount">0</div><div class="label">Оценок ДЦ</div></div>
+        <div class="stat-card" tabindex="0" data-tip="Средний балл всех оценок тех, у кого за период был ДЦ: и ДЦ, и обычные (ФСС), по звонкам. Его берут на зарплату. НЖ не входят, подтверждённая жалоба — только после даты отправки."><div class="number rating" id="dcBoth">—</div><div class="label">Среднее ФСС + ДЦ</div></div>
+        <div class="stat-card" tabindex="0" data-tip="Сколько операторов за период получили хотя бы один чек-лист по ДЦ."><div class="number" id="dcOps">0</div><div class="label">Операторов на ДЦ</div></div>
       </div>
       <div class="card">
         <div class="filter-bar" style="margin-bottom:0;">
@@ -1633,11 +1652,11 @@
     <!-- Жалобы -->
     <div id="repComplaints" class="hidden">
       <div class="stats-grid">
-        <div class="stat-card"><div class="number new" id="cmpTotal">0</div><div class="label">Всего жалоб</div></div>
-        <div class="stat-card"><div class="number rejected" id="cmpConf">0</div><div class="label">Обоснованные</div></div>
-        <div class="stat-card"><div class="number checked" id="cmpUnconf">0</div><div class="label">Необоснованные</div></div>
-        <div class="stat-card"><div class="number" id="cmpClient">0</div><div class="label">От клиентов</div></div>
-        <div class="stat-card"><div class="number" id="cmpCustomer">0</div><div class="label">От заказчика</div></div>
+        <div class="stat-card" tabindex="0" data-tip="Все чек-листы по жалобам за период — с отметкой «Признак жалобы» или «Подтверждённая жалоба», и ФСС, и ДЦ. Период — по дню, когда чек-лист сохранили, а у жалоб с внесённой датой отправки — по ней."><div class="number new" id="cmpTotal">0</div><div class="label">Всего жалоб</div></div>
+        <div class="stat-card" tabindex="0" data-tip="С отметкой «Подтверждённая жалоба» (ПЖ). В качество оператора идут с баллом 0% — после внесения даты отправки."><div class="number rejected" id="cmpConf">0</div><div class="label">Обоснованные</div></div>
+        <div class="stat-card" tabindex="0" data-tip="Только «Признак жалобы», без «Подтверждённой жалобы» (НЖ). В качество не идут."><div class="number checked" id="cmpUnconf">0</div><div class="label">Необоснованные</div></div>
+        <div class="stat-card" tabindex="0" data-tip="Жалобы, где в чек-листе выбран источник «Клиент» — и обоснованные, и нет."><div class="number" id="cmpClient">0</div><div class="label">От клиентов</div></div>
+        <div class="stat-card" tabindex="0" data-tip="Жалобы, где в чек-листе выбран источник «Заказчик» — и обоснованные, и нет."><div class="number" id="cmpCustomer">0</div><div class="label">От заказчика</div></div>
       </div>
       <div class="card">
         <div class="filter-bar" style="margin-bottom:0;">

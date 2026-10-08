@@ -1099,7 +1099,8 @@ const R = (fn, ...a) => api.call(fn, a);
     // четыре чек-листа в отдельной неделе: по пункту X — два «Не требуется»,
     // один «Отрицательно», один «Положительно». Верно: 1 из 2 = 50%.
     // Раньше «Не требуется» шли в выполненные: 3 из 4 = 75%.
-    // По пункту Z везде «Не требуется» — процента нет вовсе.
+    // По пункту Z везде «Не требуется» — процента нет вовсе («—»). 08.10
+    // в эталоне Даниила тут стояло 100%, но ошибка была в файле, не на сайте.
     const naItems = [];
     boot.cfg.blocks.forEach(b => b.items.forEach(i => {
       if (i.type === 'score' && i.options.some(o => o.value === 'Не требуется')) naItems.push(i);
@@ -1122,6 +1123,19 @@ const R = (fn, ...a) => api.call(fn, a);
     chk('пункт с «Не требуется»: 1 из 2 = 50%, а не 75%', cell(X) === 50, cell(X));
     chk('везде «Не требуется» — процента нет', cell(Z) === null, cell(Z));
     chk('остальные пункты — 100%', cell(boot.cfg.blocks[0].items.find(i => i.type === 'score' && i !== X && i !== Z)) === 100);
+    // пункт, появившийся в чек-листе после этих оценок (как «Сверка города»
+    // 30.09), их не проходил — у недели по нему пусто, а не «100% выполнено»
+    {
+      const W = boot.cfg.blocks[0].items.find(i => i.type === 'score' && i !== X && i !== Z);
+      await db.q(`UPDATE checklist_items SET added_at = now() WHERE code = $1`, [W.id]);
+      try {
+        const crW = await R('getCriteriaReport', mgrT, 'all', '2025-01-06', '2025-01-12');
+        const wRow = crW.items.find(i => i.text === W.text);
+        chk('пункт, добавленный после оценок недели, — пусто, а не 100%', wRow && wRow.cells[0] === null, wRow);
+      } finally {
+        await db.q(`UPDATE checklist_items SET added_at = NULL WHERE code = $1`, [W.id]);
+      }
+    }
     // блок — среднее процентов его пунктов, пустые не в счёт (их отчёт:
     // «Работа с конфликтом» 0,375 = (0 + 0,75) / 2)
     const bX = boot.cfg.blocks.find(b => b.items.indexOf(X) >= 0);
@@ -1165,6 +1179,14 @@ const R = (fn, ...a) => api.call(fn, a);
     };
     const fssBefore = await fssOf();
     const before = await pjOf(DATE), sentBefore = await pjOf(SENT);
+    // кабинет РГО и «Дивизион» — то же правило, что показатели (08.10)
+    const rgoSum = async () => {
+      const d = await R('getRgoDashboard', rgoT, 'all');
+      const me = d.operators.find(o => o.fullName === OP2[0]);
+      return { avg: d.summary.avgScore, calls: d.summary.callsChecked, op: me ? me.avgScore : null };
+    };
+    const orgSum = async () => { const d = await R('getOrgDashboard', srgoT, 'all'); return { avg: d.summary.avgScore, calls: d.summary.callsChecked }; };
+    const rgoBefore = await rgoSum(), orgBefore = await orgSum();
     const pjEv = await R('saveEvaluation', { pin: qcT,
       meta: { ...META, operator: OP2[0], reqId: '', callTime: '17:10', phone: '79165550301', complaintSource: 'Клиент' },
       answers: { ...ans, B8P2: 'Обнаружено' }, comments: {} });
@@ -1175,11 +1197,29 @@ const R = (fn, ...a) => api.call(fn, a);
     const fssNoSent = await fssOf();
     chk('  и в «Проекте ДЦ» (ФСС) её тоже нет', dcEv.success === true && fssBefore >= 0 && fssNoSent === fssBefore,
       [dcEv.error, fssBefore, fssNoSent]);
+    const rgoNoSent = await rgoSum(), orgNoSent = await orgSum();
+    chk('  и в кабинете РГО средний балл и «проверено» не сдвинулись',
+      JSON.stringify(rgoNoSent) === JSON.stringify(rgoBefore), [rgoBefore, rgoNoSent]);
+    chk('  и в «Дивизионе» тоже', JSON.stringify(orgNoSent) === JSON.stringify(orgBefore), [orgBefore, orgNoSent]);
+    // неподтверждённая жалоба (только «Признак жалобы») — никуда
+    const njEv = await R('saveEvaluation', { pin: qcT,
+      meta: { ...META, operator: OP2[0], reqId: '', callTime: '17:15', phone: '79165550302', complaintSource: 'Клиент' },
+      answers: { ...ans, B8P3: 'Обнаружено', B2P2: 'Отрицательно' }, comments: {} });
+    const rgoNj = await rgoSum(), orgNj = await orgSum();
+    chk('НЖ в кабинете РГО и «Дивизионе» не считается вовсе',
+      njEv.success === true && JSON.stringify(rgoNj) === JSON.stringify(rgoBefore) && JSON.stringify(orgNj) === JSON.stringify(orgBefore),
+      [njEv.error, rgoBefore, rgoNj, orgBefore, orgNj]);
+    if (njEv.success) await R('deleteEvaluation', qcT, njEv.id);
     chk('  самолётик: СКК внёс дату отправки', (await R('setSentDate', qcT, pjEv.id, SENT)).success === true);
     const onSent = await pjOf(SENT), onDay = await pjOf(DATE);
     chk('  теперь она в показателях — в день отправки',
       onSent.op === sentBefore.op + 1 && onSent.grp === sentBefore.grp + 1 && onSent.ids.indexOf(pjEv.id) >= 0, [sentBefore, onSent]);
     chk('  а не в день прослушки', onDay.ids.indexOf(pjEv.id) < 0 && onDay.op === before.op, onDay);
+    const rgoSent = await rgoSum(), orgSent = await orgSum();
+    chk('  с датой отправки ПЖ входит в средний балл группы у РГО (0% тянет вниз)',
+      rgoSent.avg < rgoBefore.avg && rgoSent.calls === rgoBefore.calls, [rgoBefore, rgoSent]);
+    chk('  но не в оценку самого оператора и не в «проверено звонков»',
+      rgoSent.op === rgoBefore.op && orgSent.calls === orgBefore.calls && orgSent.avg < orgBefore.avg, [rgoBefore, rgoSent, orgBefore, orgSent]);
     await R('deleteEvaluation', qcT, pjEv.id);
     if (dcEv.success) await R('deleteEvaluation', qcT, dcEv.id);
   }

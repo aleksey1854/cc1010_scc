@@ -735,12 +735,18 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('в работе СКК виден контролёр', org.byQc.some(q => q.qc === QC[0]), org.byQc.slice(0, 2));
 
   head('ШАГ 7. СОГЛАСОВАННОСТЬ ЦИФР');
-  const all = await db.q(`SELECT score FROM evaluations`);
+  // Правило качества группы — как в «Производственных показателях» (08.10):
+  // плановая плюс подтверждённые жалобы после даты отправки; НЖ и ДЦ — нет.
+  // Запрос написан здесь заново, а не взят из кода: сверка независимая.
+  const RULE = `NOT dc AND NOT (complaint_mark AND NOT complaint) AND NOT (complaint AND sent_at IS NULL)`;
+  const all = await db.q(`SELECT score FROM evaluations WHERE ${RULE}`);
   const trueAvg = core.round2(all.reduce((s, r) => s + Number(r.score), 0) / all.length);
-  chk('дивизион: средний = среднему по всем звонкам', org.summary.avgScore === trueAvg,
+  chk('дивизион: средний = среднему по звонкам, что входят в качество', org.summary.avgScore === trueAvg,
     { дашборд: org.summary.avgScore, поЗвонкам: trueAvg });
   const g1 = org.byGroup.find(g => g.group === 'ИНВ-1');
-  const g1db = await db.one(`SELECT round(avg(score),2)::float a, count(*)::int n FROM evaluations WHERE team='ИНВ-1'`);
+  const g1db = await db.one(`SELECT round(avg(score),2)::float a,
+                                    count(*) FILTER (WHERE NOT (complaint OR complaint_mark))::int n
+                               FROM evaluations WHERE team='ИНВ-1' AND ${RULE}`);
   chk('группа ИНВ-1 сходится с базой', g1.avgScore === g1db.a && g1.callsChecked === g1db.n, { отчёт: g1, база: g1db });
   chk('РГО и дивизион дают одну цифру по ИНВ-1', rgo.summary.avgScore === g1db.a,
     { рго: rgo.summary.avgScore, база: g1db.a });

@@ -1015,12 +1015,56 @@ const R = (fn, ...a) => api.call(fn, a);
   const rowP = planP.rows.find(x => x.operator === OP2[0]);
   chk('  оценка звонка из середины периода засчитана в «Прослушано»', evP.success && rowP && rowP.done === 1, rowP);
   chk('  период виден в плане', planP.period.from === P1 && planP.period.to === P3, planP.period);
-  chk('СКК сужает период плана', (await R('setPlanPeriod', qcT, P1, P1, P1)).success === true);
+  // поправить период у загруженного плана — только ССКК и выше (08.10)
+  chk('рядовой СКК период уже загруженного плана не правит',
+    (await R('setPlanPeriod', qcT, P1, P1, P1)).code === 'forbidden');
+  chk('ССКК сужает период плана', (await R('setPlanPeriod', sqcT, P1, P1, P1)).success === true);
   chk('  звонок вне периода больше не засчитан',
     (await R('getListeningPlan', qcT, P1)).rows.find(x => x.operator === OP2[0]).done === 0);
-  chk('конец периода раньше начала — отказ', (await R('setPlanPeriod', qcT, P1, P3, P1)).success === false);
+  chk('конец периода раньше начала — отказ', (await R('setPlanPeriod', sqcT, P1, P3, P1)).success === false);
   chk('оператору менять период нельзя', (await R('setPlanPeriod', opT, P1, P1, P3)).code === 'forbidden');
-  await R('setPlanPeriod', qcT, P1, P1, P3);
+  await R('setPlanPeriod', sqcT, P1, P1, P3);
+
+  // Окно загрузки (08.10): «План на» — день прослушки, звонки — отдельно.
+  // Раньше дата плана была первым днём звонков, а ручная вставка оставляла
+  // план без периода: план на 08.10 из звонков за 06.10 показывал
+  // «Прослушано 0» при трёх прослушанных.
+  {
+    const PL = ago(-2);                       // план на послезавтра — свой день, ни с кем не пересекается
+    const noCalls = await R('importAcceptedCalls', qcT, PL, OP[0] + ';300', '', '', false, false, { planDate: true });
+    chk('вручную без «Звонки за» не загружается — и объясняет почему',
+      noCalls.success === false && noCalls.code === 'need_calls', noCalls);
+    const future = await R('importAcceptedCalls', qcT, PL, OP[0] + ';300', '', '', false, false,
+      { planDate: true, callsFrom: ago(-1) });
+    chk('звонки за будущий день — отказ', future.success === false, future);
+    const man = await R('importAcceptedCalls', qcT, PL, OP[0] + ';300\n' + OP2[0] + ';250', '', '', false, false,
+      { planDate: true, callsFrom: P2 });
+    chk('вручную: план на выбранный день, звонки — за указанный',
+      man.success === true && man.dateIso === PL && man.period.from === P2 && man.period.to === P2, man);
+    const doneBefore = (await R('getListeningPlan', qcT, PL)).rows.find(x => x.operator === OP2[0]).done;
+    const evM = await R('saveEvaluation', { pin: qcT,
+      meta: { ...META, operator: OP2[0], reqId: '', callDate: P2, callTime: '09:50', phone: '79165557010' }, answers: ans, comments: {} });
+    const rowM = (await R('getListeningPlan', qcT, PL)).rows.find(x => x.operator === OP2[0]);
+    chk('  «Прослушано» считает звонки за указанный день, а не за день плана',
+      evM.success && rowM && doneBefore >= 1 && rowM.done === doneBefore + 1, [doneBefore, rowM]);
+    // файл: даты звонков берутся из него, дата плана — та, что выбрали
+    const ExcelJS = require('exceljs');
+    const wbF = new ExcelJS.Workbook(); const wsF = wbF.addWorksheet('Отчёт');
+    const ru = iso => iso.split('-').reverse().join('.').replace(/\.20(\d\d)$/, '.$1');
+    wsF.addRow(['Период:', ru(P1) + ' - ' + ru(P2)]);
+    wsF.addRow(['ИНВ-1_' + OP[0] + '(У)', 120]);
+    wsF.addRow(['ИНВ-1_' + OP2[0], 80]);
+    const b64F = Buffer.from(await wbF.xlsx.writeBuffer()).toString('base64');
+    const prev = await R('previewAcceptedFile', qcT, b64F);
+    chk('файл: до загрузки видно, за какие дни в нём звонки', prev.success && prev.rows === 2 && prev.from === P1 && prev.to === P2, prev);
+    const PL2 = ago(-3);
+    const fromF = await R('importAcceptedCalls', qcT, PL2, '', b64F, '', false, false, { planDate: true });
+    chk('файл: план на выбранный день, период звонков — из файла',
+      fromF.success === true && fromF.dateIso === PL2 && fromF.period.from === P1 && fromF.period.to === P2, fromF);
+    chk('  поверх уже загруженного плана — только с подтверждением',
+      (await R('importAcceptedCalls', qcT, PL2, '', b64F, '', false, false, { planDate: true })).code === 'exists');
+    await R('deleteEvaluation', qcT, evM.id);
+  }
   const rqP = await R('createRequest', { pin: opT, hasCall: 'yes', callDate: P2, callTime: '10:40', phone: '77011239999', callType: 'СР' });
   const upP = await R('getMyUploadPlan', opT, P1);
   chk('у оператора в плане выгружено считается за весь период',
@@ -1235,9 +1279,10 @@ const R = (fn, ...a) => api.call(fn, a);
     chk('  СКК-2, начавший писать до этого, его не затирает', isStale(n2) && n2.note && n2.note.text === 'звонки за 01.08 и 02.08', n2);
     chk('  увидел чужое — сохраняет осознанно', (await R('setPlanNote', q2, PD, 'другое', 'звонки за 01.08 и 02.08')).success === true);
     chk('  старая страница без «что видела» — как раньше', (await R('setPlanNote', q1, PD, 'итог')).success === true);
-    chk('период: СКК-1 поменял', (await R('setPlanPeriod', q1, PD, '2026-08-01', '2026-08-03', { from: PD, to: PD })).success === true);
-    chk('  СКК-2 со старым периодом на экране — не затирает',
-      isStale(await R('setPlanPeriod', q2, PD, '2026-08-02', '2026-08-03', { from: PD, to: PD })));
+    // период правят старшие (08.10) — двое старших с одним экраном
+    chk('период: ССКК поменял', (await R('setPlanPeriod', sq, PD, '2026-08-01', '2026-08-03', { from: PD, to: PD })).success === true);
+    chk('  руководитель со старым периодом на экране — не затирает',
+      isStale(await R('setPlanPeriod', mg, PD, '2026-08-02', '2026-08-03', { from: PD, to: PD })));
     chk('  период остался от СКК-1', (await R('getListeningPlan', q1, PD)).period.from === '2026-08-01');
 
     // --- загрузка статистики поверх загруженного дня ---

@@ -486,6 +486,13 @@
   .btn-filter.btn-quiet:hover{ background:var(--border-strong); color:var(--ink); }
 
   .date-range{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  /* загрузка статистики: что нашлось в файле; строка «звонки за» у плана */
+  .imp-info{ margin-top:8px; padding:8px 12px; border-radius:8px; font-size:13px;
+    background:var(--good-bg); color:var(--good-ink); }
+  .imp-info.warn{ background:var(--mid-bg); color:var(--mid-ink); }
+  .plan-period{ font-size:13px; color:var(--ink-2); display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .plan-period a{ color:var(--accent); font-size:12px; }
+  .plan-period input[type=date]{ padding:4px 6px; font-size:13px; }
   /* поля дат на телефоне шире экрана — ужимаем */
   @media (max-width:520px){ .date-range input[type=date]{ max-width:140px; } }
   .date-range label{ margin:0; font-size:13px; color:var(--muted); }
@@ -800,17 +807,25 @@
       <label for="impFile">Файл из веб-статистики</label>
       <input type="file" id="impFile" accept=".xlsx,.xls" onchange="impFilePicked()"
              style="width:100%;padding:10px;border:1.5px dashed var(--border-strong);border-radius:10px;font-size:13px;background:var(--surface-2);">
-      <small class="hint">«ОтчетПринятыеЗвонкиПоЗадачам.xlsx» — как скачали, ничего не перекладывая. Дата возьмётся из отчёта.</small>
+      <small class="hint">«ОтчетПринятыеЗвонкиПоЗадачам.xlsx» — как скачали, ничего не перекладывая. Даты звонков возьмутся из отчёта.</small>
+      <div id="impFileInfo" class="imp-info hidden"></div>
     </div>
-    <div class="form-grid">
-      <div class="form-group"><label for="impDate">Звонки с</label><input type="date" id="impDate"></div>
-      <div class="form-group"><label for="impDateTo">по</label><input type="date" id="impDateTo">
-        <small class="hint">Если выгрузка за несколько дней. За один день — оставьте пустым.</small></div>
+    <div class="form-group">
+      <label for="impPlanDate">План на</label>
+      <input type="date" id="impPlanDate">
+      <small class="hint">День, когда слушаете. Если на этот день план уже есть — сайт спросит, заменить ли его.</small>
     </div>
     <div class="form-group">
       <label for="impText">…или вставьте вручную: ФИО и количество принятых звонков</label>
       <textarea id="impText" rows="10" placeholder="Иванов Иван Иванович; 58&#10;Петрова Мария Сергеевна; 101&#10;..." style="width:100%;padding:11px;border:1.5px solid var(--border-strong);border-radius:10px;font-family:monospace;font-size:13px;outline:none;"></textarea>
       <small class="hint">Одна строка = один оператор. Разделитель: точка с запятой, запятая или таб (можно копировать прямо из Excel). Префикс группы «ИНВ-1_» и «(У)» распознаются автоматически.</small>
+    </div>
+    <div class="form-group" id="impCallsBox">
+      <label for="impCallsFrom">Звонки за</label>
+      <div class="date-range">
+        <input type="date" id="impCallsFrom"><label for="impCallsTo">по</label><input type="date" id="impCallsTo">
+      </div>
+      <small class="hint">Только при вставке вручную: за какой день звонки (второе поле — если за несколько дней). По этим звонкам считается «Прослушано».</small>
     </div>
     <div class="btn-row">
       <button type="button" class="btn-cancel" onclick="document.getElementById('importModal').classList.remove('active')">Отмена</button>
@@ -1158,6 +1173,7 @@
           <label for="planDate" style="font-size:14px;color:var(--ink-2);">Дата статистики:</label>
           <input type="date" id="planDate" onchange="loadPlan(false)">
           <span id="planPct" style="color:var(--muted);font-size:13px;"></span>
+          <span id="planPeriod" class="plan-period"></span>
           <button class="btn-filter" style="margin-left:auto;" onclick="openImport()"><i class="fas fa-upload"></i> Загрузить статистику дня</button>
         </div>
         <!-- та же памятка, что у операторов: сколько выгружать и какой длительности -->
@@ -3683,6 +3699,8 @@
       }
       showPlanNote(r);
       renderUploadMemo(null, 'planMemo');
+      planLatest = r.latestStat || '';
+      renderPlanPeriod(r.noData ? null : r.period);
       document.getElementById('planOps').textContent = r.summary.operators;
       document.getElementById('planNeed').textContent = r.summary.plan;
       document.getElementById('planDone').textContent = r.summary.done;
@@ -3740,6 +3758,43 @@
         };
       });
     }).getListeningPlan(sessionStorage.getItem('token'), document.getElementById('planDate').value);
+  }
+
+  // ---------- «ЗВОНКИ ЗА» У ПЛАНА ----------
+  // Видно всем: по звонкам этих дней считается «Прослушано». Поправить,
+  // если при загрузке ошиблись, может ССКК (и выше) — у остальных строка
+  // только для чтения: поля «звонки с/по» на странице сбивали СКК.
+  let planPeriodBase = null, planPeriodEditing = false;
+  function renderPlanPeriod(p) {
+    const el = document.getElementById('planPeriod');
+    if (planPeriodEditing) return;                  // правят — автообновление не трогает
+    planPeriodBase = p ? { from: p.from, to: p.to } : null;
+    if (!p) { el.innerHTML = ''; return; }
+    const role = (JSON.parse(sessionStorage.getItem('user') || '{}')).role;
+    el.innerHTML = '<span title="по звонкам этих дней считается «Прослушано»">звонки за <strong>' + p.fromRu +
+      (p.days > 1 ? ' — ' + p.toRu : '') + '</strong></span>' +
+      (['sqc', 'manager', 'admin'].indexOf(role) >= 0 ? ' <a href="#" onclick="editPlanPeriod(); return false;">изменить</a>' : '');
+  }
+  function editPlanPeriod() {
+    if (!planPeriodBase) return;
+    planPeriodEditing = true;
+    document.getElementById('planPeriod').innerHTML =
+      'звонки с <input type="date" id="ppFrom" value="' + planPeriodBase.from + '"> по ' +
+      '<input type="date" id="ppTo" value="' + planPeriodBase.to + '"> ' +
+      '<button class="btn-small" onclick="savePlanPeriod()"><i class="fas fa-check"></i></button>' +
+      '<button class="btn-small" onclick="planPeriodEditing=false; loadPlan(false, true)" title="Отмена">×</button>';
+  }
+  function savePlanPeriod() {
+    const f = document.getElementById('ppFrom').value, t = document.getElementById('ppTo').value || f;
+    if (!f) { toast('Укажите, с какого дня звонки'); return; }
+    google.script.run.withSuccessHandler(function (r) {
+      planPeriodEditing = false;
+      if (!r.success) { r.code === 'stale' ? staleToast(r) : toast(r.error); loadPlan(false, true); return; }
+      toast(r.message, 'ok');
+      planScrollY = window.scrollY;
+      loadPlan(false, true);
+    }).withFailureHandler(function (e) { toast(e); })
+      .setPlanPeriod(sessionStorage.getItem('token'), document.getElementById('planDate').value, f, t, planPeriodBase);
   }
 
   // ---------- ПЛАН ОБНОВЛЯЕТСЯ САМ ----------
@@ -3813,21 +3868,63 @@
     requestAnimationFrame(function () { window.scrollTo({ top: y, behavior: 'instant' }); });
   }
 
+  // ---------- ЗАГРУЗКА СТАТИСТИКИ ----------
+  // «План на» — день прослушки, обычный календарик: его выбирают сами
+  // (утром — на сегодня, вечером — на завтра). Звонки плана — из файла,
+  // а при вставке вручную — из «Звонки за». Раньше одно поле «Звонки с»
+  // было и датой плана: вчерашние звонки ложились в план не того дня,
+  // а ручная вставка оставляла план без периода — «Прослушано» = 0.
+  let planLatest = '';                 // последний день, на который план уже есть
+  let impFilePeriod = null;            // период, найденный в выбранном файле
+  const mskDay = function (shift) {
+    const d = new Date(Date.now() + (shift || 0) * 86400000);
+    return d.toLocaleDateString('sv', { timeZone: 'Europe/Moscow' });
+  };
+  const ruDay = function (iso) { return iso ? iso.split('-').reverse().join('.') : ''; };
+
   function openImport() {
-    document.getElementById('impDate').value = document.getElementById('planDate').value || yesterdayStr();
-    document.getElementById('impDateTo').value = '';
-    document.getElementById('impText').value = '';
-    document.getElementById('impFile').value = '';
+    // на сегодня план уже есть — значит, грузят на завтра
+    const today = mskDay(0);
+    document.getElementById('impPlanDate').value = planLatest && planLatest >= today ? mskDay(1) : today;
+    ['impCallsFrom', 'impCallsTo', 'impText', 'impFile'].forEach(function (id) { document.getElementById(id).value = ''; });
+    document.getElementById('impText').disabled = false;
+    document.getElementById('impCallsBox').classList.remove('hidden');
+    document.getElementById('impFileInfo').classList.add('hidden');
+    impFilePeriod = null;
     document.getElementById('impMessage').style.display = 'none';
     document.getElementById('importModal').classList.add('active');
   }
 
-  // Файл отчёта сам знает свой период — ручное поле даты тогда лишнее
-  function impFilePicked() {
-    const has = !!document.getElementById('impFile').files.length;
-    document.getElementById('impDate').disabled = has;
-    document.getElementById('impDateTo').disabled = has;
-    document.getElementById('impText').disabled = has;
+  // Файл выбран — сразу смотрим, за какие дни в нём звонки, и показываем.
+  // Нашлись — поле «Звонки за» не нужно; нет — просим указать.
+  async function impFilePicked() {
+    const file = document.getElementById('impFile').files[0];
+    const info = document.getElementById('impFileInfo');
+    const box = document.getElementById('impCallsBox');
+    document.getElementById('impText').disabled = !!file;
+    document.getElementById('impMessage').style.display = 'none';      // прошлая ошибка уже не про этот файл
+    impFilePeriod = null;
+    if (!file) { info.classList.add('hidden'); box.classList.remove('hidden'); return; }
+    info.className = 'imp-info'; info.textContent = 'Читаю файл…';
+    let b64 = '';
+    try { b64 = await fileToBase64(file); }
+    catch (e) { info.className = 'imp-info warn'; info.textContent = 'Файл не прочитался: ' + e; return; }
+    google.script.run.withSuccessHandler(function (r) {
+      if (document.getElementById('impFile').files[0] !== file) return;     // успели выбрать другой
+      if (!r.success) { info.className = 'imp-info warn'; info.textContent = r.error; box.classList.remove('hidden'); return; }
+      if (r.from) {
+        impFilePeriod = { from: r.from, to: r.to || r.from };
+        info.className = 'imp-info';
+        info.textContent = 'В файле: ' + r.rows + ' стр., звонки за ' + ruDay(r.from) +
+          (r.to && r.to !== r.from ? ' — ' + ruDay(r.to) : '');
+        box.classList.add('hidden');
+      } else {
+        info.className = 'imp-info warn';
+        info.textContent = 'В файле ' + r.rows + ' стр., но дат звонков нет — укажите ниже, за какой день звонки.';
+        box.classList.remove('hidden');
+      }
+    }).withFailureHandler(function (e) { info.className = 'imp-info warn'; info.textContent = String(e); box.classList.remove('hidden'); })
+      .previewAcceptedFile(sessionStorage.getItem('token'), b64);
   }
 
   function fileToBase64(f) {
@@ -3841,11 +3938,16 @@
 
   async function submitImport(replace) {
     const m = document.getElementById('impMessage');
+    const fail = function (t) { m.textContent = '❌ ' + t; m.className = 'message error'; m.style.display = 'block'; };
     const file = document.getElementById('impFile').files[0];
-    const date = document.getElementById('impDate').value;
+    const date = document.getElementById('impPlanDate').value;
     const text = file ? '' : document.getElementById('impText').value;
-    if (!file && !date) { m.textContent = '❌ Укажите дату'; m.className = 'message error'; m.style.display = 'block'; return; }
-    if (!file && !text.trim()) { m.textContent = '❌ Выберите файл или вставьте строки'; m.className = 'message error'; m.style.display = 'block'; return; }
+    const needCalls = !document.getElementById('impCallsBox').classList.contains('hidden');
+    const callsFrom = needCalls ? document.getElementById('impCallsFrom').value : '';
+    const callsTo = needCalls ? document.getElementById('impCallsTo').value : '';
+    if (!date) { fail('Укажите, на какой день план'); return; }
+    if (!file && !text.trim()) { fail('Выберите файл или вставьте строки'); return; }
+    if (needCalls && !callsFrom) { fail('Укажите, за какой день звонки — иначе «Прослушано» не посчитается'); document.getElementById('impCallsFrom').focus(); return; }
 
     let base64 = '';
     if (file) {
@@ -3862,16 +3964,19 @@
         m.className = 'message error'; m.style.display = 'block';
         return;
       }
-      if (!r.success) { m.textContent = '❌ ' + r.error; m.className = 'message error'; m.style.display = 'block'; return; }
-      let txt = '✅ Загружено строк: ' + r.imported + ' за ' +
-        (r.period && r.period.days > 1 ? 'звонки ' + r.period.fromRu + ' — ' + r.period.toRu : r.date);
+      if (!r.success) {
+        if (r.code === 'need_calls') document.getElementById('impCallsBox').classList.remove('hidden');
+        m.textContent = '❌ ' + r.error; m.className = 'message error'; m.style.display = 'block'; return;
+      }
+      let txt = '✅ Загружено строк: ' + r.imported + ' — план на ' + r.date + ', звонки за ' +
+        (r.period ? r.period.fromRu + (r.period.days > 1 ? ' — ' + r.period.toRu : '') : r.date);
       if (r.unknown.length) txt += '. Нет в составе (' + r.unknown.length + '): ' + r.unknown.join(', ');
       m.textContent = txt; m.className = r.unknown.length ? 'message error' : 'message success'; m.style.display = 'block';
-      document.getElementById('planDate').value = r.date.split('.').reverse().join('-');
+      document.getElementById('planDate').value = r.dateIso || r.date.split('.').reverse().join('-');
       setTimeout(function () { document.getElementById('importModal').classList.remove('active'); loadPlan(false); }, r.unknown.length ? 3500 : 1200);
     }).withFailureHandler(function (e) { m.textContent = '❌ ' + e; m.className = 'message error'; m.style.display = 'block'; })
-      .importAcceptedCalls(sessionStorage.getItem('token'), date, text, base64,
-        file ? '' : document.getElementById('impDateTo').value, false, replace === true);
+      .importAcceptedCalls(sessionStorage.getItem('token'), date, text, base64, '', false, replace === true,
+        { planDate: true, callsFrom: callsFrom, callsTo: callsTo });
   }
 
   function backToQc() {

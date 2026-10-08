@@ -1593,7 +1593,7 @@
 Жалобы и звонки ДЦ сюда не входят."><div class="number new" id="prChecked">0</div><div class="label">Плановых прослушек</div></div>
         <div class="stat-card" tabindex="0" data-tip="Чек-листы с отметкой «Подтверждённая жалоба» за период.
 Каждая входит в «Качество за период» с баллом 0%.
-В период жалоба попадает по дате отправки чек-листа, если её внесли (самолётик), иначе — по дате прослушки."><div class="number rejected" id="prPj">0</div><div class="label">Подтверждённых жалоб</div></div>
+Жалоба попадает сюда только после того, как СКК внёс дату отправки (самолётик), и считается в период этой даты. Пока даты нет — её в показателях нет."><div class="number rejected" id="prPj">0</div><div class="label">Подтверждённых жалоб</div></div>
         <div class="stat-card" tabindex="0" data-tip="Контрольные звонки заказчика за период.
 Они уже входят в плановые прослушки и в качество наравне с ними — здесь показаны отдельно."><div class="number" id="prKz" style="color:var(--kz);">0</div><div class="label">КЗ от заказчика</div></div>
         <div class="stat-card" tabindex="0" data-tip="Сколько операторов в отчёте, включая тех, кого за период ещё не слушали.
@@ -3710,7 +3710,9 @@
           '<option value="done"' + (x.mark === 'done' ? ' selected' : '') + '>Готово</option>' +
           '</select>' + (x.markBy ? '<div class="hint">' + x.markBy + '</div>' : '');
         html += '<tr' + (x.mark === 'in_progress' ? ' class="mark-row"' : '') + '><td class="m-q" data-l="Разбор">' + sel + '</td>' +
-          '<td class="m-op" data-l="Оператор">' + x.operator + '</td><td data-l="Группа">' + x.group + '</td><td data-l="Принято">' + x.accepted + '</td><td data-l="План (' + r.percent + '%)"><strong>' + x.plan + '</strong></td><td data-l="Прослушано">' + x.done + '</td><td data-l="Осталось">' + leftCell + '</td>' +
+          '<td class="m-op" data-l="Оператор">' + x.operator + '</td><td data-l="Группа">' + x.group + '</td><td data-l="Принято">' + x.accepted + '</td><td data-l="План (' + r.percent + '%)"><strong>' + x.plan + '</strong></td><td data-l="Прослушано">' + x.done +
+          // чек-лист по жалобе — не плановая прослушка: виден, но в план не идёт
+          (x.complaints ? ' <span class="hint" style="white-space:nowrap;" title="чек-листы по жалобам в план не входят">+' + x.complaints + ' по жалобе</span>' : '') + '</td><td data-l="Осталось">' + leftCell + '</td>' +
           '<td data-l="Выгрузил оператор">' + x.fromOperator + (x.submitted > x.fromOperator ? ' <span style="color:var(--mid-ink);font-size:12px;">(+' + (x.submitted - x.fromOperator) + ' ждут)</span>' : '') + '</td><td data-l="СКК сам">' + x.bySkk + '</td></tr>';
       });
       html += '</tbody></table></div>';

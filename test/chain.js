@@ -1025,6 +1025,29 @@ const R = (fn, ...a) => api.call(fn, a);
   const upP = await R('getMyUploadPlan', opT, P1);
   chk('у оператора в плане выгружено считается за весь период',
     rqP.success === true && upP.submitted === 1 && upP.period.days === 3, { rq: rqP.error, submitted: upP.submitted, period: upP.period });
+
+  // Чек-лист по жалобе — не плановая прослушка. План считал его в
+  // «Прослушано»: у оператора стояло «готово», хотя планово его никто не
+  // слушал и отметки не было (Клеван, 07.10).
+  const pjAns = { ...ans, B8P2: 'Обнаружено', B8P3: 'Обнаружено' };
+  const pjP = await R('saveEvaluation', { pin: qcT,
+    meta: { ...META, operator: OP[0], reqId: '', callDate: P2, callTime: '09:40', phone: '79165557002', complaintSource: 'Заказчик' },
+    answers: pjAns, comments: {} });
+  const pjP2 = await R('saveEvaluation', { pin: qcT,
+    meta: { ...META, operator: OP2[0], reqId: '', callDate: P2, callTime: '09:45', phone: '79165557003', complaintSource: 'Клиент' },
+    answers: pjAns, comments: {} });
+  const planPJ = await R('getListeningPlan', qcT, P1);
+  const rowPJ = planPJ.rows.find(x => x.operator === OP[0]);
+  const rowPJ2 = planPJ.rows.find(x => x.operator === OP2[0]);
+  chk('жалоба в плане: не «прослушано» и не «готово», а отдельно',
+    pjP.success && rowPJ && rowPJ.done === 0 && rowPJ.left === rowPJ.plan && rowPJ.complaints === 1, pjP.error || rowPJ);
+  chk('  плановая оценка рядом с жалобой считается как была',
+    pjP2.success && rowPJ2 && rowPJ2.done === 1 && rowPJ2.complaints === 1, pjP2.error || rowPJ2);
+  chk('  и в итоге плана жалобы не в «Прослушано»',
+    planPJ.summary.done === planPJ.rows.reduce((a, x) => a + x.done, 0) &&
+    planPJ.rows.every(x => x.fromOperator + x.bySkk === x.done), planPJ.summary);
+  await R('deleteEvaluation', qcT, pjP.id);
+  await R('deleteEvaluation', qcT, pjP2.id);
   await R('deleteEvaluation', qcT, evP.id);
 
   head('ШАГ 9д. КРИТЕРИИ: «НЕ ТРЕБУЕТСЯ» НЕ В СЧЁТ');
@@ -1077,6 +1100,44 @@ const R = (fn, ...a) => api.call(fn, a);
       chk('в выгрузке строка блока с тем же процентом', found.length === 1 && Math.abs(found[0] - want / 100) < 1e-9, found);
     }
     for (const id of ids) await R('deleteEvaluation', qcT, id);
+  }
+
+  head('ШАГ 9е. ПОДТВЕРЖДЁННАЯ ЖАЛОБА — В ПОКАЗАТЕЛИ ТОЛЬКО С ДАТОЙ ОТПРАВКИ');
+  {
+    const pjOf = async (d) => {
+      const pr = await R('getProductionReport', qcT, d, d, '');
+      const o = [].concat(...pr.groups.map(g => g.operators)).find(x => x.name === OP2[0]);
+      return { op: o ? o.pjConfirmed : 0, grp: pr.groups.find(g => g.name === 'ИНВ-1').pjConfirmed,
+               ids: o ? o.pj.map(x => x.id) : [] };
+    };
+    const SENT = '2026-08-17';
+    // у оператора есть ДЦ — значит, он стоит и в отчёте «Проект ДЦ» (там ФСС рядом)
+    const dcEv = await R('saveEvaluation', { pin: qcT,
+      meta: { ...META, operator: OP2[0], reqId: '', callTime: '17:05', phone: '79165550300', dc: true },
+      answers: ans, comments: {} });
+    const fssOf = async () => {
+      const row = (await R('getDcReport', qcT, DATE, DATE, '')).rows.find(x => x.operator === OP2[0]);
+      return row ? row.fssCount : -1;
+    };
+    const fssBefore = await fssOf();
+    const before = await pjOf(DATE), sentBefore = await pjOf(SENT);
+    const pjEv = await R('saveEvaluation', { pin: qcT,
+      meta: { ...META, operator: OP2[0], reqId: '', callTime: '17:10', phone: '79165550301', complaintSource: 'Клиент' },
+      answers: { ...ans, B8P2: 'Обнаружено' }, comments: {} });
+    chk('подтверждённая жалоба сохранена', pjEv.success === true && pjEv.result.score === 0, pjEv.error || pjEv.result);
+    const noSent = await pjOf(DATE);
+    chk('  без даты отправки её нет в показателях',
+      noSent.op === before.op && noSent.grp === before.grp && noSent.ids.indexOf(pjEv.id) < 0, [before, noSent]);
+    const fssNoSent = await fssOf();
+    chk('  и в «Проекте ДЦ» (ФСС) её тоже нет', dcEv.success === true && fssBefore >= 0 && fssNoSent === fssBefore,
+      [dcEv.error, fssBefore, fssNoSent]);
+    chk('  самолётик: СКК внёс дату отправки', (await R('setSentDate', qcT, pjEv.id, SENT)).success === true);
+    const onSent = await pjOf(SENT), onDay = await pjOf(DATE);
+    chk('  теперь она в показателях — в день отправки',
+      onSent.op === sentBefore.op + 1 && onSent.grp === sentBefore.grp + 1 && onSent.ids.indexOf(pjEv.id) >= 0, [sentBefore, onSent]);
+    chk('  а не в день прослушки', onDay.ids.indexOf(pjEv.id) < 0 && onDay.op === before.op, onDay);
+    await R('deleteEvaluation', qcT, pjEv.id);
+    if (dcEv.success) await R('deleteEvaluation', qcT, dcEv.id);
   }
 
   head('ШАГ 10. СЕССИИ');

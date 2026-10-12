@@ -154,6 +154,13 @@
     return '';
   }
 
+  // Страницу закрывают или перезагружают — браузер обрывает запросы на
+  // лету. Это не сбой: раньше такие обрывы попадали в журнал «ошибкой
+  // страницы» (08–09.10, «The operation was aborted»).
+  var leaving = false;
+  window.addEventListener('pagehide', function () { leaving = true; });
+  window.addEventListener('beforeunload', function () { leaving = true; });
+
   function callServer(fn, args) {
     var ctrl = typeof AbortController === 'function' ? new AbortController() : null;
     var timedOut = false;
@@ -170,6 +177,7 @@
     }).then(function (r) { done(); return r; }, function (e) {
       done();
       var why = (e && e.name ? e.name : '') + (e && e.message ? ': ' + e.message : '');
+      if (leaving && !timedOut) return new Promise(function () {});   // уходим со страницы — молчим
       if (timedOut) throw sysError('NET_TIMEOUT', TEXT.NET_TIMEOUT, info + ' · ожидание ' + TIMEOUT_MS + ' мс');
       if (navigator.onLine === false) throw sysError('NET_OFFLINE', TEXT.NET_OFFLINE, info + ' · браузер без сети · ' + why);
       throw sysError('NET_FAIL', TEXT.NET_FAIL, info + ' · ' + why);
@@ -177,7 +185,14 @@
       var h = function (n) { try { return r.headers.get(n) || ''; } catch (e) { return ''; } };
       var ctype = h('content-type'), vid = h('x-vercel-id'), verr = h('x-vercel-error');
       var meta = info + ' · HTTP ' + r.status + (verr ? ' · ' + verr : '') + (vid ? ' · запрос ' + vid : '');
-      return r.text().then(function (body) {
+      // Тело ответа тоже может оборваться (Firefox: «Content-Length header
+      // of network response exceeds response Body») — это связь, а не
+      // ошибка страницы, как его раньше записывали
+      return r.text().catch(function (e) {
+        var why = (e && e.name ? e.name : '') + (e && e.message ? ': ' + e.message : '');
+        if (leaving) return new Promise(function () {});
+        throw sysError('NET_FAIL', TEXT.NET_FAIL, meta + ' · ответ оборвался · ' + why);
+      }).then(function (body) {
         var payload = null;
         if (/json/i.test(ctype) || /^\s*\{/.test(body)) {
           try { payload = JSON.parse(body); } catch (e) { payload = null; }

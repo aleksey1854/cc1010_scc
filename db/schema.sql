@@ -175,10 +175,14 @@ CREATE TABLE evaluations (
   created_at    timestamptz NOT NULL DEFAULT now()
 );
 
--- один звонок не оценивается дважды — было проверкой под блокировкой
+-- один звонок не оценивается дважды — было проверкой под блокировкой.
+-- С 019: плановая оценка и чек-лист по жалобе — по одной каждого вида
 CREATE UNIQUE INDEX evaluations_dup_uq
   ON evaluations (operator_id, call_date, call_time, phone)
-  WHERE call_time <> '' OR phone <> '';
+  WHERE (call_time <> '' OR phone <> '') AND NOT (complaint OR complaint_mark);
+CREATE UNIQUE INDEX evaluations_dup_pj_uq
+  ON evaluations (operator_id, call_date, call_time, phone)
+  WHERE (call_time <> '' OR phone <> '') AND (complaint OR complaint_mark);
 
 CREATE INDEX evaluations_operator_date_idx ON evaluations (operator_id, call_date DESC);
 CREATE INDEX evaluations_team_date_idx     ON evaluations (team, call_date DESC);

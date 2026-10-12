@@ -79,6 +79,17 @@ const R = (fn, ...a) => api.call(fn, a);
   const again = await R('saveEvaluation', { pin: qcT, meta: { ...META, reqId: '' }, answers: ans, comments: {} });
   chk('повторная оценка того же звонка запрещена', again.success === false, again);
   chk('  и отказывает именно из-за дубля', /оцен/i.test(again.error || ''), again.error);
+  chk('  и подсказывает, как сохранить чек-лист по жалобе', /Признак жалобы/.test(again.error || ''), again.error);
+  // На звонок с плановой оценкой пришёл отзыв (08.10, Клеван): чек-лист по
+  // жалобе на тот же звонок сохраняется отдельно — время двигать не нужно
+  const pjSame = await R('saveEvaluation', { pin: qcT, meta: { ...META, reqId: '', complaintSource: 'Клиент' },
+    answers: { ...ans, B8P3: 'Обнаружено' }, comments: {} });
+  chk('чек-лист по жалобе на уже оценённый звонок сохраняется', pjSame.success === true, pjSame.error);
+  const pjSame2 = await R('saveEvaluation', { pin: qcT, meta: { ...META, reqId: '', complaintSource: 'Клиент' },
+    answers: { ...ans, B8P3: 'Обнаружено' }, comments: {} });
+  chk('  второй чек-лист по жалобе на тот же звонок — нет, и сказано почему',
+    pjSame2.success === false && /по жалобе/.test(pjSame2.error || ''), pjSame2);
+  if (pjSame.success) await R('deleteEvaluation', qcT, pjSame.id);
 
   head('ШАГ 3а. ЧЕГО НЕ ПРОПУСКАЕТ');
   const noAnswers = await R('saveEvaluation', { pin: qcT, meta: { ...META, reqId: '', callTime: '12:00' }, answers: {} });
@@ -210,9 +221,11 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('оператор править не может',
     (await R('updateEvaluation', { pin: opT, meta: { ...cMeta, evId: cEv.id }, answers: fixed })).success === false);
   // правкой можно въехать в уже оценённый звонок — тот же уникальный индекс
+  // плановая на звонок, где плановая уже есть (019: чек-листу по жалобе туда
+  // можно, а второй плановой — нет)
   const clash = await R('updateEvaluation', {
-    pin: qcT, meta: { ...META, reqId: '', complaintSource: 'Клиент', evId: cEv.id },
-    answers: fixed, comments: {}
+    pin: qcT, meta: { ...META, reqId: '', evId: cEv.id },
+    answers: { ...fixed, B8P3: 'Не обнаружено' }, comments: {}
   });
   chk('правка в уже оценённый звонок отклонена', clash.success === false, clash);
   chk('  и объясняет причину, а не падает', /оцен/i.test(clash.error || ''), clash.error);
@@ -1043,6 +1056,10 @@ const R = (fn, ...a) => api.call(fn, a);
     const future = await R('importAcceptedCalls', qcT, PL, OP[0] + ';300', '', '', false, false,
       { planDate: true, callsFrom: ago(-1) });
     chk('звонки за будущий день — отказ', future.success === false, future);
+    const sameDay = await R('importAcceptedCalls', qcT, P3, OP[0] + ';300', '', '', false, false,
+      { planDate: true, callsFrom: P3 });
+    chk('звонки за сам день плана — отказ (09.10 так «Прослушано» стояло на нуле)',
+      sameDay.success === false && sameDay.code === 'need_calls' && /раньше дня плана/.test(sameDay.error || ''), sameDay);
     const man = await R('importAcceptedCalls', qcT, PL, OP[0] + ';300\n' + OP2[0] + ';250', '', '', false, false,
       { planDate: true, callsFrom: P2 });
     chk('вручную: план на выбранный день, звонки — за указанный',

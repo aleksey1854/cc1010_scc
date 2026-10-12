@@ -818,7 +818,7 @@
     </div>
     <div class="form-group">
       <label for="impPlanDate">План на</label>
-      <input type="date" id="impPlanDate">
+      <input type="date" id="impPlanDate" onchange="impPlanChanged()">
       <small class="hint">День, когда слушаете. Если на этот день план уже есть — сайт спросит, заменить ли его.</small>
     </div>
     <div class="form-group">
@@ -3905,6 +3905,7 @@
     // на сегодня план уже есть — значит, грузят на завтра
     const today = mskDay(0);
     document.getElementById('impPlanDate').value = planLatest && planLatest >= today ? mskDay(1) : today;
+    impPlanChanged();
     ['impCallsFrom', 'impCallsTo', 'impText', 'impFile'].forEach(function (id) { document.getElementById(id).value = ''; });
     document.getElementById('impText').disabled = false;
     document.getElementById('impCallsBox').classList.remove('hidden');
@@ -3912,6 +3913,15 @@
     impFilePeriod = null;
     document.getElementById('impMessage').style.display = 'none';
     document.getElementById('importModal').classList.add('active');
+  }
+
+  // Звонки в плане — всегда за прошлые дни: позже дня плана календарь не пустит
+  // (09.10 в «Звонки за» поставили сам день плана — «Прослушано» стояло на нуле)
+  function impPlanChanged() {
+    const d = document.getElementById('impPlanDate').value;
+    let max = '';
+    if (d) { const t = new Date(d + 'T12:00:00Z'); t.setUTCDate(t.getUTCDate() - 1); max = t.toISOString().slice(0, 10); }
+    ['impCallsFrom', 'impCallsTo'].forEach(function (id) { document.getElementById(id).max = max; });
   }
 
   // Файл выбран — сразу смотрим, за какие дни в нём звонки, и показываем.

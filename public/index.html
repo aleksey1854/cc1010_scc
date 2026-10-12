@@ -3271,7 +3271,12 @@
 
   const V = { POS: 'Положительно', DBT: 'Сомнительно', NEG: 'Отрицательно', NA: 'Не требуется', YES: 'Обнаружено', NO: 'Не обнаружено' };
 
-  function pct2(n) { return n.toFixed(2).replace('.', ',') + '%'; }   // 91,11% — требование заказчика
+  // 91,11% — требование заказчика. Пусто — «—»: 12.10 «Дивизион» падал на
+  // СКК, у которого за период только чек-листы по жалобам (балла нет)
+  function pct2(n) {
+    const v = Number(n);
+    return (n === null || n === undefined || n === '' || !isFinite(v)) ? '—' : v.toFixed(2).replace('.', ',') + '%';
+  }
 
   // ---------- ГДЕ МЫ БЫЛИ ----------
   // После F5 возвращаемся на ту вкладку, где работали, а не на первую.
@@ -5848,7 +5853,11 @@
       if (isMgr) {
         let qh = '<div class="table-wrapper"><table><thead><tr><th>Контролёр</th><th>Проверено звонков</th><th>Средний балл, который ставит</th></tr></thead><tbody>';
         if (!res.byQc.length) qh += '<tr><td colspan="3"><span style="color:#bbb">Пока нет проверок</span></td></tr>';
-        res.byQc.forEach(function (q) { qh += '<tr><td>' + q.qc + '</td><td>' + q.checkedCount + '</td><td><strong style="color:' + scoreColorHex(q.avgGiven) + '">' + pct2(q.avgGiven) + '</strong></td></tr>'; });
+        // средний поставленный балл — по плановой прослушке; у кого за период
+        // только чек-листы по жалобам, его нет (12.10 тут падала страница)
+        res.byQc.forEach(function (q) { qh += '<tr><td>' + q.qc + '</td><td>' + q.checkedCount + '</td><td>' + (q.avgGiven == null
+          ? '<span style="color:#bbb" title="за период только чек-листы по жалобам — плановых оценок нет">—</span>'
+          : '<strong style="color:' + scoreColorHex(q.avgGiven) + '">' + pct2(q.avgGiven) + '</strong>') + '</td></tr>'; });
         qh += '</tbody></table></div>';
         document.getElementById('orgQcTable').innerHTML = qh;
       }
@@ -5932,6 +5941,7 @@
   function drawLineChart(canvasId, label, labels, data) {
     const ctx = document.getElementById(canvasId); if (!ctx) return;
     chartCaption(ctx, label);
+    if (noChartLib(ctx)) return;
     if (charts[canvasId]) charts[canvasId].destroy();
     if (!labels.length) { emptyChart(ctx); return; }
     const sc = scoreScale(data);
@@ -5970,6 +5980,7 @@
   function drawBarChart(canvasId, label, labels, data) {
     const ctx = document.getElementById(canvasId); if (!ctx) return;
     chartCaption(ctx, label);
+    if (noChartLib(ctx)) return;
     if (charts[canvasId]) charts[canvasId].destroy();
     if (!labels.length) { emptyChart(ctx); return; }
     charts[canvasId] = new Chart(ctx, {
@@ -5999,6 +6010,7 @@
   function drawBarChartV(canvasId, label, labels, data) {
     const ctx = document.getElementById(canvasId); if (!ctx) return;
     chartCaption(ctx, label);
+    if (noChartLib(ctx)) return;
     if (charts[canvasId]) charts[canvasId].destroy();
     if (!labels.length) { emptyChart(ctx); return; }
     const sc = scoreScale(data);
@@ -6020,6 +6032,17 @@
         }
       })
     });
+  }
+
+  // Библиотека графиков грузится со стороннего сервера, и из России он
+  // бывает недоступен: 07.10 у оператора из-за этого не открылся весь
+  // кабинет («Chart is not defined»). Без неё — надпись вместо графика.
+  function noChartLib(ctx) {
+    if (typeof Chart !== 'undefined') return false;
+    const c = ctx.getContext('2d'); c.clearRect(0, 0, ctx.width, ctx.height);
+    c.fillStyle = '#8b94a5'; c.font = '13px Inter'; c.textAlign = 'center';
+    c.fillText('График не загрузился — обновите страницу позже', ctx.width / 2, ctx.height / 2);
+    return true;
   }
 
   function emptyChart(ctx) {

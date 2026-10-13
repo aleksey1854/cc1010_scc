@@ -17,6 +17,8 @@ exit /b %errorlevel%
 # Ничего не меняет на компьютере. Отчёт — на рабочий стол.
 # ------------------------------------------------------------------
 $ErrorActionPreference = 'Continue'
+# старая PowerShell по умолчанию ходит по устаревшему TLS — сервисы её не пускают
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 $lines = New-Object System.Collections.Generic.List[string]
 function Out([string]$s, [string]$color = 'Gray') { $lines.Add($s); Write-Host $s -ForegroundColor $color }
 
@@ -38,6 +40,44 @@ try {
   $px = [Net.WebRequest]::DefaultWebProxy.GetProxy([Uri]'https://a1010.ru')
   if ($px.Host -ne 'a1010.ru') { Out ('Прокси в системе: ' + $px) } else { Out 'Прокси в системе: нет' }
 } catch { }
+try {
+  $org = (New-Object Net.WebClient).DownloadString('https://ipinfo.io/org')
+  Out ('Провайдер по внешнему IP: ' + $org.Trim())
+} catch { }
+
+# --- рабочий VPN (OpenVPN от Октелла): при нём адрес сайта может отдавать
+# DNS-сервер VPN, а сам трафик — идти через VPN, а не через домашний интернет ---
+try {
+  $vpn = @(Get-NetAdapter -ErrorAction Stop | Where-Object { $_.Status -eq 'Up' -and $_.InterfaceDescription -match 'TAP|OpenVPN|Wintun|WireGuard|VPN|TUN' })
+  if ($vpn.Count) { Out ('VPN: ВКЛЮЧЁН — ' + (($vpn | ForEach-Object { $_.Name }) -join '; ')) Yellow } else { Out 'VPN: выключен' }
+} catch { }
+$dnsList = @()
+try {
+  Get-DnsClientServerAddress -AddressFamily IPv4 -ErrorAction Stop | Where-Object { $_.ServerAddresses.Count } | ForEach-Object {
+    $ad = Get-NetAdapter -InterfaceIndex $_.InterfaceIndex -ErrorAction SilentlyContinue
+    if ($ad -and $ad.Status -eq 'Up') {
+      Out ('DNS-серверы (' + $_.InterfaceAlias + '): ' + ($_.ServerAddresses -join ', '))
+      $dnsList += $_.ServerAddresses
+    }
+  }
+} catch { Out 'DNS-серверы: не удалось узнать' }
+try {
+  $hf = Join-Path $env:SystemRoot 'System32\drivers\etc\hosts'
+  $hl = @(Get-Content $hf -ErrorAction Stop | Where-Object { $_ -match 'a1010|vercel' -and $_ -notmatch '^\s*#' })
+  if ($hl.Count) { Out ('Файл hosts: ' + ($hl -join ' | ')) Yellow } else { Out 'Файл hosts: записей про сайт нет' }
+} catch { }
+Out ''
+
+# --- что каждый DNS-сервер отвечает про сайт: у сервера VPN ответ может
+# отставать от остальных (старый адрес держится в его памяти) ---
+Out '== Что отвечают DNS-серверы про a1010.ru' Cyan
+$names = @{ '77.88.8.8' = ' (Яндекс)'; '8.8.8.8' = ' (Google)' }
+foreach ($s in (@($dnsList) + @('77.88.8.8', '8.8.8.8') | Select-Object -Unique)) {
+  try {
+    $a = @(Resolve-DnsName a1010.ru -Type A -Server $s -DnsOnly -NoHostsFile -QuickTimeout -ErrorAction Stop | Where-Object { $_.Type -eq 'A' })
+    Out ('  ' + $s + $names[$s] + ': ' + (($a | ForEach-Object { $_.IPAddress }) -join ', '))
+  } catch { Out ('  ' + $s + $names[$s] + ': нет ответа') Red }
+}
 Out ''
 
 # --- одна проверка: DNS → TCP → TLS → загрузка страницы ---
@@ -51,6 +91,11 @@ function Check([string]$title, [string]$hostName, [string]$ipFixed, [string]$pat
       Out ('  адрес (DNS): ' + (($all | ForEach-Object { $_.IPAddressToString }) -join ', '))
     } catch { Out '  адрес (DNS): НЕ НАЙДЕН — интернет-провайдер не знает такого адреса' Red; return }
   } else { Out ('  адрес: ' + $ip + ' (напрямую)') }
+  # через какое подключение уходит трафик: домашний интернет или VPN
+  try {
+    $rt = Find-NetRoute -RemoteIPAddress $ip -ErrorAction Stop | Where-Object { $_.InterfaceAlias } | Select-Object -First 1
+    if ($rt) { Out ('  идёт через: ' + $rt.InterfaceAlias) }
+  } catch { }
 
   $tcp = New-Object Net.Sockets.TcpClient
   $sw = [Diagnostics.Stopwatch]::StartNew()
@@ -124,13 +169,14 @@ Check 'Сервер Vercel 76.76.21.21 напрямую' 'a1010.ru' '76.76.21.21
 Check 'Сервер Vercel 216.198.79.1 напрямую' 'a1010.ru' '216.198.79.1' '/api/health'
 
 Out ''
-$desk = [Environment]::GetFolderPath('Desktop')
+$desk = if ($env:CA_OUT) { $env:CA_OUT } else { [Environment]::GetFolderPath('Desktop') }
 $file = Join-Path $desk ('CallAudit1010-проверка-' + (Get-Date -Format 'ddMM-HHmm') + '.txt')
 try {
   [IO.File]::WriteAllText($file, ($lines -join "`r`n"), (New-Object Text.UTF8Encoding($true)))
   Write-Host ('Отчёт сохранён на рабочий стол: ' + (Split-Path $file -Leaf)) -ForegroundColor Green
   Write-Host 'Отправьте этот файл (или скриншот этого окна) Арыстану и напишите, какой у вас интернет-провайдер.' -ForegroundColor Yellow
-  Start-Process notepad.exe $file
+  if (-not $env:CA_OUT) { Start-Process notepad.exe $file }
 } catch { Write-Host 'Не удалось сохранить отчёт — сделайте скриншот этого окна.' -ForegroundColor Red }
 Write-Host ''
-Read-Host 'Нажмите Enter, чтобы закрыть'
+# CA_OUT — прогон для проверки самого файла: без Блокнота и ожидания Enter
+if (-not $env:CA_OUT) { Read-Host 'Нажмите Enter, чтобы закрыть' }

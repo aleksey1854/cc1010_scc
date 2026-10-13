@@ -764,6 +764,27 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('РГО и дивизион дают одну цифру по ИНВ-1', rgo.summary.avgScore === g1db.a,
     { рго: rgo.summary.avgScore, база: g1db.a });
 
+  // Ровная половина: 91,21 и 100 → 95,605. База (round в SQL) давала
+  // 95,61, а JS-округление показателей — 95,60: один оператор, две цифры
+  // (Цурикова, 13.10). Обе стороны должны давать 95,61.
+  chk('округление: 95,605 → 95,61', core.round2(95.605) === 95.61 && core.round2((91.21 + 100) / 2) === 95.61,
+    [core.round2(95.605), core.round2((91.21 + 100) / 2)]);
+  chk('  в тексте — «95,61%»', core.pct2((91.21 + 100) / 2) === '95,61%', core.pct2((91.21 + 100) / 2));
+  {
+    const free = (await R('getRgoDashboard', rgoT, 'all')).operators.find(o => o.checkedCount === 0 && !o.dismissed);
+    for (const [id, sc] of [['EV-ROUND-1', 91.21], ['EV-ROUND-2', 100]]) {
+      await db.q(`INSERT INTO evaluations (public_id, operator_id, qc_id, team, call_date, iso_week, score, pts_got, pts_max)
+                  SELECT $1, o.id, q.id, o.team, current_date, to_char(current_date, 'IYYY-"W"IW'), $2, 0, 91
+                    FROM staff o, staff q WHERE o.full_name = $3 AND q.full_name = $4`, [id, sc, free.fullName, QC[0]]);
+    }
+    const inRgo = (await R('getRgoDashboard', rgoT, 'all')).operators.find(o => o.fullName === free.fullName);
+    const prod = await R('getProductionReport', rgoT, '2020-01-01', '2099-12-31', '');
+    const inProd = [].concat(...prod.groups.map(g => g.operators)).find(o => o.name === free.fullName);
+    chk('  кабинет РГО: 91,21 и 100 → 95,61', inRgo && inRgo.avgScore === 95.61, inRgo && inRgo.avgScore);
+    chk('  «Производственные показатели» — та же цифра', inProd && inProd.avg === 95.61, inProd && inProd.avg);
+    await db.q(`DELETE FROM evaluations WHERE public_id IN ('EV-ROUND-1', 'EV-ROUND-2')`);
+  }
+
   head('ШАГ 8. ПЛАН ПРОСЛУШКИ');
   const imp = await R('importAcceptedCalls', qcT, DATE, OP[0] + ';200\n' + creds.find(x => x[2] === 'operator' && x[0] !== OP[0])[0] + ';24');
   chk('статистика загружена', imp.success && imp.imported === 2, imp);

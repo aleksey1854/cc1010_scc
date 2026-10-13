@@ -74,7 +74,8 @@ Out '== Что отвечают DNS-серверы про a1010.ru' Cyan
 $names = @{ '77.88.8.8' = ' (Яндекс)'; '8.8.8.8' = ' (Google)' }
 foreach ($s in (@($dnsList) + @('77.88.8.8', '8.8.8.8') | Select-Object -Unique)) {
   try {
-    $a = @(Resolve-DnsName a1010.ru -Type A -Server $s -DnsOnly -NoHostsFile -QuickTimeout -ErrorAction Stop | Where-Object { $_.Type -eq 'A' })
+    # только раздел Answer: в ответ попадают и адреса самих DNS-серверов (Additional)
+    $a = @(Resolve-DnsName a1010.ru -Type A -Server $s -DnsOnly -NoHostsFile -QuickTimeout -ErrorAction Stop | Where-Object { $_.Type -eq 'A' -and $_.Section -eq 'Answer' })
     Out ('  ' + $s + $names[$s] + ': ' + (($a | ForEach-Object { $_.IPAddress }) -join ', '))
   } catch { Out ('  ' + $s + $names[$s] + ': нет ответа') Red }
 }

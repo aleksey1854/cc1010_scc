@@ -3,6 +3,7 @@
 Description=CallAudit1010: проверка main раз в минуту
 
 [Timer]
+OnActiveSec=1min
 OnBootSec=1min
 OnUnitActiveSec=1min
 

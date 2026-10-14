@@ -341,7 +341,8 @@ CREATE TABLE site_errors (
   staff_id  bigint      REFERENCES staff(id) ON DELETE SET NULL,
   who       text        NOT NULL DEFAULT '',
   role      text        NOT NULL DEFAULT '',
-  ua        text        NOT NULL DEFAULT ''
+  ua        text        NOT NULL DEFAULT '',
+  ctx       jsonb       NOT NULL DEFAULT '{}'::jsonb   -- 020: подробности сбоя (без аргументов вызовов)
 );
 CREATE INDEX site_errors_at_idx ON site_errors (at DESC);
 

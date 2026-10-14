@@ -67,6 +67,50 @@ function req(port, method, path, parts) {
   const r413 = await req(port, 'POST', '/api/health', [big]).catch(e => ({ status: 'обрыв: ' + e.code }));
   chk('тело больше предела — 413, а не обрыв связи', r413.status === 413, r413.status);
 
+  console.log('\n━━━ ЖУРНАЛ СБОЕВ: ПОДРОБНОСТИ ━━━');
+  chk('в ответе API — версия кода', /^[0-9a-f]{7,}$|^dev$/.test(h.headers['x-app-version'] || ''), h.headers['x-app-version']);
+
+  // вход тестовым оператором — журнал принимает сбои только от вошедших
+  const creds = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'seed-creds.json'), 'utf8'));
+  const op = creds.find(x => x[2] === 'operator');
+  const token = (await api.call('login', [op[3], op[4]])).token;
+  chk('тестовый оператор вошёл', /^T-/.test(token || ''));
+  const mark = 'проверка-ctx-' + Date.now();
+  const item = { at: Date.now(), code: 'NET_FAIL', message: 'тест', detail: mark, place: 'тест', ua: 'тест',
+    ctx: { host: 'a1010.ru', pv: 'abc1234', ms: 40000, trail: Array.from({ length: 12 }, (_, i) => 'вызов' + i + ' 200 10мс'),
+           net: { t: '4g', rtt: 150, evil: { deep: 1 } }, password: 'Sekret-Parol-987', ip: '1.2.3.4' } };
+  // IP подделывают: в аргументах и в заголовке nginx — верим только заголовку
+  // (до сервера браузер доходит только через nginx, который его и ставит)
+  const logged = await new Promise((resolve, reject) => {
+    const body = Buffer.from(JSON.stringify({ args: [token, [item], { ip: '6.6.6.6' }] }));
+    const r = http.request({ port, method: 'POST', path: '/api/logClientErrors',
+      headers: { 'content-type': 'application/json', 'x-real-ip': '203.0.113.7' } }, res => {
+      const out = []; res.on('data', c => out.push(c)); res.on('end', () => resolve(Buffer.concat(out).toString('utf8')));
+    });
+    r.on('error', reject); r.end(body);
+  });
+  chk('сбой с подробностями принят', /"saved":1/.test(logged), logged);
+  const row = await db.one(`SELECT ctx FROM site_errors WHERE detail = $1`, [mark]);
+  const c = row ? row.ctx : {};
+  chk('  IP — от сервера, а не из присланного браузером', c.ip === '203.0.113.7', c.ip);
+  chk('  лишние поля отброшены (пароль, вложенный мусор)', !('password' in c) && c.net && !('evil' in c.net), c);
+  chk('  последних вызовов — не больше 8', Array.isArray(c.trail) && c.trail.length === 8, c.trail && c.trail.length);
+  chk('  нужное сохранено', c.host === 'a1010.ru' && c.pv === 'abc1234' && c.ms === 40000 && c.net.rtt === 150, c);
+  await db.q(`DELETE FROM site_errors WHERE detail = $1`, [mark]);
+
+  // медленный ответ сервера — в журнал, чтобы отличать сервер от сети
+  const errors = require('../lib/errors');
+  const was = errors.SLOW_MS;
+  errors.SLOW_MS = 20;
+  api.HANDLERS.__slow = () => new Promise(r => setTimeout(() => r({ success: true }), 60));
+  await api.call('__slow', [token, 'Sekret-Parol-987']);
+  errors.SLOW_MS = was;
+  delete api.HANDLERS.__slow;
+  const slow = await db.one(`SELECT code, detail, who, message FROM site_errors WHERE code = 'SRV_SLOW' AND detail LIKE 'вызов __slow%' ORDER BY id DESC LIMIT 1`);
+  chk('медленный вызов попал в журнал: кто и сколько', slow && slow.who === op[0] && /мс/.test(slow.detail), slow);
+  chk('  без аргументов вызова', slow && !/Sekret-Parol-987/.test(slow.detail + slow.message), slow);
+  await db.q(`DELETE FROM site_errors WHERE code = 'SRV_SLOW' AND detail LIKE 'вызов __slow%'`);
+
   server.close();
   await db.pool.end();
   console.log(`\nПРОВАЛЕНО: ${bad.length}`);

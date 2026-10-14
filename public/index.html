@@ -507,6 +507,9 @@
   .btn-small.btn-mute:hover{ background:var(--border-strong); color:var(--ink); }
   .btn-small.btn-warn{ background:var(--mid-bg); color:#8a5600; }
   .btn-small.btn-warn:hover{ background:var(--mid); color:#fff; }
+  /* скачать — зелёным, как «Скачать» в отчётах */
+  .btn-small.btn-dl{ background:var(--good-bg); color:var(--good-ink); }
+  .btn-small.btn-dl:hover{ background:var(--good); color:#fff; }
   .btn-small.btn-ok{ background:var(--good-bg); color:#0a6e3d; }
   .btn-small.btn-ok:hover{ background:var(--good); color:#fff; }
 
@@ -5684,7 +5687,9 @@
           '<td class="m-q" data-l="Качество"><strong style="color:' + scoreColorHex(e.score) + '">' + pct2(e.score) + '</strong>' + flags + '</td>' +
           '<td class="m-wide" data-l="Ошибки" style="max-width:420px;">' + errs + '</td>' +
           '<td class="col-actions m-wide" style="white-space:nowrap;">' + appeal + edit + sent + del +
-          '<button class="btn-small" title="Скачать чек-лист" onclick="downloadEval(\'' + e.id + '\')"><i class="fas fa-file-excel"></i></button>' +
+          // та же стрелка, что у всех «Скачать» в отчётах: значок Excel
+          // не читался как скачивание (Арыстан, 14.10)
+          '<button class="btn-small btn-dl" title="Скачать чек-лист" aria-label="Скачать чек-лист" onclick="downloadEval(\'' + e.id + '\')"><i class="fas fa-download"></i></button>' +
           // чек-лист правили — часики в конце ряда; по клику кто, когда и что
           (e.edits ? ' <button class="btn-small hist-btn" data-hist="' + e.id + '" title="Чек-лист правили' +
             (e.edits > 1 ? ' ' + e.edits + ' раза' : '') + ' — кто, когда и что поменял"><i class="fas fa-clock-rotate-left"></i>' +

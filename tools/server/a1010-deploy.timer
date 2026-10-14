@@ -1,0 +1,10 @@
+# /etc/systemd/system/a1010-deploy.timer — раз в минуту
+[Unit]
+Description=CallAudit1010: проверка main раз в минуту
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+
+[Install]
+WantedBy=timers.target

@@ -1491,6 +1491,27 @@ const R = (fn, ...a) => api.call(fn, a);
   }
   chk('каждый вызов сервера из интерфейса несёт токен', noToken.length === 0, noToken);
 
+  // Брошенная правка оценки переживала выход: поля оставались заполненными,
+  // следующий вход принимал их за черновик новой оценки, а возврат
+  // черновика пересохранял его с новым временем — и «Вернул незаконченный
+  // чек-лист» всплывал при каждом входе (Арыстан, 14.10). Браузера в тестах
+  // нет, поэтому смотрим сами функции; поведение проверено в браузере.
+  const fnBody = name => {
+    const i = html.indexOf('function ' + name + '(');
+    if (i < 0) return '';
+    let k = html.indexOf('{', i), depth = 0;
+    for (let p = k; p < html.length; p++) {
+      if (html[p] === '{') depth++;
+      else if (html[p] === '}' && --depth === 0) return html.slice(k, p + 1);
+    }
+    return '';
+  };
+  chk('выход чистит поля чек-листа — брошенная правка не становится черновиком',
+    /clearEvalFields\(\)/.test(fnBody('resetState')) && /evEditBar/.test(fnBody('clearEvalFields')));
+  chk('возврат черновика не продлевает ему срок',
+    /if \(draftRestoring\) return/.test(fnBody('draftSave')) &&
+    /clearTimeout\(draftTimer\)/.test(fnBody('draftRestore')) && /draftRestoring = true/.test(fnBody('draftRestore')));
+
   console.log(`\nПРОВАЛЕНО: ${bad.length}`);
   bad.forEach(b => console.log('   ·', b));
   await db.pool.end();

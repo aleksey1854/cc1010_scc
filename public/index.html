@@ -507,6 +507,9 @@
   .btn-small.btn-mute:hover{ background:var(--border-strong); color:var(--ink); }
   .btn-small.btn-warn{ background:var(--mid-bg); color:#8a5600; }
   .btn-small.btn-warn:hover{ background:var(--mid); color:#fff; }
+  /* скачать — зелёным, как «Скачать» в отчётах */
+  .btn-small.btn-dl{ background:var(--good-bg); color:var(--good-ink); }
+  .btn-small.btn-dl:hover{ background:var(--good); color:#fff; }
   .btn-small.btn-ok{ background:var(--good-bg); color:#0a6e3d; }
   .btn-small.btn-ok:hover{ background:var(--good); color:#fff; }
 
@@ -1960,6 +1963,7 @@
     allRequests = []; orgOperators = []; staffAll = []; staffEditing = null; myRequests = [];
     evLinkedReq = ''; evEditing = ''; evComplaintSrc = ''; evCmtOpen = {};
     evCfg = null; evAnswers = {}; evComments = {};
+    clearEvalFields();
     hasCallState = 'yes'; repFrom = 'org';
     ['opRequestsList', 'opEvalsList', 'qcRequestsList', 'rgoOperatorsList',
      'orgOperatorsTable', 'planTable', 'evChecklist', 'staffList', 'staffAudit'].forEach(function (id) {
@@ -4410,6 +4414,21 @@
   // оценки не храним: её можно открыть из журнала заново.
   const DRAFT_TTL = 24 * 3600 * 1000;
   let draftTimer = null;
+  // Возврат черновика сам меняет поля, и каждое изменение пересохраняло
+  // его с новым временем: сутки не истекали никогда, и брошенный черновик
+  // всплывал при каждом входе. Пока возвращаем — не пишем.
+  let draftRestoring = false;
+
+  // Поля чек-листа при выходе. Сбрасывался только режим правки, а поля
+  // брошенной правки оставались заполненными — следующий вход принимал их
+  // за черновик новой оценки: «Вернул незаконченный чек-лист» при каждом
+  // входе (Арыстан, 14.10). Без событий: черновик тут писать нечего.
+  function clearEvalFields() {
+    ['evOperator', 'evDate', 'evTime', 'evPhone', 'evCriterion', 'evTopic', 'evSub', 'evCity', 'evAgg', 'evAggOther']
+      .forEach(function (id) { const el = document.getElementById(id); if (el) el.value = ''; });
+    ['evControl', 'evDc'].forEach(function (id) { const el = document.getElementById(id); if (el) el.checked = false; });
+    ['evEditBar', 'evLinkBar'].forEach(function (id) { const el = document.getElementById(id); if (el) el.classList.add('hidden'); });
+  }
 
   function draftKey() {
     const u = JSON.parse(sessionStorage.getItem('user') || '{}');
@@ -4429,6 +4448,7 @@
     try { const k = draftKey(); if (k) localStorage.removeItem(k); } catch (e) {}
   }
   function draftSave() {
+    if (draftRestoring) return;
     clearTimeout(draftTimer);
     draftTimer = setTimeout(function () {
       const key = draftKey();
@@ -4454,7 +4474,17 @@
     try { d = JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) { d = null; }
     if (!d) return;
     if (Date.now() - (d.at || 0) > DRAFT_TTL || draftEmpty(d)) { draftClear(); return; }
-
+    // и отложенную запись, запланированную до возврата, — тоже: через 300 мс
+    // она сняла бы уже возвращённую форму с новым временем
+    clearTimeout(draftTimer);
+    draftRestoring = true;
+    try { fillFromDraft(d); } finally { draftRestoring = false; }
+    const at = new Date(d.at);
+    toast('Вернул незаконченный чек-лист' + (d.operator ? ' (' + d.operator + ')' : '') + ' от ' +
+      String(at.getHours()).padStart(2, '0') + ':' + String(at.getMinutes()).padStart(2, '0'), 'ok',
+      { ms: 12000, actions: [['Начать заново', function () { draftClear(); if (evLinkedReq) clearReqLink(false); resetEvalForm(); }]] });
+  }
+  function fillFromDraft(d) {
     const set = function (id, val) {
       const el = document.getElementById(id);
       el.value = val || '';
@@ -4482,10 +4512,6 @@
     }
     renderChecklist();
     recalcEval();
-    const at = new Date(d.at);
-    toast('Вернул незаконченный чек-лист' + (d.operator ? ' (' + d.operator + ')' : '') + ' от ' +
-      String(at.getHours()).padStart(2, '0') + ':' + String(at.getMinutes()).padStart(2, '0'), 'ok',
-      { ms: 12000, actions: [['Начать заново', function () { draftClear(); if (evLinkedReq) clearReqLink(false); resetEvalForm(); }]] });
   }
 
   function evSubmitReady() {
@@ -5661,7 +5687,9 @@
           '<td class="m-q" data-l="Качество"><strong style="color:' + scoreColorHex(e.score) + '">' + pct2(e.score) + '</strong>' + flags + '</td>' +
           '<td class="m-wide" data-l="Ошибки" style="max-width:420px;">' + errs + '</td>' +
           '<td class="col-actions m-wide" style="white-space:nowrap;">' + appeal + edit + sent + del +
-          '<button class="btn-small" title="Скачать чек-лист" onclick="downloadEval(\'' + e.id + '\')"><i class="fas fa-file-excel"></i></button>' +
+          // та же стрелка, что у всех «Скачать» в отчётах: значок Excel
+          // не читался как скачивание (Арыстан, 14.10)
+          '<button class="btn-small btn-dl" title="Скачать чек-лист" aria-label="Скачать чек-лист" onclick="downloadEval(\'' + e.id + '\')"><i class="fas fa-download"></i></button>' +
           // чек-лист правили — часики в конце ряда; по клику кто, когда и что
           (e.edits ? ' <button class="btn-small hist-btn" data-hist="' + e.id + '" title="Чек-лист правили' +
             (e.edits > 1 ? ' ' + e.edits + ' раза' : '') + ' — кто, когда и что поменял"><i class="fas fa-clock-rotate-left"></i>' +

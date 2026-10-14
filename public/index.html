@@ -1960,6 +1960,7 @@
     allRequests = []; orgOperators = []; staffAll = []; staffEditing = null; myRequests = [];
     evLinkedReq = ''; evEditing = ''; evComplaintSrc = ''; evCmtOpen = {};
     evCfg = null; evAnswers = {}; evComments = {};
+    clearEvalFields();
     hasCallState = 'yes'; repFrom = 'org';
     ['opRequestsList', 'opEvalsList', 'qcRequestsList', 'rgoOperatorsList',
      'orgOperatorsTable', 'planTable', 'evChecklist', 'staffList', 'staffAudit'].forEach(function (id) {
@@ -4410,6 +4411,21 @@
   // оценки не храним: её можно открыть из журнала заново.
   const DRAFT_TTL = 24 * 3600 * 1000;
   let draftTimer = null;
+  // Возврат черновика сам меняет поля, и каждое изменение пересохраняло
+  // его с новым временем: сутки не истекали никогда, и брошенный черновик
+  // всплывал при каждом входе. Пока возвращаем — не пишем.
+  let draftRestoring = false;
+
+  // Поля чек-листа при выходе. Сбрасывался только режим правки, а поля
+  // брошенной правки оставались заполненными — следующий вход принимал их
+  // за черновик новой оценки: «Вернул незаконченный чек-лист» при каждом
+  // входе (Арыстан, 14.10). Без событий: черновик тут писать нечего.
+  function clearEvalFields() {
+    ['evOperator', 'evDate', 'evTime', 'evPhone', 'evCriterion', 'evTopic', 'evSub', 'evCity', 'evAgg', 'evAggOther']
+      .forEach(function (id) { const el = document.getElementById(id); if (el) el.value = ''; });
+    ['evControl', 'evDc'].forEach(function (id) { const el = document.getElementById(id); if (el) el.checked = false; });
+    ['evEditBar', 'evLinkBar'].forEach(function (id) { const el = document.getElementById(id); if (el) el.classList.add('hidden'); });
+  }
 
   function draftKey() {
     const u = JSON.parse(sessionStorage.getItem('user') || '{}');
@@ -4429,6 +4445,7 @@
     try { const k = draftKey(); if (k) localStorage.removeItem(k); } catch (e) {}
   }
   function draftSave() {
+    if (draftRestoring) return;
     clearTimeout(draftTimer);
     draftTimer = setTimeout(function () {
       const key = draftKey();
@@ -4454,7 +4471,17 @@
     try { d = JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) { d = null; }
     if (!d) return;
     if (Date.now() - (d.at || 0) > DRAFT_TTL || draftEmpty(d)) { draftClear(); return; }
-
+    // и отложенную запись, запланированную до возврата, — тоже: через 300 мс
+    // она сняла бы уже возвращённую форму с новым временем
+    clearTimeout(draftTimer);
+    draftRestoring = true;
+    try { fillFromDraft(d); } finally { draftRestoring = false; }
+    const at = new Date(d.at);
+    toast('Вернул незаконченный чек-лист' + (d.operator ? ' (' + d.operator + ')' : '') + ' от ' +
+      String(at.getHours()).padStart(2, '0') + ':' + String(at.getMinutes()).padStart(2, '0'), 'ok',
+      { ms: 12000, actions: [['Начать заново', function () { draftClear(); if (evLinkedReq) clearReqLink(false); resetEvalForm(); }]] });
+  }
+  function fillFromDraft(d) {
     const set = function (id, val) {
       const el = document.getElementById(id);
       el.value = val || '';
@@ -4482,10 +4509,6 @@
     }
     renderChecklist();
     recalcEval();
-    const at = new Date(d.at);
-    toast('Вернул незаконченный чек-лист' + (d.operator ? ' (' + d.operator + ')' : '') + ' от ' +
-      String(at.getHours()).padStart(2, '0') + ':' + String(at.getMinutes()).padStart(2, '0'), 'ok',
-      { ms: 12000, actions: [['Начать заново', function () { draftClear(); if (evLinkedReq) clearReqLink(false); resetEvalForm(); }]] });
   }
 
   function evSubmitReady() {

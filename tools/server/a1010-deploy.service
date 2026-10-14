@@ -1,0 +1,8 @@
+# /etc/systemd/system/a1010-deploy.service — выкатка main (tools/server/deploy.sh)
+[Unit]
+Description=CallAudit1010: подтянуть main и перезапустить сайт
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/a1010/deploy.sh

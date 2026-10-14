@@ -30,6 +30,23 @@ const NO_CACHE = new Set(['/index.html', '/gs-shim.js', '/ui-select.js', '/ui-ph
 // предел тела 4,5 МБ — держим тот же порядок, с запасом на JSON.
 const BODY_LIMIT = Number(process.env.BODY_LIMIT) || 6 * 1024 * 1024;
 
+// Версия кода — в каждом ответе API: браузер помнит, с какой версией
+// открыл страницу, и в журнале сбоев видно, что страница устарела.
+const VERSION = (() => {
+  if (process.env.APP_VERSION) return String(process.env.APP_VERSION).slice(0, 12);
+  try {
+    return require('child_process').execSync('git rev-parse --short HEAD',
+      { cwd: path.join(__dirname, '..'), stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+  } catch (e) { return 'dev'; }
+})();
+const API_HEADERS = { 'X-App-Version': VERSION };
+
+// IP человека: за nginx — из X-Real-IP (его ставит сам nginx, браузер
+// подделать не может), без nginx — адрес соединения.
+function clientIp(req) {
+  return String(req.headers['x-real-ip'] || req.socket.remoteAddress || '').replace(/^::ffff:/, '');
+}
+
 function send(res, code, body, type, headers) {
   res.writeHead(code, Object.assign({ 'Content-Type': type || 'application/json; charset=utf-8' }, headers || {}));
   res.end(body);
@@ -42,7 +59,7 @@ const server = http.createServer(async (req, res) => {
     const fn = decodeURIComponent(url.pathname.slice(5));
     // health открываем и по GET — так же, как в app/api/[fn]/route.js
     if (req.method === 'GET' && fn === 'health') {
-      return send(res, 200, JSON.stringify({ ok: true, result: await call('health', []) }));
+      return send(res, 200, JSON.stringify({ ok: true, result: await call('health', []) }), null, API_HEADERS);
     }
     if (req.method !== 'POST') return send(res, 405, JSON.stringify({ ok: false, error: 'Только POST' }));
     if (!Object.prototype.hasOwnProperty.call(HANDLERS, fn)) {
@@ -64,15 +81,17 @@ const server = http.createServer(async (req, res) => {
       let args = [];
       try { const b = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); args = Array.isArray(b.args) ? b.args : []; }
       catch { return send(res, 400, JSON.stringify({ ok: false, error: 'Тело запроса не разобрано' })); }
+      // журналу сбоев — IP от самого сервера, что бы ни прислал браузер
+      if (fn === 'logClientErrors') args = [args[0], args[1], { ip: clientIp(req) }];
       try {
-        send(res, 200, JSON.stringify({ ok: true, result: await call(fn, args) }));
+        send(res, 200, JSON.stringify({ ok: true, result: await call(fn, args) }), null, API_HEADERS);
       } catch (e) {
         // как в route.js: call() ловит исключения обработчиков сам, сюда
         // попадает только то, что сломалось вокруг, — и оно идёт в журнал
         console.error('[api]', fn, e && e.message);
         let r = { error: 'Внутренняя ошибка', code: 'SRV_500' };
         try { r = await errors.logServerError(fn, args, e); } catch (e2) { /* журнал недоступен */ }
-        send(res, 500, JSON.stringify({ ok: false, error: r.error, code: r.code }));
+        send(res, 500, JSON.stringify({ ok: false, error: r.error, code: r.code }), null, API_HEADERS);
       }
     };
     req.on('end', finish);

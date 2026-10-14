@@ -1999,11 +1999,17 @@
       m.className = 'message error'; m.style.display = 'block';
       return;
     }
+    // те же подробности, что у записей журнала сбоев: с какого сервера
+    // открыта страница, какой версии, была ли сеть, последние вызовы
+    const c = window.__siteErrorCtx ? window.__siteErrorCtx() : {};
     const ctx = [
+      'сайт ' + location.host + (c.pv ? ' · версия ' + c.pv + (c.sv && c.sv !== c.pv ? ' (сервер ' + c.sv + ')' : '') : ''),
       'экран ' + window.innerWidth + '×' + window.innerHeight,
       'адрес ' + location.pathname + location.hash,
+      (c.on === false ? 'браузер без сети' : 'сеть есть') + (c.net && c.net.t ? ' (' + c.net.t + ', rtt ' + c.net.rtt + ' мс)' : ''),
+      c.trail && c.trail.length ? 'последние вызовы: ' + c.trail.join('; ') : '',
       navigator.userAgent
-    ].join(' · ');
+    ].filter(Boolean).join(' · ');
     google.script.run.withSuccessHandler(function (r) {
       if (!r.success) {
         m.textContent = r.error; m.className = 'message error'; m.style.display = 'block';
@@ -5483,8 +5489,38 @@
     APP_BAD_JSON: 'повреждённый ответ', SRV_TIMEOUT: 'сервер не успел', SRV_TOO_LARGE: 'слишком большой объём',
     SRV_RESP_TOO_LARGE: 'слишком большой ответ', SRV_RATE: 'слишком много запросов', SRV_UNAVAILABLE: 'сервер недоступен',
     SRV_HTTP: 'ошибка сервера (HTTP)', SRV_EXCEPTION: 'ошибка в коде сервера', SRV_DB_DOWN: 'нет связи с базой',
-    SRV_DB_TIMEOUT: 'база не успела', JS_ERROR: 'ошибка страницы'
+    SRV_DB_TIMEOUT: 'база не успела', SRV_SLOW: 'сервер отвечал долго', JS_ERROR: 'ошибка страницы'
   };
+  // Подробности сбоя (ctx, с 14.10) — по-человечески: откуда открыта
+  // страница и какой версии, сеть, сколько ждал запрос, что было перед этим.
+  function errCtxText(c) {
+    if (!c || !Object.keys(c).length) return '';
+    const L = [];
+    const where = c.host ? (/vercel\.app$/.test(c.host) ? 'Vercel (' + c.host + ')' : c.host) : '';
+    if (where || c.pv) L.push('Страница: ' + (where || '—') + (c.pv ? ' · версия ' + c.pv : '') +
+      (c.sv && c.pv && c.sv !== c.pv ? ' · на сервере уже ' + c.sv + ' — страница устарела' : ''));
+    if (c.ip) L.push('IP: ' + c.ip);
+    const net = [];
+    if (c.on === false) net.push('браузер без сети'); else if (c.on === true) net.push('браузер в сети');
+    if (c.net && c.net.t) net.push(c.net.t + (c.net.rtt != null ? ', задержка ' + c.net.rtt + ' мс' : '') +
+      (c.net.dl != null ? ', ' + c.net.dl + ' Мбит/с' : ''));
+    if (c.vis) net.push('вкладка ' + (c.vis === 'visible' ? 'на экране' : 'свёрнута') + (c.hid ? ', во время запроса пряталась' : ''));
+    if (net.length) L.push('Связь: ' + net.join(' · '));
+    const t = [];
+    if (c.ms != null) t.push('запрос шёл ' + (c.ms / 1000).toFixed(1) + ' с');
+    if (c.up != null) t.push('страница открыта ' + Math.round(c.up / 60) + ' мин');
+    if (c.ok != null) t.push('прошлый удачный ответ ' + (c.ok < 90 ? c.ok + ' с' : Math.round(c.ok / 60) + ' мин') + ' назад');
+    else if (c.up != null) t.push('удачных ответов с открытия не было');
+    if (t.length) L.push('Время: ' + t.join(' · '));
+    if (c.trail && c.trail.length) L.push('Перед этим: ' + c.trail.join(' · '));
+    const env = [];
+    if (c.scr) env.push('экран ' + c.scr + (c.vw ? ', окно ' + c.vw : '') + (c.touch ? ', сенсорный' : ''));
+    if (c.tz) env.push(c.tz);
+    if (c.skew != null && Math.abs(c.skew) >= 60) env.push('часы расходятся с сервером на ' + Math.round(c.skew / 60) + ' мин');
+    if (c.rid) env.push('запрос ' + c.rid);
+    if (env.length) L.push('Устройство: ' + env.join(' · '));
+    return L.join('\n');
+  }
   function loadSiteErrors() {
     const me = JSON.parse(sessionStorage.getItem('user') || '{}');
     const wrap = document.getElementById('errJournal');
@@ -5500,7 +5536,8 @@
       document.getElementById('errPeople').textContent = r.people;
       document.getElementById('errByCode').innerHTML = r.byCode.map(function (c) {
         return '<span class="fail-tag" title="' + h(c.code) + '">' + h(ERR_CODE_RU[c.code] || c.code) + ' · ' + c.n + '</span>';
-      }).join(' ');
+      }).join(' ') + ((r.byHost || []).length ? '<div class="hint" style="margin-top:6px;">Откуда открыта страница: ' +
+        r.byHost.map(function (x) { return h(x.host === '—' ? 'не записано (до 14.10)' : x.host) + ' — ' + x.n; }).join(' · ') + '</div>' : '');
       if (!r.rows.length) {
         box.innerHTML = '<div class="empty-state"><i class="fas fa-circle-check"></i><p>Сбоев за этот период не было</p></div>';
         return;
@@ -5510,13 +5547,16 @@
         '</tr></thead><tbody>' + r.rows.map(function (x) {
           const ua = /Edg\//.test(x.ua) ? 'Edge' : /YaBrowser/.test(x.ua) ? 'Яндекс' : /Firefox\//.test(x.ua) ? 'Firefox'
                    : /Chrome\//.test(x.ua) ? 'Chrome' : (x.source === 'server' ? 'сервер' : '');
+          const host = x.ctx && x.ctx.host ? (/vercel\.app$/.test(x.ctx.host) ? 'Vercel' : x.ctx.host) : '';
+          const more = errCtxText(x.ctx);
           return '<tr><td style="white-space:nowrap;">' + h(x.at) + '</td>' +
             '<td>' + h(x.who || '—') + (x.role ? '<div class="hint">' + h(roleRu(x.role)) + '</div>' : '') + '</td>' +
-            '<td>' + h(x.place || '—') + (ua ? '<div class="hint">' + h(ua) + '</div>' : '') + '</td>' +
+            '<td>' + h(x.place || '—') + (ua || host ? '<div class="hint">' + h([ua, host].filter(Boolean).join(' · ')) + '</div>' : '') + '</td>' +
             '<td><span class="fail-tag" title="' + h(x.code) + '">' + h(ERR_CODE_RU[x.code] || x.code) + '</span></td>' +
             '<td style="max-width:320px;">' + h(x.message) + '</td>' +
             '<td style="max-width:360px;"><details class="memo"><summary>' + h(x.code) + '</summary>' +
-              '<div class="hint" style="padding:6px 0;white-space:pre-wrap;word-break:break-word;">' + h(x.detail) + '</div></details></td></tr>';
+              '<div class="hint" style="padding:6px 0;white-space:pre-wrap;word-break:break-word;">' + h(x.detail) +
+              (more ? '\n\n' + h(more) : '') + '</div></details></td></tr>';
         }).join('') + '</tbody></table></div>';
     }).withFailureHandler(function (e) {
       box.innerHTML = '<div class="empty-state"><i class="fas fa-ban"></i><p>' + h(String(e)) + '</p></div>';

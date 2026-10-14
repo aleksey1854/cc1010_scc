@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 ENV_FILE="${ENV_FILE:-.env.test}"
 [ -f "$ENV_FILE" ] || : "${DATABASE_URL:?задайте DATABASE_URL или положите $ENV_FILE}"
 total=0; failed=0; skipped=""
-for t in parity migration parity-api server chain; do
+for t in parity migration parity-api server shim chain; do
   echo "═══ $t ═══"
   out=$(node --env-file-if-exists="$ENV_FILE" test/$t.js 2>&1); code=$?
   echo "$out" | grep -E "✓|✗" | sed 's/^/  /'

@@ -51,6 +51,51 @@
     return 'Сервер вернул ошибку ' + status + '. Повторите; если повторится — сообщите о проблеме.';
   }
 
+  // ---------- подробности сбоя ----------
+  // По записи «сервер не ответил» было не понять главного: страница открыта
+  // с нашего сервера или с Vercel, какой версии, была ли у браузера сеть,
+  // пряталась ли вкладка, что человек делал перед этим (Арыстан, 14.10).
+  // Собираем это сами и кладём к каждой записи журнала. Аргументы вызовов —
+  // никогда: в них пароли; от вызовов остаются только имя, итог и время.
+  var PAGE_START = Date.now();
+  var pageVer = '', srvVer = '', skew = null, lastOkAt = 0;
+  var trail = [];        // последние вызовы
+  var hiddenAt = [];     // когда вкладку прятали (фоновые вкладки браузер тормозит)
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') { hiddenAt.push(Date.now()); if (hiddenAt.length > 20) hiddenAt.shift(); }
+  });
+  function note(fn, result, ms) {
+    trail.push({ fn: fn, r: String(result), ms: ms, t: Date.now() });
+    if (trail.length > 8) trail.shift();
+  }
+  function ctx(req) {
+    var now = Date.now(), c = {};
+    try {
+      c.host = location.host;
+      c.pv = pageVer; c.sv = srvVer;
+      c.on = navigator.onLine;
+      var nc = navigator.connection;
+      if (nc) c.net = { t: nc.effectiveType || '', rtt: nc.rtt, dl: nc.downlink, save: !!nc.saveData };
+      c.vis = document.visibilityState;
+      if (req) {
+        c.ms = now - req.t0;
+        c.hid = document.visibilityState === 'hidden' || hiddenAt.some(function (t) { return t >= req.t0; });
+        if (req.rid) c.rid = req.rid;
+      }
+      c.up = Math.round((now - PAGE_START) / 1000);
+      if (lastOkAt) c.ok = Math.round((now - lastOkAt) / 1000);
+      c.trail = trail.map(function (x) { return x.fn + ' ' + x.r + ' ' + x.ms + 'мс −' + Math.round((now - x.t) / 1000) + 'с'; });
+      c.scr = screen.width + 'x' + screen.height + '@' + (window.devicePixelRatio || 1);
+      c.vw = window.innerWidth;
+      c.touch = 'ontouchstart' in window;
+      try { c.tz = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) {}
+      if (skew !== null) c.skew = skew;
+      c.lang = navigator.language;
+    } catch (e) { /* подробности — не повод ронять запись */ }
+    return c;
+  }
+  window.__siteErrorCtx = ctx;
+
   // ---------- журнал ошибок ----------
   // Сбой связи нельзя отправить по той же связи — копим в браузере и
   // отправляем, как только сервер снова отвечает. Не больше 50 записей,
@@ -70,7 +115,7 @@
   }
   // одинаковый сбой подряд пишем один раз в минуту, а не на каждый клик
   var lastLogged = {};
-  function logError(code, message, detail) {
+  function logError(code, message, detail, c) {
     var sig = code + '|' + detail;
     var now = Date.now();
     if (lastLogged[sig] && now - lastLogged[sig] < 60000) return;
@@ -78,7 +123,7 @@
     var weekAgo = now - 7 * 86400000;
     var q = readQ().filter(function (x) { return x && x.at > weekAgo; });
     q.push({ at: now, code: code, message: String(message).slice(0, 600), detail: String(detail).slice(0, 4000),
-             place: place().slice(0, 200), ua: navigator.userAgent.slice(0, 300) });
+             place: place().slice(0, 200), ua: navigator.userAgent.slice(0, 300), ctx: c || ctx() });
     writeQ(q.slice(-50));
     flush();
   }
@@ -126,12 +171,12 @@
 
   // Ошибка, которую страница покажет как «Ошибка: » + e — без служебного
   // «Error:» в тексте; code и detail — для журнала и сообщения о проблеме.
-  function sysError(code, message, detail, alreadyLogged) {
+  function sysError(code, message, detail, alreadyLogged, c) {
     var err = new Error(message);
     err.code = code; err.detail = detail; err.sys = true;
     err.toString = function () { return message; };
     remember(code, message, detail);
-    if (!alreadyLogged) logError(code, message, detail);
+    if (!alreadyLogged) logError(code, message, detail, c);
     return err;
   }
 
@@ -167,6 +212,12 @@
     var timer = ctrl ? setTimeout(function () { timedOut = true; ctrl.abort(); }, TIMEOUT_MS) : null;
     var done = function () { if (timer) clearTimeout(timer); };
     var info = 'вызов ' + fn;
+    var req = { t0: Date.now(), rid: '' };
+    // сбой этого вызова: в «последние вызовы» и в журнал — с подробностями
+    var fail = function (code, text, detail, logged) {
+      note(fn, code, Date.now() - req.t0);
+      return sysError(code, text, detail, logged, ctx(req));
+    };
 
     return fetch(API_BASE + '/' + encodeURIComponent(fn), {
       method: 'POST',
@@ -178,20 +229,27 @@
       done();
       var why = (e && e.name ? e.name : '') + (e && e.message ? ': ' + e.message : '');
       if (leaving && !timedOut) return new Promise(function () {});   // уходим со страницы — молчим
-      if (timedOut) throw sysError('NET_TIMEOUT', TEXT.NET_TIMEOUT, info + ' · ожидание ' + TIMEOUT_MS + ' мс');
-      if (navigator.onLine === false) throw sysError('NET_OFFLINE', TEXT.NET_OFFLINE, info + ' · браузер без сети · ' + why);
-      throw sysError('NET_FAIL', TEXT.NET_FAIL, info + ' · ' + why);
+      if (timedOut) throw fail('NET_TIMEOUT', TEXT.NET_TIMEOUT, info + ' · ожидание ' + TIMEOUT_MS + ' мс');
+      if (navigator.onLine === false) throw fail('NET_OFFLINE', TEXT.NET_OFFLINE, info + ' · браузер без сети · ' + why);
+      throw fail('NET_FAIL', TEXT.NET_FAIL, info + ' · ' + why);
     }).then(function (r) {
       var h = function (n) { try { return r.headers.get(n) || ''; } catch (e) { return ''; } };
       var ctype = h('content-type'), vid = h('x-vercel-id'), verr = h('x-vercel-error');
-      var meta = info + ' · HTTP ' + r.status + (verr ? ' · ' + verr : '') + (vid ? ' · запрос ' + vid : '');
+      // наш сервер: версия кода в каждом ответе API и номер запроса от nginx
+      var ver = h('x-app-version');
+      if (ver) { srvVer = ver; if (!pageVer) pageVer = ver; }
+      req.rid = h('x-request-id');
+      var sd = Date.parse(h('date'));
+      if (sd) skew = Math.round((Date.now() - sd) / 1000);
+      var meta = info + ' · HTTP ' + r.status + (verr ? ' · ' + verr : '') + (vid ? ' · запрос ' + vid : '') +
+        (req.rid ? ' · запрос ' + req.rid : '');
       // Тело ответа тоже может оборваться (Firefox: «Content-Length header
       // of network response exceeds response Body») — это связь, а не
       // ошибка страницы, как его раньше записывали
       return r.text().catch(function (e) {
         var why = (e && e.name ? e.name : '') + (e && e.message ? ': ' + e.message : '');
         if (leaving) return new Promise(function () {});
-        throw sysError('NET_FAIL', TEXT.NET_FAIL, meta + ' · ответ оборвался · ' + why);
+        throw fail('NET_FAIL', TEXT.NET_FAIL, meta + ' · ответ оборвался · ' + why);
       }).then(function (body) {
         var payload = null;
         if (/json/i.test(ctype) || /^\s*\{/.test(body)) {
@@ -201,11 +259,14 @@
           if (payload.ok === false) {
             // ответ нашего маршрута: 404 — страница устарела, 400 —
             // не разобрано тело, 500 — сервер уже записал сбой в журнал
-            if (r.status === 404) throw sysError('APP_STALE', TEXT.APP_STALE, meta + ' · ' + (payload.error || ''));
-            if (r.status === 400 || r.status === 405) throw sysError('APP_BAD_REQUEST', TEXT.APP_BAD_REQUEST, meta + ' · ' + (payload.error || ''));
-            if (payload.code) throw sysError(payload.code, payload.error || httpText(r.status), meta, true);
-            throw sysError('SRV_HTTP', httpText(r.status), meta + ' · ' + (payload.error || ''));
+            if (r.status === 404) throw fail('APP_STALE', TEXT.APP_STALE, meta + ' · ' + (payload.error || ''));
+            if (r.status === 400 || r.status === 405) throw fail('APP_BAD_REQUEST', TEXT.APP_BAD_REQUEST, meta + ' · ' + (payload.error || ''));
+            if (payload.code) throw fail(payload.code, payload.error || httpText(r.status), meta, true);
+            throw fail('SRV_HTTP', httpText(r.status), meta + ' · ' + (payload.error || ''));
           }
+          lastOkAt = Date.now();
+          var pr = payload.result;
+          note(fn, pr && pr.success === false && pr.code ? pr.code : r.status, lastOkAt - req.t0);
           flush();                       // связь есть — отправим накопленное
           var res = payload.result;
           if (res && res.success === false) {
@@ -224,19 +285,19 @@
         var vc = vercelCode(verr, body);
         if (vc) {
           var code = VERCEL[vc];
-          throw sysError(code, code === 'SRV_HTTP' ? httpText(r.status) : TEXT[code], meta + ' · ' + vc);
+          throw fail(code, code === 'SRV_HTTP' ? httpText(r.status) : TEXT[code], meta + ' · ' + vc);
         }
-        if (r.status === 413) throw sysError('SRV_TOO_LARGE', TEXT.SRV_TOO_LARGE, meta);
-        if (r.status === 429) throw sysError('SRV_RATE', TEXT.SRV_RATE, meta);
-        if (r.status === 504) throw sysError('SRV_TIMEOUT', TEXT.SRV_TIMEOUT, meta);
-        if (r.status === 502 || r.status === 503) throw sysError('SRV_UNAVAILABLE', TEXT.SRV_UNAVAILABLE, meta);
-        // без отметки Vercel в ответе — это прислал кто-то по дороге
-        if (!vid) {
-          throw sysError('NET_FOREIGN', TEXT.NET_FOREIGN,
+        if (r.status === 413) throw fail('SRV_TOO_LARGE', TEXT.SRV_TOO_LARGE, meta);
+        if (r.status === 429) throw fail('SRV_RATE', TEXT.SRV_RATE, meta);
+        if (r.status === 504) throw fail('SRV_TIMEOUT', TEXT.SRV_TIMEOUT, meta);
+        if (r.status === 502 || r.status === 503) throw fail('SRV_UNAVAILABLE', TEXT.SRV_UNAVAILABLE, meta);
+        // без отметки Vercel и без версии нашего сервера — это прислал кто-то по дороге
+        if (!vid && !ver) {
+          throw fail('NET_FOREIGN', TEXT.NET_FOREIGN,
             meta + ' · ' + (ctype || 'без типа') + ' · ' + body.slice(0, 200).replace(/\s+/g, ' '));
         }
-        if (r.status >= 400) throw sysError('SRV_HTTP', httpText(r.status), meta + ' · ' + body.slice(0, 200).replace(/\s+/g, ' '));
-        throw sysError('APP_BAD_JSON', TEXT.APP_BAD_JSON, meta + ' · ' + body.slice(0, 200).replace(/\s+/g, ' '));
+        if (r.status >= 400) throw fail('SRV_HTTP', httpText(r.status), meta + ' · ' + body.slice(0, 200).replace(/\s+/g, ' '));
+        throw fail('APP_BAD_JSON', TEXT.APP_BAD_JSON, meta + ' · ' + body.slice(0, 200).replace(/\s+/g, ' '));
       });
     });
   }

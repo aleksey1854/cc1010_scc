@@ -9,6 +9,10 @@ User=a1010
 WorkingDirectory=/opt/a1010/app
 Environment=HOST=127.0.0.1
 Environment=NODE_ENV=production
+# У сервера нет IPv6, а Node по умолчанию соединяется «наперегонки» по всем
+# адресам базы и даёт каждому 250 мс: до Франкфурта бывает дольше, и вход
+# падал с ETIMEDOUT (14.10, 11:56). Только IPv4 и обычное ожидание (8 с в db.js).
+Environment="NODE_OPTIONS=--dns-result-order=ipv4first --no-network-family-autoselection"
 ExecStart=/usr/bin/node --env-file=/opt/a1010/.env scripts/dev-server.js 3000
 Restart=always
 RestartSec=2

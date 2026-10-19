@@ -1508,6 +1508,19 @@ const R = (fn, ...a) => api.call(fn, a);
   };
   chk('выход чистит поля чек-листа — брошенная правка не становится черновиком',
     /clearEvalFields\(\)/.test(fnBody('resetState')) && /evEditBar/.test(fnBody('clearEvalFields')));
+  // Подсказка графика рисуется внутри холста: длинное название пункта
+  // срезало краем (19.10, «Мои частые ошибки» у оператора). Переносим.
+  let wrapOut = null, wrapOk = false;
+  try {
+    const wl = new Function('function wrapLines(text, max) ' + fnBody('wrapLines') + '; return wrapLines;')();
+    const long = 'Информация по товару или услуге/решение вопроса клиента/корректность действий по алгоритму';
+    wrapOut = wl(long, 30);
+    wrapOk = wrapOut.length > 1 && wrapOut.every(l => l.length <= 30) && wrapOut.join(' ').replace(/\/ /g, '/') === long;
+  } catch (e) { wrapOut = e.message; }
+  chk('длинная подпись в подсказке графика переносится по ширине', wrapOk, wrapOut);
+  chk('  у всех графиков', /title: tooltipTitle/.test(fnBody('chartBase')) &&
+    ['drawLineChart', 'drawBarChartV'].every(f => /title: tooltipTitle/.test(fnBody(f))));
+
   chk('возврат черновика не продлевает ему срок',
     /if \(draftRestoring\) return/.test(fnBody('draftSave')) &&
     /clearTimeout\(draftTimer\)/.test(fnBody('draftRestore')) && /draftRestoring = true/.test(fnBody('draftRestore')));

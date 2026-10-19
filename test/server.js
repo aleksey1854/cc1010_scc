@@ -96,6 +96,10 @@ function req(port, method, path, parts) {
   chk('  лишние поля отброшены (пароль, вложенный мусор)', !('password' in c) && c.net && !('evil' in c.net), c);
   chk('  последних вызовов — не больше 8', Array.isArray(c.trail) && c.trail.length === 8, c.trail && c.trail.length);
   chk('  нужное сохранено', c.host === 'a1010.ru' && c.pv === 'abc1234' && c.ms === 40000 && c.net.rtt === 150, c);
+  // повтор той же записи (ответ на прошлую отправку потерялся) — один раз
+  const again = await api.call('logClientErrors', [token, [item], { ip: '203.0.113.7' }]);
+  const copies = await db.one(`SELECT count(*)::int n FROM site_errors WHERE detail = $1`, [mark]);
+  chk('повтор той же записи не дублируется в журнале', again.saved === 1 && copies.n === 1, [again, copies.n]);
   await db.q(`DELETE FROM site_errors WHERE detail = $1`, [mark]);
 
   // медленный ответ сервера — в журнал, чтобы отличать сервер от сети

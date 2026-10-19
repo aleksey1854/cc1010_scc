@@ -14,7 +14,7 @@
 | nginx: TLS, сжатие, 80 → 443 | `/etc/nginx/sites-available/a1010` ← `nginx-a1010.conf` |
 | Сертификат Let's Encrypt | `/etc/letsencrypt/live/a1010.ru`, продление — `certbot.timer` |
 | Выкатка main раз в минуту | `a1010-deploy.timer` → `/opt/a1010/deploy.sh` ← `deploy.sh` |
-| Настройки (DATABASE_URL) | `/opt/a1010/.env`, права 600 |
+| Настройки (DATABASE_URL, PG_POOL_MAX=15) | `/opt/a1010/.env`, права 600 |
 | Журналы | `journalctl -u a1010-app`, `journalctl -t a1010-deploy`, `/var/log/nginx/a1010-access.log` |
 
 Вход: `ssh -i ~/.ssh/cloudru_ed25519 a1010@45.151.31.60` (только ключ).
@@ -22,3 +22,7 @@
 **Откат на Vercel**, если сервер подвёл: вернуть в DNS a1010.ru две A-записи
 76.76.21.21 и 216.198.79.1 (делает IT). Схема «пересылка на Vercel» лежит в
 `/opt/a1010/rollback/` — но через неё Vercel показывает свою проверку.
+
+**Пул соединений с базой — 15**, а не 3, как было для Vercel: там каждый запрос
+шёл отдельным процессом, а здесь все люди идут через один. При трёх 19.10
+запросы ждали свободного соединения по 8–11 с и падали «нет связи с базой».

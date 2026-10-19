@@ -810,6 +810,16 @@ const R = (fn, ...a) => api.call(fn, a);
   const pr = plan.rows.find(r => r.operator === OP[0]);
   chk('200 × 2% = 4', pr.plan === 4, pr);
   chk('прослушано 1, осталось 3', pr.done === 1 && pr.left === 3, pr);
+  // Оценка ДЦ — не плановая прослушка ФСС: у Кузьминой (ИНВ-ДЦ) она закрыла
+  // план, и стояло «готово», хотя звонок ФСС никто не слушал (Даниил, 19.10)
+  const dcPlan = await R('saveEvaluation', { pin: qcT,
+    meta: { ...META, reqId: '', callDate: plan.period.from, callTime: '18:40', phone: '79164449901', dc: true },
+    answers: ans, comments: {} });
+  chk('оценка ДЦ в периоде плана сохранена', dcPlan.success === true, dcPlan.error);
+  const pr2 = (await R('getListeningPlan', qcT, DATE)).rows.find(r => r.operator === OP[0]);
+  chk('  в «Прослушано» плана ФСС не идёт', pr2.done === pr.done && pr2.left === pr.left, [pr, pr2]);
+  chk('  но видна рядом отдельно («+1 ДЦ»)', pr2.dc === (pr.dc || 0) + 1, [pr.dc, pr2.dc]);
+  if (dcPlan.success) await R('deleteEvaluation', qcT, dcPlan.id);
   // оператор видит свою строку выгрузки и только её
   const myPlan = await R('getMyUploadPlan', opT, DATE);
   chk('оператор видит свой план выгрузки', myPlan.success === true, myPlan.error);

@@ -5982,6 +5982,35 @@
     if (cap) cap.textContent = String(label || '').replace(/,\s*%$/, '');
   }
 
+  // Подсказка рисуется внутри холста, и длинное название пункта («Информация
+  // по товару или услуге/решение вопроса клиента/…») шире самого графика —
+  // его срезало краем (19.10, кабинет оператора). Режем на строки по словам
+  // и косым чертам под ширину графика; у всех графиков одинаково.
+  function wrapLines(text, max) {
+    const parts = [];
+    String(text == null ? '' : text).split(' ').forEach(function (w) {
+      const bits = w.split('/');
+      bits.forEach(function (b, i) { parts.push(i < bits.length - 1 ? b + '/' : b); });
+    });
+    const lines = [];
+    let cur = '';
+    parts.forEach(function (p) {
+      if (p === '') return;
+      const sep = cur && !/\/$/.test(cur) ? ' ' : '';
+      if (cur && (cur + sep + p).length > max) { lines.push(cur); cur = p; }
+      else cur = cur + sep + p;
+    });
+    if (cur) lines.push(cur);
+    return lines;
+  }
+  function tooltipTitle(items) {
+    if (!items || !items.length) return '';
+    const w = items[0].chart && items[0].chart.width ? items[0].chart.width : 300;
+    // не шире половины графика с небольшим: подсказке нужно место, чтобы
+    // встать у столбца, а не упереться в край
+    return wrapLines(items[0].label, Math.max(18, Math.floor(w * 0.55 / 7.5)));
+  }
+
   function chartBase(extra) {
     return Object.assign({
       responsive: true, maintainAspectRatio: false,
@@ -5990,7 +6019,8 @@
         legend: { display: false },
         tooltip: {
           displayColors: false, padding: 10, caretPadding: 8,
-          backgroundColor: 'rgba(18,23,34,.92)', titleFont: { size: 12 }, bodyFont: { size: 13 }
+          backgroundColor: 'rgba(18,23,34,.92)', titleFont: { size: 12 }, bodyFont: { size: 13 },
+          callbacks: { title: tooltipTitle }
         }
       }
     }, extra || {});
@@ -6038,7 +6068,7 @@
           tooltip: {
             displayColors: false, padding: 10, caretPadding: 8,
             backgroundColor: 'rgba(18,23,34,.92)',
-            callbacks: { label: function (c) { return label + ': ' + pct2(c.parsed.y); } }
+            callbacks: { title: tooltipTitle, label: function (c) { return label + ': ' + pct2(c.parsed.y); } }
           }
         }
       })
@@ -6095,7 +6125,7 @@
           tooltip: {
             displayColors: false, padding: 10,
             backgroundColor: 'rgba(18,23,34,.92)',
-            callbacks: { label: function (c) { return label + ': ' + pct2(c.parsed.y); } }
+            callbacks: { title: tooltipTitle, label: function (c) { return label + ': ' + pct2(c.parsed.y); } }
           }
         }
       })

@@ -532,6 +532,12 @@
   /* Кнопки в последней колонке не рвём по словам: лучше прокрутка, чем
      обрезанное «Изменит». */
   .table-wrapper td:last-child{ white-space:nowrap; }
+  /* Журнал: ошибкам — место. Ячейку сжимало до ~110px, на живых данных
+     таблица вылезала за экран, и правый край ошибок уходил под закреплённые
+     кнопки (19.10). Кнопки переносятся в две строки, но сами не рвутся. */
+  .table-wrapper td.col-errs{ min-width:220px; max-width:420px; }
+  .table-wrapper td.col-wrap{ white-space:normal; min-width:96px; }
+  .col-wrap .btn-small{ white-space:nowrap; margin:2px; }
   /* Многоколоночные отчёты набираем плотнее — иначе на ноутбуке они
      не влезают и приходится возить таблицу вбок. */
   .table-dense table{ font-size:13px; }
@@ -5715,7 +5721,7 @@
       }
       if (!r.rows.length) { box.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Оценок нет</p></div>'; return; }
       // m-cards: на телефоне строка журнала — карточка, без прокрутки вбок
-      let html = '<div class="table-wrapper table-dense m-cards"><table><thead><tr><th>Дата звонка</th><th>Дата прослушки</th><th>Оператор</th><th>Группа</th><th>СКК</th><th>Телефон</th><th>Длительность</th><th>Тематика</th><th>Подтематика</th><th>Качество</th><th>Ошибки</th><th class="col-actions"></th></tr></thead><tbody>';
+      let html = '<div class="table-wrapper table-dense m-cards"><table><thead><tr><th>Звонок / прослушка</th><th>Оператор</th><th>СКК</th><th>Телефон</th><th>Длитель&shy;ность</th><th>Тематика</th><th>Качество</th><th class="col-errs">Ошибки</th><th class="col-actions col-wrap"></th></tr></thead><tbody>';
       r.rows.forEach(function (e) {
         // замечания к пунктам без ошибки — после ошибок, своим цветом:
         // при 100% стояло «без ошибок», а замечание было не найти (Даниил, 19.10)
@@ -5748,19 +5754,23 @@
         const edit = canEditEval
           ? '<button class="btn-small btn-warn" title="Изменить оценку по апелляции" onclick="editEvaluation(\'' + e.id + '\')"><i class="fas fa-pen-to-square"></i> Правка</button> '
           : '';
-        html += '<tr><td data-l="Звонок" style="white-space:nowrap;">' + e.callDate + '</td>' +
-          // сама дата не переносится, а «отправлен …» — может: без этого
-          // столбец был вдвое шире и выталкивал кнопки за край окна
-          '<td data-l="Прослушка" style="color:var(--muted);"><span style="white-space:nowrap;">' + (e.checkedDate || '—') + '</span>' +
+        // Дата прослушки — под датой звонка, группа — под оператором: отдельными
+        // столбцами они раздували журнал шире экрана, и правый край «Ошибок»
+        // уходил под закреплённые кнопки (19.10). Сами даты не переносятся.
+        html += '<tr><td data-l="Звонок"><span style="white-space:nowrap;">' + e.callDate + '</span>' +
+            '<div class="hint">прослушан ' + (e.checkedDate || '—') + '</div>' +
             (e.sentDate ? '<div class="hint">отправлен ' + e.sentDate + '</div>' : '') + '</td>' +
-          '<td class="m-op" data-l="Оператор">' + e.operator + '</td><td data-l="Группа">' + e.group + '</td><td data-l="СКК">' + e.qc + '</td>' +
+          '<td class="m-op" data-l="Оператор">' + escHtml(e.operator) + (e.group ? '<div class="hint">' + escHtml(e.group) + '</div>' : '') + '</td>' +
+          '<td data-l="СКК">' + escHtml(e.qc) + '</td>' +
           '<td data-l="Телефон" style="white-space:nowrap;">' + (e.phone || '—') + '</td>' +
           // «Длит: » в каждой строке лишнее — это и так колонка длительности
           '<td data-l="Длительность">' + (e.criterion ? escHtml(String(e.criterion).replace(/^Длит:\s*/i, '')) : '—') + '</td>' +
-          '<td data-l="Тематика">' + (e.topic || '—') + '</td><td data-l="Подтематика">' + (e.sub || '—') + '</td>' +
+          // тематика и подтематика — в одной ячейке: отдельным столбцом они
+          // теснили «Ошибки», и их край уходил под кнопки (19.10)
+          '<td data-l="Тематика">' + escHtml(e.topic || '—') + (e.sub ? '<div class="hint">' + escHtml(e.sub) + '</div>' : '') + '</td>' +
           '<td class="m-q" data-l="Качество"><strong style="color:' + scoreColorHex(e.score) + '">' + pct2(e.score) + '</strong>' + flags + '</td>' +
-          '<td class="m-wide" data-l="Ошибки" style="max-width:420px;">' + errs + '</td>' +
-          '<td class="col-actions m-wide" style="white-space:nowrap;">' + appeal + edit + sent + del +
+          '<td class="m-wide col-errs" data-l="Ошибки">' + errs + '</td>' +
+          '<td class="col-actions col-wrap m-wide">' + appeal + edit + sent + del +
           // та же стрелка, что у всех «Скачать» в отчётах: значок Excel
           // не читался как скачивание (Арыстан, 14.10)
           '<button class="btn-small btn-dl" title="Скачать чек-лист" aria-label="Скачать чек-лист" onclick="downloadEval(\'' + e.id + '\')"><i class="fas fa-download"></i></button>' +

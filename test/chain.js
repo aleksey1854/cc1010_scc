@@ -175,6 +175,20 @@ const R = (fn, ...a) => api.call(fn, a);
     card.answers.B3P1 === 'Положительно', card.answers.B3P1);
   chk('оператору карточка закрыта', (await R('getEvaluationCard', opT, cEv.id)).success === false);
 
+  // Замечание к «Положительно» видно без открытия чек-листа — в журнале и
+  // у оператора, — но ошибкой не считается (Даниил, 19.10: при 100% стояло
+  // «без ошибок», а замечание пряталось внутри)
+  const jRow = (await R('getJournal', qcT, { operator: OP2[0] })).rows.find(r => r.id === cEv.id);
+  chk('журнал: замечание к «Положительно» видно',
+    jRow && (jRow.remarks || []).some(f => f.comment === 'поздоровался, но тихо' && /\S/.test(f.text)), jRow && jRow.remarks);
+  chk('  и не попало в ошибки', jRow && !jRow.failed.some(f => f.comment === 'поздоровался, но тихо'), jRow && jRow.failed);
+  const op2T = (await R('login', OP2[3], OP2[4])).token;
+  const op2Ev = (await R('getMyEvaluations', op2T)).evaluations.find(e => e.id === cEv.id);
+  chk('оператор видит замечание у себя',
+    op2Ev && (op2Ev.remarks || []).some(f => f.comment === 'поздоровался, но тихо'), op2Ev && op2Ev.remarks);
+  chk('  в «Мои частые ошибки» оно не идёт',
+    !(await R('getMyEvaluations', op2T)).fails.some(f => op2Ev && (op2Ev.remarks || []).some(r => r.text === f.text)));
+
   // агломерация: округ из списка или своя — сохраняется ровно выбранная
   for (const [agg, tm, ph] of [['Урал', '14:30', '79165550101'], ['Казахстан', '14:35', '79165550102']]) {
     const a = await R('saveEvaluation', { pin: qcT, meta: { ...META, reqId: '', callTime: tm, phone: ph, agg },

@@ -655,6 +655,8 @@
   .fail-call .fc-score.bad{ color:var(--bad-ink); background:var(--bad-bg); }
   .fail-tag{ display:inline-block; background:var(--bad-bg); color:#a52020; border-radius:8px; padding:4px 10px; font-size:12px; font-weight:500; margin:3px 4px 3px 0; }
   .fail-tag.minor{ background:var(--mid-bg); color:#9a6206; }
+  /* замечание к пункту без ошибки — не тревожным цветом */
+  .fail-tag.note-tag{ background:var(--accent-soft); color:var(--accent-ink); }
   .all-pass{ color:var(--good-ink); font-weight:600; font-size:13px; }
 
   /* ===== ЧЕК-ЛИСТ v2 (единый белый блок) ===== */
@@ -2614,13 +2616,20 @@
           e.failed.forEach(function (f) {
             const chip = f.critical ? 'fail-tag' : 'fail-tag minor';
             html += '<div style="margin:6px 0;">' +
-              '<span class="' + chip + '">' + (f.critical ? '✕' : '!') + ' ' + f.text + ' — ' + f.result.toLowerCase() + '</span>' +
-              (f.comment ? '<div style="margin:4px 0 0 4px;color:var(--ink-2);font-size:13px;"><i class="fas fa-comment"></i> ' + f.comment + '</div>' : '') +
+              '<span class="' + chip + '">' + (f.critical ? '✕' : '!') + ' ' + escHtml(f.text) + ' — ' + escHtml(f.result.toLowerCase()) + '</span>' +
+              (f.comment ? '<div style="margin:4px 0 0 4px;color:var(--ink-2);font-size:13px;"><i class="fas fa-comment"></i> ' + escHtml(f.comment) + '</div>' : '') +
             '</div>';
           });
           html += '</div>';
         } else if (!e.violation && !e.complaint) {
           html += '<div class="all-pass"><i class="fas fa-check"></i> Ошибок нет</div>';
+        }
+        // замечания к пунктам без ошибки: оператору тоже важно их видеть
+        if ((e.remarks || []).length) {
+          html += '<div style="margin-top:8px;">' + e.remarks.map(function (f) {
+            return '<div style="margin:6px 0;"><span class="fail-tag note-tag">' + escHtml(f.text) + ' — замечание</span>' +
+              '<div style="margin:4px 0 0 4px;color:var(--ink-2);font-size:13px;"><i class="fas fa-comment"></i> ' + escHtml(f.comment) + '</div></div>';
+          }).join('') + '</div>';
         }
         html += '</div>';
       });
@@ -5689,9 +5698,15 @@
       // m-cards: на телефоне строка журнала — карточка, без прокрутки вбок
       let html = '<div class="table-wrapper table-dense m-cards"><table><thead><tr><th>Дата звонка</th><th>Дата прослушки</th><th>Оператор</th><th>Группа</th><th>СКК</th><th>Телефон</th><th>Длительность</th><th>Тематика</th><th>Подтематика</th><th>Качество</th><th>Ошибки</th><th class="col-actions"></th></tr></thead><tbody>';
       r.rows.forEach(function (e) {
-        const errs = e.failed.length
+        // замечания к пунктам без ошибки — после ошибок, своим цветом:
+        // при 100% стояло «без ошибок», а замечание было не найти (Даниил, 19.10)
+        const notes = (e.remarks || []).map(function (f) {
+          return '<div style="margin:2px 0;"><span class="fail-tag note-tag" title="' + escHtml(f.result) + ', но с замечанием">' +
+            escHtml(f.text) + '</span><span style="color:var(--muted);font-size:12px;"> — ' + escHtml(f.comment) + '</span></div>';
+        }).join('');
+        const errs = (e.failed.length
           ? e.failed.map(function (f) { return '<div style="margin:2px 0;"><span class="fail-tag' + (f.critical ? '' : ' minor') + '">' + escHtml(f.text) + '</span>' + (f.comment ? '<span style="color:var(--muted);font-size:12px;"> — ' + escHtml(f.comment) + '</span>' : '') + '</div>'; }).join('')
-          : '<span style="color:var(--good-ink);font-weight:600;">без ошибок</span>';
+          : '<span style="color:var(--good-ink);font-weight:600;">без ошибок</span>') + notes;
         const flags = (e.violation ? ' <span class="fail-tag">НС</span>' : '') + (e.complaint ? ' <span class="fail-tag">ПЖ</span>' : '') + (e.isComplaint && !e.complaint ? ' <span class="fail-tag nj-tag" title="чек-лист по неподтверждённой жалобе: в качество не идёт">НЖ</span>' : '') + (e.complaintSource ? ' <span class="fail-tag src-tag" title="от кого жалоба">' + (e.complaintSource === 'Заказчик' ? 'от заказчика' : e.complaintSource === 'Клиент' ? 'от клиента' : escHtml(e.complaintSource)) + '</span>' : '') + (e.gratitude ? ' <span class="fail-tag minor">★</span>' : '') + (e.controlCall ? ' <span class="fail-tag kz-tag" title="контрольный звонок заказчика">КЗ</span>' : '') + (e.dc ? ' <span class="fail-tag dc-tag" title="звонок по проекту ДЦ">ДЦ</span>' : '');
         // дату отправки вносят только у чек-листов по жалобе — их
         // оценивают одним днём, а отправляют другим

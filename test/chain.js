@@ -1549,6 +1549,15 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('  у всех графиков', /title: tooltipTitle/.test(fnBody('chartBase')) &&
     ['drawLineChart', 'drawBarChartV'].every(f => /title: tooltipTitle/.test(fnBody(f))));
 
+  // Журнал шире экрана — правый край «Ошибок» уходил под закреплённые
+  // кнопки (19.10): ошибкам — минимальная ширина, кнопки переносятся,
+  // подтематика/группа/дата прослушки — второй строкой, а не столбцами
+  const jHead = (html.match(/<th>Звонок \/ прослушка<\/th>[^']*/) || [''])[0];
+  chk('журнал: «Ошибки» не уходят под кнопки',
+    /td\.col-errs\{ min-width:\d+px/.test(html) && /td\.col-wrap\{ white-space:normal/.test(html) &&
+    /class="m-wide col-errs"/.test(html) && /col-actions col-wrap/.test(html) &&
+    jHead !== '' && !/<th>Подтематика<\/th>|<th>Группа<\/th>|<th>Дата прослушки<\/th>/.test(jHead), jHead.slice(0, 200));
+
   // длинное замечание в однострочном поле уезжало за край (19.10)
   chk('замечание в чек-листе — многострочное поле, растёт под текст',
     /class="ev-cmt grow"/.test(fnBody('renderChecklist')) && /textarea/.test(fnBody('renderChecklist')) &&

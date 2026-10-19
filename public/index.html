@@ -681,6 +681,8 @@
   .ev-opt.on-no{ background:#eceff5; border-color:var(--border-strong); color:#6b7585; }
   .ev-cmt{ width:100%; margin-top:8px; padding:8px 11px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; font-family:inherit; outline:none; }
   .ev-cmt:focus{ border-color:var(--accent); }
+  /* поле, которое растёт под текст: длинное замечание уезжало за край строки */
+  textarea.grow{ display:block; resize:none; overflow:hidden; line-height:1.4; min-height:36px; }
 
   .ev-sticky{ position:sticky; bottom:12px; z-index:40; display:flex; align-items:center; gap:18px; flex-wrap:wrap;
     background:var(--surface); border:1px solid var(--border-strong); border-radius:var(--radius); box-shadow:0 6px 26px rgba(18,23,34,.14); padding:14px 20px; margin-bottom:16px; }
@@ -4218,9 +4220,11 @@
         // по ссылке, чтобы форма не превращалась в стену из полей.
         const isErr = (cur === V.NEG || cur === V.DBT);
         if (isErr || evComments[it.id] || evCmtOpen[it.id]) {
-          html += '<input type="text" class="ev-cmt" id="c_' + it.id + '" placeholder="' +
-                  (isErr ? 'Комментарий к ошибке (увидит оператор)' : 'Замечание к пункту (увидит оператор)') + '" value="' +
-                  (evComments[it.id] || '').replace(/"/g, '&quot;') + '" oninput="evComments[\'' + it.id + '\']=this.value">';
+          // многострочное и растёт под текст: в однострочном длинный
+          // комментарий уезжал за край и его было не перечитать (19.10)
+          html += '<textarea class="ev-cmt grow" rows="1" id="c_' + it.id + '" placeholder="' +
+                  (isErr ? 'Комментарий к ошибке (увидит оператор)' : 'Замечание к пункту (увидит оператор)') +
+                  '" oninput="evComments[\'' + it.id + '\']=this.value">' + escHtml(evComments[it.id] || '') + '</textarea>';
         } else {
           html += '<button type="button" class="ev-addcmt" onclick="openCmt(\'' + it.id + '\')">+ замечание</button>';
         }
@@ -4228,7 +4232,20 @@
       html += '</div>';
     });
     document.getElementById('evChecklist').innerHTML = html;
+    growAll(document.getElementById('evChecklist'));
   }
+
+  // Поля «растут под текст» (textarea.grow): высота — по содержимому.
+  function autoGrow(el) {
+    el.style.height = 'auto';
+    el.style.height = (el.scrollHeight + 3) + 'px';
+  }
+  function growAll(root) {
+    (root || document).querySelectorAll('textarea.grow').forEach(autoGrow);
+  }
+  document.addEventListener('input', function (e) {
+    if (e.target && e.target.matches && e.target.matches('textarea.grow')) autoGrow(e.target);
+  });
 
   function openCmt(id) {
     evCmtOpen[id] = true;
@@ -5465,8 +5482,8 @@
             (b.answeredAt ? ', ' + h(b.answeredAt) : '') + '</span></div>' : '');
         if (r.canAnswer) {
           html += '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">' +
-            '<input type="text" class="bug-answer" placeholder="Комментарий (необязательно)" ' +
-              'style="flex:1;min-width:200px;padding:8px 10px;border:1.5px solid var(--border-strong);border-radius:8px;font-family:inherit;font-size:13px;">' +
+            '<textarea class="bug-answer grow" rows="1" placeholder="Комментарий (необязательно)" ' +
+              'style="flex:1;min-width:200px;padding:8px 10px;border:1.5px solid var(--border-strong);border-radius:8px;font-family:inherit;font-size:13px;"></textarea>' +
             '<button class="btn-small" data-st="in_work">В работу</button>' +
             '<button class="btn-small" data-st="fixed">Исправлено</button>' +
             '<button class="btn-small btn-danger" data-st="declined">Отклонить</button>' +

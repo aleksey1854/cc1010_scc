@@ -466,7 +466,8 @@ const R = (fn, ...a) => api.call(fn, a);
   // ДЦ идёт только в свой отчёт: снимем, как всё выглядит до ДЦ-оценки
   const rgoB = (await R('getRgoDashboard', rgoT, 'all')).summary.callsChecked;
   const orgB = (await R('getOrgDashboard', mgrT, 'all')).summary.callsChecked;
-  const topB = JSON.stringify((await R('getTopicsReport', mgrT, 'all')).rows);
+  const topSum = rows => rows.reduce((a, r) => a + r.count, 0);
+  const topB = topSum((await R('getTopicsReport', mgrT, 'all')).rows);
   const myQB = (await R('getMyQuality', opT, DATE, DATE)).total;
 
   const dcAns = { ...ans, B2P1: 'Положительно' };
@@ -547,7 +548,10 @@ const R = (fn, ...a) => api.call(fn, a);
   // смешивало ФСС и ДЦ
   chk('ДЦ не идёт в качество группы в кабинете РГО', (await R('getRgoDashboard', rgoT, 'all')).summary.callsChecked === rgoB);
   chk('  и в аналитику дивизиона', (await R('getOrgDashboard', mgrT, 'all')).summary.callsChecked === orgB);
-  chk('  и в тематики', JSON.stringify((await R('getTopicsReport', mgrT, 'all')).rows) === topB);
+  // а тематики считают все чек-листы — и ДЦ (Даниил, 19.10: «ДЦ, ФСС, ПЖ и НЖ»):
+  // с начала шага добавились два чек-листа ДЦ — плановый и по жалобе
+  const topA = topSum((await R('getTopicsReport', mgrT, 'all')).rows);
+  chk('тематики считают и ДЦ: оба новых чек-листа ДЦ вошли', topA === topB + 2, [topB, topA]);
   chk('  и в «Моё качество» оператора', (await R('getMyQuality', opT, DATE, DATE)).total === myQB);
 
   // ДЦ по неподтверждённой жалобе (НЖ): в отчёте ДЦ видна, в среднее не идёт
@@ -1534,6 +1538,11 @@ const R = (fn, ...a) => api.call(fn, a);
   chk('длинная подпись в подсказке графика переносится по ширине', wrapOk, wrapOut);
   chk('  у всех графиков', /title: tooltipTitle/.test(fnBody('chartBase')) &&
     ['drawLineChart', 'drawBarChartV'].every(f => /title: tooltipTitle/.test(fnBody(f))));
+
+  // длинное замечание в однострочном поле уезжало за край (19.10)
+  chk('замечание в чек-листе — многострочное поле, растёт под текст',
+    /class="ev-cmt grow"/.test(fnBody('renderChecklist')) && /textarea/.test(fnBody('renderChecklist')) &&
+    !/type="text" class="ev-cmt"/.test(html) && /scrollHeight/.test(fnBody('autoGrow')));
 
   chk('возврат черновика не продлевает ему срок',
     /if \(draftRestoring\) return/.test(fnBody('draftSave')) &&

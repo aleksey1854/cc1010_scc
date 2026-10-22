@@ -1507,12 +1507,16 @@ const R = (fn, ...a) => api.call(fn, a);
     const PD = '2026-08-20';
     const opA = creds.find(x => x[2] === 'operator' && x[1] === 'ИНВ-1')[0];
     const evBefore = (await db.one(`SELECT count(*)::int n FROM evaluations`)).n;
-    const im = await R('importAcceptedCalls', qcT, PD, opA + ';150');
+    // токен первого СКК тут уже погас (ему раньше сменили пароль) — свежий вход другого
+    const qc2 = creds.filter(x => x[2] === 'qc')[1];
+    const qc2T = (await R('login', qc2[3], qc2[4])).token;
+    const im = await R('importAcceptedCalls', qc2T, PD, opA + ';150');
     chk('план на отдельный день загружен', im.success === true, im.error);
-    chk('СКК очистить план не может', (await R('clearListeningPlan', qcT, PD)).success === false);
+    const byQc = await R('clearListeningPlan', qc2T, PD);
+    chk('СКК очистить план не может', byQc.success === false && /прав|доступ/i.test(byQc.error || ''), byQc);
     const cl = await R('clearListeningPlan', sqcT, PD);
     chk('ССКК очищает план', cl.success === true && cl.removed === 1, cl);
-    const after = await R('getListeningPlan', qcT, PD);
+    const after = await R('getListeningPlan', qc2T, PD);
     chk('  статистики за день больше нет', after.success && after.noData === true, after.noData);
     chk('  оценки не тронуты', (await db.one(`SELECT count(*)::int n FROM evaluations`)).n === evBefore);
     chk('  в журнале действий — кто и что очистил',

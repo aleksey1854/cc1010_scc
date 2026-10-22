@@ -1500,6 +1500,26 @@ const R = (fn, ...a) => api.call(fn, a);
     chk('  РГО дважды одновременно ставит дату приёмки — встаёт одна', hRes.filter(r => r.success).length === 1, hRes.map(r => r.error || 'ok'));
   }
 
+  head('ШАГ 10а. ОЧИСТИТЬ ПЛАН');
+  // СКК залил не тот файл или не на тот день — ССКК очищает план и грузит
+  // заново (Даниил, 22.10). Кнопка только у ССКК и админа.
+  {
+    const PD = '2026-08-20';
+    const opA = creds.find(x => x[2] === 'operator' && x[1] === 'ИНВ-1')[0];
+    const evBefore = (await db.one(`SELECT count(*)::int n FROM evaluations`)).n;
+    const im = await R('importAcceptedCalls', qcT, PD, opA + ';150');
+    chk('план на отдельный день загружен', im.success === true, im.error);
+    chk('СКК очистить план не может', (await R('clearListeningPlan', qcT, PD)).success === false);
+    const cl = await R('clearListeningPlan', sqcT, PD);
+    chk('ССКК очищает план', cl.success === true && cl.removed === 1, cl);
+    const after = await R('getListeningPlan', qcT, PD);
+    chk('  статистики за день больше нет', after.success && after.noData === true, after.noData);
+    chk('  оценки не тронуты', (await db.one(`SELECT count(*)::int n FROM evaluations`)).n === evBefore);
+    chk('  в журнале действий — кто и что очистил',
+      !!(await db.one(`SELECT 1 FROM audit_log WHERE event = 'План очищен' AND details LIKE $1`, [PD + '%'])));
+    chk('пустой день очищать нечего', (await R('clearListeningPlan', sqcT, PD)).success === false);
+  }
+
   head('ШАГ 11. ИНТЕРФЕЙС ПЕРЕДАЁТ ТОКЕН');
   // Сервер тут проверяли прямыми вызовами с токеном, а кнопка смены
   // пароля в интерфейсе токен не передавала — и отвечала «Не выполнен

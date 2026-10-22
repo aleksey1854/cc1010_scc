@@ -1194,6 +1194,8 @@
           <span id="planPct" style="color:var(--muted);font-size:13px;"></span>
           <span id="planPeriod" class="plan-period"></span>
           <button class="btn-filter" style="margin-left:auto;" onclick="openImport()"><i class="fas fa-upload"></i> Загрузить статистику дня</button>
+          <!-- только ССКК и администратору: у СКК её нет, чтобы план не стёрли случайно -->
+          <button class="btn-filter btn-quiet hidden" id="planClearBtn" style="color:var(--bad-ink);" onclick="clearPlan()"><i class="fas fa-eraser"></i> Очистить план</button>
         </div>
         <!-- та же памятка, что у операторов: сколько выгружать и какой длительности -->
         <details class="memo">
@@ -3749,6 +3751,8 @@
         return;
       }
       showPlanNote(r);
+      const me = JSON.parse(sessionStorage.getItem('user') || '{}');
+      document.getElementById('planClearBtn').classList.toggle('hidden', r.noData || ['sqc', 'admin'].indexOf(me.role) < 0);
       renderUploadMemo(null, 'planMemo');
       planLatest = r.latestStat || '';
       renderPlanPeriod(r.noData ? null : r.period);
@@ -3934,6 +3938,20 @@
     return d.toLocaleDateString('sv', { timeZone: 'Europe/Moscow' });
   };
   const ruDay = function (iso) { return iso ? iso.split('-').reverse().join('.') : ''; };
+
+  // Залили не тот файл или не на тот день — ССКК очищает план и грузит заново
+  // (Даниил, 22.10). Оценки и заявки остаются: это работа, а не план.
+  function clearPlan() {
+    const d = document.getElementById('planDate').value;
+    if (!d) return;
+    if (!confirm('Очистить план за ' + formatDate(d) + '?\n\nУберутся загруженная статистика, период звонков и отметки «в работе».\n' +
+                 'Оценки и заявки останутся. После этого статистику можно загрузить заново.')) return;
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.success) { toast(r.error); return; }
+      toast(r.message, 'ok');
+      loadPlan(false);
+    }).clearListeningPlan(sessionStorage.getItem('token'), d);
+  }
 
   function openImport() {
     // на сегодня план уже есть — значит, грузят на завтра
